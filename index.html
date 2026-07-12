@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cosmos — your CMO</title>
+<meta name="description" content="Introducing Cosmos, your CMO. Runs your marketing, skips the busywork. Try free for a month.">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0A0B;
+    --panel:#0F0F11;
+    --fg:#FAFAFA;
+    --dim:#8F9099;
+    --faint:#55565E;
+    --line:#1C1D21;
+    --green:#CDA6F2;
+    --red:#5A5B63;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--green);color:#000}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  .mono{font-family:'Geist Mono',monospace}
+  .label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:40;background:rgba(10,10,11,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:960px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .logo i{width:8px;height:8px;background:var(--green);display:inline-block}
+  .nav-r{display:flex;gap:20px;align-items:center}
+  .nav-r a{color:var(--dim);text-decoration:none;font-size:13.5px}
+  .nav-r a:hover{color:var(--fg)}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:#000;text-decoration:none;
+    font-weight:500;font-size:13.5px;padding:8px 16px;border-radius:6px;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn .kbd{font-family:'Geist Mono',monospace;font-size:11px;background:rgba(0,0,0,.12);padding:1px 5px;border-radius:3px}
+
+  /* agents grid */
+  .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}
+  @media(max-width:960px){.agrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.agrid{grid-template-columns:1fr}}
+  .acell{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;transition:border-color .15s,background .15s}
+  .acell:hover{border-color:rgba(205,166,242,.4);background:#131316}
+  .ahead{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+  .aic{--ac:#CDA6F2;color:var(--ac);display:inline-grid;place-items:center;width:36px;height:36px;flex:0 0 auto;background:color-mix(in srgb,var(--ac) 11%,transparent);border:1px solid color-mix(in srgb,var(--ac) 22%,transparent);border-radius:9px}
+  .aic svg{width:17px;height:17px;display:block}
+  .acell h3{font-size:15px;font-weight:600;margin:0}
+  .acell p{font-size:13.5px;color:var(--dim)}
+  .soon{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:var(--dim);border:1px solid var(--line);background:var(--bg);border-radius:5px;padding:2px 7px;margin-left:2px}
+
+  /* comparison */
+  .cmp{margin-top:44px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cmp-row{display:grid;grid-template-columns:1.4fr 1fr .8fr;padding:14px 20px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
+  .cmp-row:last-child{border-bottom:0}
+  .cmp-row span:nth-child(2){color:var(--dim)}
+  .cmp-head{font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);background:var(--panel)}
+  .cmp-head span:nth-child(2){color:var(--faint)}
+  .cmp .hi{color:var(--green);text-align:right;font-weight:500}
+  .cmp .na{color:var(--faint);font-style:italic}
+  .cmp-total{background:var(--panel);font-weight:600;font-size:15px}
+  .cmp-total .strike{text-decoration:line-through;color:var(--faint);font-weight:400}
+  .cmp-total .hi{font-size:17px}
+  @media(max-width:560px){.cmp-row{grid-template-columns:1.2fr .9fr .6fr;padding:12px 14px;font-size:12.5px}}
+
+  /* hero */
+  header{padding:96px 0 72px;text-align:center;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+  #dots{position:absolute;inset:0;width:100%;height:100%;z-index:0;
+    -webkit-mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%);
+    mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%)}
+  .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:100px;
+    padding:5px 12px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--dim)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+  h1{margin-top:28px;font-size:clamp(38px,5.4vw,64px);line-height:1.02;letter-spacing:-.04em;font-weight:600}
+  h1 .name{font-family:'Geist Mono',monospace;font-weight:500;letter-spacing:-.02em}
+  h1 .dim{color:var(--faint)}
+  .sub{margin:22px auto 0;max-width:34em;color:var(--dim);font-size:16.5px}
+  .cta-row{margin-top:32px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .btn-lg{padding:12px 22px;font-size:14.5px;border-radius:8px}
+  .btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+  .btn-ghost:hover{opacity:1;background:var(--panel)}
+  .under{margin-top:16px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+
+  /* terminal — the centerpiece */
+  .term{max-width:760px;margin:64px auto 0;text-align:left;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 24px 60px -30px rgba(0,0,0,.9)}
+  .term-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .term-bar b{width:10px;height:10px;border-radius:50%;background:#232428}
+  .term-bar span{margin-left:8px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
+  .term-body{padding:18px 20px 22px;font-family:'Geist Mono',monospace;font-size:13px;line-height:2.05;min-height:216px}
+  .ln{white-space:pre-wrap}
+  .p{color:var(--green)}
+  .skip{color:var(--red);text-decoration:line-through}
+  .c{color:var(--faint)}
+  .do{color:var(--green)}
+  .cursor{display:inline-block;width:7px;height:14px;background:var(--fg);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){.cursor,.pill i{animation:none}}
+
+  /* features */
+  section{padding:88px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:clamp(24px,3vw,34px);letter-spacing:-.03em;font-weight:600;line-height:1.15}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);margin-top:48px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  @media(max-width:780px){.grid{grid-template-columns:1fr}}
+  .cell{padding:26px;border-right:1px solid var(--line);background:var(--panel)}
+  .cell:last-child{border-right:0}
+  @media(max-width:780px){.cell{border-right:0;border-bottom:1px solid var(--line)}.cell:last-child{border-bottom:0}}
+  .cell h3{font-size:15px;font-weight:600;margin:14px 0 6px}
+  .cell p{font-size:13.5px;color:var(--dim)}
+
+  /* pricing */
+  .price{margin-top:48px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+    padding:36px;display:flex;justify-content:space-between;align-items:center;gap:32px;flex-wrap:wrap}
+  .amt{font-size:44px;font-weight:600;letter-spacing:-.04em}
+  .amt small{font-size:14px;color:var(--dim);font-weight:400;letter-spacing:0}
+  .was{color:var(--faint);text-decoration:line-through;font-size:20px;margin-right:8px;font-weight:400}
+  .inc{margin-top:10px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--dim)}
+
+  footer{padding:32px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+  a:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-in">
+    <span class="logo"><img src="logo.png" alt="cosmos.ai" style="height:16px;image-rendering:pixelated"></span>
+    <div class="nav-r">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="app.html" class="btn">Try free <span class="kbd">1 mo</span></a>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <canvas id="dots" aria-hidden="true"></canvas>
+  <div class="wrap" style="position:relative;z-index:2">
+    <span class="pill"><i></i>now in early access</span>
+    <h1>Introducing <span class="name">cosmos</span><span class="dim"> —</span><br>your CMO.</h1>
+    <p class="sub">Paste your URL. Cosmos learns your product, runs SEO, AI search, Reddit and content daily — and only pings you for what actually moves your numbers.</p>
+    <div class="cta-row">
+      <a href="app.html" class="btn btn-lg">Try free for a month</a>
+      <a href="#how" class="btn btn-lg btn-ghost">See how it works</a>
+    </div>
+    <p class="under">no card · no setup · one URL</p>
+
+    <div class="term" role="img" aria-label="Terminal showing Cosmos skipping low-value marketing tasks and recommending one fix">
+      <div class="term-bar"><b></b><b></b><b></b><span>cosmos · daily run</span></div>
+      <div class="term-body" id="tbody"></div>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <p class="label">How it works</p>
+    <h2 style="margin-top:14px">Three steps. No dashboard babysitting.</h2>
+    <div class="grid">
+      <div class="cell">
+        <span class="label" style="color:var(--green)">01</span>
+        <h3>Connect</h3>
+        <p>One URL. Cosmos reads your site, GA4, and Search Console to learn what your business actually is and where revenue comes from.</p>
+      </div>
+      <div class="cell">
+        <span class="label" style="color:var(--green)">02</span>
+        <h3>Run</h3>
+        <p>Agents work every channel daily — SEO, AI-search visibility, Reddit, content. Everything drafts in the background.</p>
+      </div>
+      <div class="cell">
+        <span class="label" style="color:var(--green)">03</span>
+        <h3>Approve</h3>
+        <p>Cosmos skips low-value work with a reason attached and sends you the few things worth doing. Nothing ships without you.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="wrap">
+    <div style="text-align:center">
+      <p class="label">The team</p>
+      <h2 style="margin-top:14px">Every agent a marketing team would hire.<br>You stay in control.</h2>
+      <p class="sub">Agents do the heavy lifting. Nothing ships without your sign-off.</p>
+    </div>
+    <div class="agrid">
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#3ECF8E"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z"/></svg></span><h3>Influencer Agent</h3></div><p>Finds creators who match your audience and drafts the outreach.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#FF4500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="14" rx="8" ry="5.6"/><circle cx="19.5" cy="9.5" r="1.6"/><path d="M12 8.4l1.2-4.2 4 1.1" stroke-linecap="round"/><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" stroke-linecap="round"/></svg></span><h3>Reddit Agent</h3></div><p>Surfaces high-intent threads and drafts replies for your review.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#CDA6F2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.2"/><path d="M15.6 15.6L20 20"/><path d="M8.5 11h5M11 8.5v5"/></svg></span><h3>SEO Agent</h3></div><p>Keyword opportunities, drafted into posts and pages for approval.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#9A6AE8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z"/><path d="M14.5 6.5l3 3"/></svg></span><h3>Writer Agent</h3></div><p>Long-form articles and copy in your brand voice.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#FAFAFA"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z"/></svg></span><h3>X (Twitter) Agent</h3></div><p>Post and thread drafts you refine and ship yourself.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#0A66C2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="3.5"/><circle cx="8" cy="8.3" r="1.25" fill="currentColor" stroke="none"/><path d="M8 11.2v6" stroke-width="2" stroke-linecap="round"/><path d="M12.2 17.2v-6" stroke-width="2" stroke-linecap="round"/><path d="M12.2 13.6a2.5 2.5 0 0 1 5 0v3.6" stroke-width="2" stroke-linecap="round"/></svg></span><h3>LinkedIn Agent</h3></div><p>Professional drafts for you to personalise and share.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#FF6600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="3.5"/><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" stroke-width="1.9" stroke-linecap="round"/></svg></span><h3>Hacker News Agent</h3></div><p>Spots the right moments and drafts comments worth posting.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#5A8DE8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><ellipse cx="12" cy="12" rx="3.6" ry="8.4"/><path d="M3.8 12h16.4"/></svg></span><h3>GEO Agent</h3></div><p>Gets your brand cited in ChatGPT and AI Overviews.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#3A8DE8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5"/></svg></span><h3>Coding Agent</h3></div><p>Ships technical SEO fixes as real code changes.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#E8843A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="4.8" width="18.4" height="14.4" rx="3"/><path d="M10.2 9.2l4.6 2.8-4.6 2.8V9.2z" fill="currentColor" stroke="none"/></svg></span><h3>UGC Videos Agent</h3></div><p>Guided briefs and AI clips, ready for social and ads.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#4285F4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8L20 20"/><path d="M8.6 13.2v-2M11 13.2V8.8M13.4 13.2v-3.1"/></svg></span><h3>Google Search Console</h3></div><p>Live search data reveals ranking opportunities.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#E8B45A"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="13.5" width="4.2" height="6.5" rx="1.4"/><rect x="9.9" y="8.5" width="4.2" height="11.5" rx="1.4"/><rect x="15.8" y="4" width="4.2" height="16" rx="1.4"/></svg></span><h3>Google Analytics</h3></div><p>GA4 signals show what's working and where to focus.</p></div>
+      <div class="acell"><div class="ahead"><span class="aic" style="--ac:#5AC8E8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10.2 13.8a4.2 4.2 0 0 0 6.2.4l2.8-2.8a4.2 4.2 0 0 0-5.9-5.9l-1.5 1.5"/><path d="M13.8 10.2a4.2 4.2 0 0 0-6.2-.4l-2.8 2.8a4.2 4.2 0 0 0 5.9 5.9l1.5-1.5"/></svg></span><h3>Link Broker Agent</h3><span class="soon">SOON</span></div><p>High-quality backlink building, on autopilot.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <p class="label">The math</p>
+    <h2 style="margin-top:14px">What cosmos replaces vs. what it costs.</h2>
+    <div class="cmp">
+      <div class="cmp-row cmp-head"><span>What needs doing</span><span>Hiring it out</span><span class="hi">With cosmos</span></div>
+      <div class="cmp-row"><span>Marketing generalist</span><span>$5,000/mo</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>SEO agency</span><span>$4,000/mo</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>Content writer</span><span>$1,500/mo</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>Social media manager</span><span>$1,500/mo</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>Community &amp; Reddit growth</span><span>$1,000/mo</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>AI-search visibility (GEO)</span><span class="na">not offered</span><span class="hi">✓</span></div>
+      <div class="cmp-row"><span>Saying no to busywork</span><span class="na">rare</span><span class="hi">✓</span></div>
+      <div class="cmp-row cmp-total"><span>Total per month</span><span class="strike">$13,000+</span><span class="hi">$49/mo</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" style="border-bottom:0">
+  <div class="wrap">
+    <p class="label">Pricing</p>
+    <h2 style="margin-top:14px">One plan. First month free.</h2>
+    <div class="price">
+      <div>
+        <div class="amt"><span class="was">$99</span>$49<small> /mo after your free month</small></div>
+        <p class="inc">all channels · unlimited drafts · cancel anytime</p>
+      </div>
+      <a href="app.html" class="btn btn-lg">Try free for a month</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px">
+    <span style="display:flex;align-items:center;gap:8px"><img src="logo.png" alt="cosmos.ai" style="height:12px;image-rendering:pixelated;opacity:.7"></span>
+    <span style="display:flex;gap:18px;align-items:center">
+      <a href="#how" style="color:var(--faint);text-decoration:none">how it works</a>
+      <a href="#pricing" style="color:var(--faint);text-decoration:none">pricing</a>
+      <a href="mailto:hello@cosmos.ai" style="color:var(--faint);text-decoration:none">hello@cosmos.ai</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+/* Typed terminal. Types once, leaves the result on screen. */
+const lines = [
+  {t:'$ cosmos run --daily', cls:'p', d:24},
+  {t:'scanning: site, ga4, search-console … done', cls:'c', d:10},
+  {t:'skip  write 4 articles for "best crm"   # won\'t rank', cls:'skip', d:10},
+  {t:'skip  daily linkedin posts              # buyers aren\'t there', cls:'skip', d:10},
+  {t:'skip  reply to 14 reddit threads        # 11 low-intent', cls:'skip', d:10},
+  {t:'do →  fix pricing page. 61% bounce in 9s. draft attached.', cls:'do', d:16},
+];
+const body = document.getElementById('tbody');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+if(reduce){
+  body.innerHTML = lines.map(l=>`<div class="ln ${l.cls}">${esc(l.t)}</div>`).join('');
+}else{
+  let li=0;
+  function next(){
+    if(li>=lines.length){ body.insertAdjacentHTML('beforeend','<div class="ln"><span class="cursor"></span></div>'); return; }
+    const l = lines[li++];
+    const div = document.createElement('div');
+    div.className = 'ln '+l.cls;
+    body.appendChild(div);
+    let i=0;
+    (function type(){
+      div.textContent = l.t.slice(0,++i);
+      if(i<l.t.length) setTimeout(type, l.d);
+      else setTimeout(next, 260);
+    })();
+  }
+  setTimeout(next, 500);
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+/* Dot-matrix background — tiny squares pulsing on a slow drifting wave. Very light. */
+const dcv = document.getElementById('dots'), dg = dcv.getContext('2d');
+let DW, DH, GAP, dots = [];
+function dsize(){
+  const r = dcv.parentElement.getBoundingClientRect();
+  DW = dcv.width  = r.width  * devicePixelRatio;
+  DH = dcv.height = r.height * devicePixelRatio;
+  GAP = 26 * devicePixelRatio;
+  dots = [];
+  for(let y = GAP/2; y < DH; y += GAP)
+    for(let x = GAP/2; x < DW; x += GAP)
+      dots.push({x, y, ph: (x*0.011 + y*0.017)});
+}
+dsize(); addEventListener('resize', dsize);
+
+let heroVisible = true;
+function ddraw(t){
+  if(!reduce && !heroVisible) return; // stop the loop while the hero is off-screen
+  dg.clearRect(0,0,DW,DH);
+  const tt = t * 0.00028;
+  for(const d of dots){
+    // two slow drifting waves -> brightness + size
+    const w = Math.sin(d.x*0.0016 + d.y*0.0011 + tt*2 + d.ph) * 0.5 + 0.5;
+    const w2 = Math.sin(d.y*0.002 - tt*1.4) * 0.5 + 0.5;
+    const b = w * 0.7 + w2 * 0.3;
+    const a = 0.03 + b * 0.10;                    // max ~13% opacity — stays behind the text
+    const s = (1.1 + b * 1.9) * devicePixelRatio; // square size breathes
+    dg.fillStyle = `rgba(250,250,250,${a.toFixed(3)})`;
+    dg.fillRect(d.x - s/2, d.y - s/2, s, s);
+  }
+  if(!reduce) requestAnimationFrame(ddraw);
+}
+new IntersectionObserver(es=>{
+  const was = heroVisible;
+  heroVisible = es[0].isIntersecting;
+  if(!reduce && heroVisible && !was) requestAnimationFrame(ddraw);
+}).observe(dcv.parentElement);
+if(reduce){ ddraw(0); } else { requestAnimationFrame(ddraw); }
+</script>
+</body>
+</html>

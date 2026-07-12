@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cosmos — app</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0A0B; --panel:#0F0F11; --panel2:#131316;
+    --fg:#FAFAFA; --dim:#8F9099; --faint:#55565E;
+    --line:#1C1D21; --acc:#CDA6F2; --green:#3ECF8E; --amberr:#E8B45A; --redd:#E86A6A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif;font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--acc);color:#000}
+  .mono{font-family:'Geist Mono',monospace}
+  .label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  input{font-family:inherit}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#232428;border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ============ ONBOARDING ============ */
+  #onboard{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;position:relative;overflow:hidden}
+  #dots{position:absolute;inset:0;-webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 75%);mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 75%)}
+  .ob-in{position:relative;z-index:2;width:100%;max-width:520px}
+  #onboard h1{margin-top:34px;font-size:clamp(28px,4.4vw,40px);letter-spacing:-.03em;font-weight:600;line-height:1.1}
+  #onboard p.s{margin-top:12px;color:var(--dim);font-size:15px}
+  .urlbox{margin-top:32px;display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px}
+  .urlbox:focus-within{border-color:var(--acc)}
+  .urlbox input{flex:1;background:transparent;border:0;color:var(--fg);font-family:'Geist Mono',monospace;font-size:14px;padding:10px 12px;outline:none}
+  .urlbox input::placeholder{color:var(--faint)}
+  .go{background:var(--fg);color:#000;border:0;border-radius:7px;font-weight:600;font-size:13.5px;padding:0 20px;transition:opacity .15s}
+  .go:hover{opacity:.85}
+  .go:disabled{opacity:.4;cursor:default}
+  .ob-note{margin-top:14px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
+  #progress{margin-top:36px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:'Geist Mono',monospace;font-size:12.5px;line-height:2.1;display:none}
+  #progress .pl{color:var(--dim)}
+  #progress .pl.done{color:var(--green)}
+  #progress .pl .spin{display:inline-block;animation:rot 1s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){#progress .pl .spin{animation:none}}
+
+  /* ============ APP ============ */
+  #app{display:none;height:100svh;flex-direction:column;overflow:hidden}
+
+  /* topbar */
+  .topbar{height:50px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#000;border-bottom:1px solid var(--line)}
+  .tb-l{display:flex;align-items:center;gap:14px}
+  .tb-l img{height:13px;image-rendering:pixelated}
+  .tb-l .sep{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+  .tb-r{display:flex;align-items:center;gap:12px;font-family:'Geist Mono',monospace;font-size:11px;color:var(--dim)}
+  .tb-r .credits{color:var(--acc)}
+  .avatar{width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font-size:10px;color:var(--dim)}
+
+  /* terminal strip */
+  .termstrip{flex:0 0 auto;height:150px;background:#000;border-bottom:1px solid var(--line);overflow:hidden;position:relative}
+  .termstrip .tlog{position:absolute;inset:0;padding:10px 16px;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.85;overflow-y:auto;color:var(--dim)}
+  .tlog .tl-p{color:var(--acc)}
+  .tlog .tl-ok{color:var(--green)}
+  .tlog .tl-dim{color:var(--faint)}
+  .term-toggle{position:absolute;top:6px;right:10px;z-index:2;background:transparent;border:0;color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+  .term-toggle:hover{color:var(--fg)}
+  #app.term-collapsed .termstrip{height:34px}
+  #app.term-collapsed .tlog{overflow:hidden}
+
+  /* dashboard grid */
+  .dash{flex:1;display:grid;grid-template-columns:250px minmax(340px,1fr) 300px 330px;min-height:0}
+  .col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+  .col:last-child{border-right:0}
+  .col-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .col-head .ct{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+  .col-head .ct .ic{color:var(--faint);font-family:'Geist Mono',monospace;font-size:12px}
+  .col-head .ca{display:flex;gap:10px;color:var(--faint);font-size:12px}
+  .col-head .ca button{background:none;border:0;color:var(--faint);font-size:12px}
+  .col-head .ca button:hover{color:var(--fg)}
+  .col-body{flex:1;overflow-y:auto;min-height:0;padding:14px}
+
+  @media(max-width:1180px){
+    .dash{grid-template-columns:1fr 1fr;grid-auto-rows:minmax(320px,48svh);overflow-y:auto}
+    .col{border-bottom:1px solid var(--line)}
+    .col:nth-child(2n){border-right:0}
+  }
+  @media(max-width:720px){
+    #app{height:auto;overflow:visible}
+    .dash{grid-template-columns:1fr;grid-auto-rows:auto;overflow:visible}
+    .col{border-right:0;max-height:none}
+    .col-body{overflow:visible}
+  }
+
+  /* ---- company col ---- */
+  .company-desc{color:var(--dim);font-size:12.5px;line-height:1.65}
+  .docrow{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;text-align:left;padding:7px 8px;border-radius:7px;color:var(--fg);font-size:12.5px;font-weight:500}
+  .docrow:hover{background:var(--panel)}
+  .docrow .di{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+  .docrow .new{margin-left:auto;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--green);border:1px solid rgba(62,207,142,.35);border-radius:4px;padding:1px 6px}
+  .docrow .cnt{margin-left:auto;color:var(--faint);font-size:11px}
+  .comp-row{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12.5px;color:var(--dim)}
+  .comp-row .cdot{width:14px;height:14px;border-radius:4px;display:grid;place-items:center;font-size:8px;font-family:'Geist Mono',monospace}
+  .sect{margin-top:20px}
+  .sect .label{display:block;margin-bottom:8px}
+
+  /* ---- analytics col ---- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 14px;flex:0 0 auto}
+  .tab{background:none;border:0;color:var(--faint);font-size:12.5px;font-weight:500;padding:9px 10px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab:hover{color:var(--fg)}
+  .tab.on{color:var(--fg);border-bottom-color:var(--acc)}
+  .rangebar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .rangebar .rlabel{color:var(--faint);font-size:12px}
+  .pillset{display:flex;gap:6px}
+  .rpill{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:100px;font-size:11.5px;font-weight:500;padding:4px 12px}
+  .rpill.on{background:var(--fg);color:#000;border-color:var(--fg)}
+  .an-h{font-size:14.5px;font-weight:600}
+  .an-s{color:var(--faint);font-size:12px;margin-top:2px}
+  .statgrid{display:flex;align-items:stretch;gap:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:14px;padding:16px 0}
+  .stat{flex:1;text-align:center;padding:0 8px;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:0}
+  .stat .sl{color:var(--faint);font-size:11px}
+  .stat .sv{font-size:22px;font-weight:600;letter-spacing:-.03em;margin-top:2px}
+  .stat .sd{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--green);margin-top:2px}
+  .statfoot{display:flex;gap:18px;justify-content:center;border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:11.5px;color:var(--faint)}
+  .statfoot b{color:var(--dim);font-weight:600}
+  .chartbox{margin-top:8px}
+  .chartbox svg{width:100%;height:150px;display:block}
+  .legend{display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--faint)}
+  .legend i{display:inline-block;width:14px;height:2px;background:var(--acc);vertical-align:middle;margin-right:5px}
+  .legend .l2 i{background:var(--faint);height:0;border-top:2px dashed var(--faint)}
+  .rankrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:12.5px}
+  .rankrow:last-child{border-bottom:0}
+  .rankpos{font-family:'Geist Mono',monospace;font-size:11px;color:var(--acc);background:rgba(205,166,242,.08);border:1px solid rgba(205,166,242,.25);border-radius:5px;padding:2px 7px;min-width:34px;text-align:center}
+  .rankrow .rq{flex:1;color:var(--dim)}
+  .rankrow .rt{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--green)}
+  .placeholder{border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--faint);font-size:12.5px;margin-top:14px}
+
+  /* ---- agents feed ---- */
+  .agent{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;overflow:hidden}
+  .agent-head{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:11px 12px;text-align:left}
+  .agent-head:hover{background:var(--panel2)}
+  .aico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;background:color-mix(in srgb,var(--ac,#CDA6F2) 12%,transparent);border:1px solid color-mix(in srgb,var(--ac,#CDA6F2) 24%,transparent);color:var(--ac,#CDA6F2)}
+  .aico svg{width:14px;height:14px;display:block}
+  .agent-head .an{font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg);font-weight:500}
+  .agent-head .as{color:var(--dim);font-size:12px;margin-top:1px}
+  .agent-head .chev{margin-left:auto;color:var(--faint);font-size:11px;transition:transform .15s}
+  .agent.open .chev{transform:rotate(180deg)}
+  .agent-body{display:none;border-top:1px solid var(--line);padding:6px 12px 10px}
+  .agent.open .agent-body{display:block}
+  .aitem{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .aitem:last-child{border-bottom:0}
+  .aitem .go2{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;color:var(--dim);font-size:11px;padding:3px 10px;white-space:nowrap}
+  .aitem .go2:hover{color:var(--fg);border-color:var(--faint)}
+
+  /* ---- chat col ---- */
+  .chat-body{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+  .msg{max-width:88%;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
+  .msg.ai{background:var(--panel);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;color:#C9CAD1}
+  .msg.me{background:var(--acc);color:#000;align-self:flex-end;border-bottom-right-radius:4px;font-weight:500}
+  .msg-meta{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);align-self:flex-start;margin:2px 2px -6px}
+  .msg-meta.me{align-self:flex-end}
+  .chat-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:10px 12px}
+  .chatbox{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 4px 4px 12px}
+  .chatbox:focus-within{border-color:var(--acc)}
+  .chatbox input{flex:1;background:transparent;border:0;outline:none;color:var(--fg);font-size:12.5px}
+  .chatbox input::placeholder{color:var(--faint)}
+  .send{background:var(--fg);color:#000;border:0;border-radius:7px;width:30px;height:30px;font-weight:600}
+  .send:hover{opacity:.85}
+  .typing{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px;align-self:flex-start;padding:2px}
+
+  /* ---- doc drawer (right slide-over) ---- */
+  .docwrap{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70;display:none}
+  .docwrap.open{display:block}
+  .docpanel{position:absolute;top:0;right:0;bottom:0;width:min(600px,100%);background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .doc-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .doc-head .dt{font-size:15px;font-weight:600;flex:1}
+  .doc-head button{background:none;border:0;color:var(--faint);font-size:13px;padding:4px 6px}
+  .doc-head button:hover{color:var(--fg)}
+  .doc-body{flex:1;overflow-y:auto;padding:22px 24px;font-size:13px;color:#C9CAD1;white-space:pre-wrap;line-height:1.75;font-family:'Geist Mono',monospace}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 18px;font-size:13px;z-index:90;display:none}
+</style>
+</head>
+<body>
+
+<!-- ============ ONBOARDING ============ -->
+<div id="onboard">
+  <canvas id="dots" aria-hidden="true"></canvas>
+  <div class="ob-in">
+    <img src="logo.png" alt="cosmos.ai" style="height:28px;image-rendering:pixelated">
+    <h1>What are we growing?</h1>
+    <p class="s">Paste your website. Cosmos reads it, figures out your positioning, and builds today's plan.</p>
+    <div class="urlbox">
+      <input id="url" type="url" placeholder="https://yourcompany.com" autocomplete="off" spellcheck="false">
+      <button class="go" id="analyze">Analyze →</button>
+    </div>
+    <p class="ob-note">read-only · nothing publishes without you</p>
+    <div id="progress"></div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+
+  <div class="topbar">
+    <div class="tb-l">
+      <img src="logo.png" alt="cosmos.ai">
+      <span class="sep">·</span>
+      <span class="mono" style="font-size:11px;color:var(--dim)">AI CMO Terminal · running daily</span>
+    </div>
+    <div class="tb-r">
+      <span class="credits">∞ credits</span>
+      <span class="avatar" id="avatarInit">–</span>
+    </div>
+  </div>
+
+  <div class="termstrip">
+    <button class="term-toggle" id="termToggle">[–] collapse</button>
+    <div class="tlog" id="tlog"></div>
+  </div>
+
+  <div class="dash">
+
+    <!-- COMPANY -->
+    <div class="col">
+      <div class="col-head">
+        <span class="ct"><span class="ic">▤</span>Company</span>
+        <span class="ca"><button title="Settings" id="resetApp">⚙</button></span>
+      </div>
+      <div class="col-body">
+        <p class="company-desc" id="companyDesc">—</p>
+
+        <div class="sect">
+          <span class="label">Documents</span>
+          <div id="docList"></div>
+        </div>
+
+        <div class="sect">
+          <span class="label">Competitors</span>
+          <div id="compList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="col">
+      <div class="col-head">
+        <span class="ct"><span class="ic">∿</span>Analytics</span>
+      </div>
+      <div class="tabs" id="anTabs">
+        <button class="tab on" data-tab="traffic">Traffic</button>
+        <button class="tab" data-tab="seo">SEO</button>
+        <button class="tab" data-tab="links">Links</button>
+        <button class="tab" data-tab="technical">Technical</button>
+        <button class="tab" data-tab="geo">GEO</button>
+      </div>
+      <div class="col-body" id="anBody"></div>
+    </div>
+
+    <!-- AGENTS FEED -->
+    <div class="col">
+      <div class="col-head">
+        <span class="ct"><span class="ic">≋</span>Agents Feed</span>
+        <span class="ca"><button title="Refresh">↻</button></span>
+      </div>
+      <div class="col-body" id="feedBody"></div>
+    </div>
+
+    <!-- TALK TO AI CMO -->
+    <div class="col">
+      <div class="col-head">
+        <span class="ct"><span class="ic">◍</span>Talk to AI CMO</span>
+      </div>
+      <div class="col-body chat-body" id="chatBody"></div>
+      <div class="chat-foot">
+        <div class="chatbox">
+          <input id="chatIn" placeholder="Ask me anything…" autocomplete="off">
+          <button class="send" id="chatSend" aria-label="Send">↑</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- doc drawer -->
+<div class="docwrap" id="docwrap">
+  <div class="docpanel">
+    <div class="doc-head">
+      <span class="dt" id="docTitle"></span>
+      <button id="docCopy" title="Copy">⧉ copy</button>
+      <button id="docClose" title="Close">✕</button>
+    </div>
+    <div class="doc-body" id="docBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= STATE ================= */
+const S = {
+  url:'', profile:null,
+  agents:[
+    {id:'reddit',  name:'Reddit Agent',    color:'#FF4500', glyph:'r/', sum:'36 opportunities ready',
+      items:[['Thread: "tools for early-stage marketing?" — high intent','Draft reply'],['Thread: "is SEO dead in 2026?" — position cosmos','Draft reply'],['Thread: "AI CMO tools worth it?" — direct match','Draft reply']]},
+    {id:'geo',     name:'GEO Agent',       color:'#5A8DE8', glyph:'✦', sum:'11 citation gaps detected',
+      items:[['Not cited for "ai marketing automation" in ChatGPT','Fix gap'],['Perplexity cites 2 competitors for your core query','Fix gap']]},
+    {id:'seo',     name:'SEO Agent',       color:'#CDA6F2', glyph:'◎', sum:'46 recommendations ready',
+      items:[['12 pages missing meta descriptions','Review'],['Keyword gap: "marketing copilot" — 2.1k/mo, low difficulty','Draft post']]},
+    {id:'x',       name:'X Agent',         color:'#FAFAFA', glyph:'𝕏', sum:'137 ideas ready',
+      items:[['Thread idea: "we skipped 80% of our marketing tasks"','Draft'],['Post: launch-week metrics recap','Draft']]},
+    {id:'articles',name:'Articles Agent',  color:'#9A6AE8', glyph:'≡', sum:'32 topics ready',
+      items:[['"AI CMO vs marketing agency: real math" — outline ready','Open'],['"how to get cited by ChatGPT" — research done','Open']]},
+    {id:'hn',      name:'Hacker News Agent',color:'#FF6600', glyph:'Y', sum:'1 post ready',
+      items:[['Show HN draft: "Cosmos — an AI CMO that says no"','Review']]},
+    {id:'linkedin',name:'LinkedIn Agent',  color:'#0A66C2', glyph:'in', sum:'3 posts ready',
+      items:[['Founder post: why we skip most marketing tasks','Review']]},
+    {id:'ugc',     name:'UGC Videos Agent',color:'#E8843A', glyph:'▶', sum:'1 video · 1 completed',
+      items:[['15s product clip — ready to preview','Preview']]},
+    {id:'infl',    name:'Influencer Campaigns',color:'#3ECF8E', glyph:'★', sum:'Launch your first campaign',
+      items:[['23 creators scored for audience fit','Open list']]},
+  ],
+  docs:[
+    {id:'product',  name:'Product Information', icon:'▤'},
+    {id:'compet',   name:'Competitor Analysis', icon:'▥'},
+    {id:'voice',    name:'Brand Voice',         icon:'✎'},
+    {id:'strategy', name:'Marketing Strategy',  icon:'◎'},
+    {id:'llms',     name:'llms.txt',            icon:'⌥', tag:'new'},
+    {id:'articles', name:'Articles',            icon:'▸', count:'(39)'},
+  ],
+  competitors:[{n:'okara.ai',c:'#E86A3A'},{n:'jasper.ai',c:'#5A8DE8'},{n:'hubspot.com',c:'#E8843A'}],
+  range:'7d', tab:'traffic',
+  chat:[]
+};
+
+/* ================= AI API (proxied through server.py — key never reaches the browser) ================= */
+async function ai(prompt, opts={}){
+  const r = await fetch('/api/generate',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt, url:opts.url||null})
+  });
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok || data.error) throw new Error(data.error||('api '+r.status));
+  return data.text;
+}
+function parseJSON(txt){
+  const clean = txt.replace(/```json|```/g,'').trim();
+  const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
+  return JSON.parse(clean.slice(s, e+1));
+}
+
+/* ================= ONBOARDING ================= */
+const steps = ['reading your site','building product profile','checking channels','scoring opportunities','writing today’s plan'];
+document.getElementById('analyze').addEventListener('click', analyze);
+document.getElementById('url').addEventListener('keydown', e=>{ if(e.key==='Enter') analyze(); });
+
+async function analyze(){
+  let u = document.getElementById('url').value.trim();
+  if(!u) return;
+  if(!/^https?:\/\//.test(u)) u = 'https://'+u;
+  S.url = u;
+  const btn = document.getElementById('analyze'); btn.disabled = true;
+  const prog = document.getElementById('progress');
+  prog.style.display='block';
+  prog.innerHTML = steps.map((s,i)=>`<div class="pl" id="st${i}"><span class="spin" style="display:none">◐</span><span class="dot0">○</span> ${s}</div>`).join('');
+  const tick = i=>{ const el=document.getElementById('st'+i); if(!el)return;
+    el.querySelector('.dot0').style.display='none'; el.querySelector('.spin').style.display='inline-block'; };
+  const done = i=>{ const el=document.getElementById('st'+i); if(!el)return;
+    el.classList.add('done'); el.querySelector('.spin').style.display='none';
+    el.querySelector('.dot0').style.display='inline'; el.querySelector('.dot0').textContent='●'; };
+
+  try{
+    tick(0); tick(1);
+    const profileTxt = await ai(
+`Analyze the website ${S.url} using the page content above.
+Respond ONLY with JSON, no markdown fences, no preamble:
+{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`, {url:S.url});
+    S.profile = parseJSON(profileTxt);
+    if(S.profile.competitors) S.competitors = S.profile.competitors.slice(0,4).map((n,i)=>({n, c:['#E86A3A','#5A8DE8','#E8843A','#9A6AE8'][i%4]}));
+    done(0); done(1); tick(2); tick(3); done(2); done(3); tick(4); done(4);
+    enterApp();
+  }catch(err){
+    S.profile = {
+      name: hostOf(S.url), oneLiner:'(demo mode — API unreachable)',
+      audience:'early-stage teams', voice:'clear, direct, useful',
+      positioning:'Demo data shown. Re-run analysis when online.',
+      description:'Cosmos is your AI CMO for teams who cannot afford a full marketing department. It researches opportunities, drafts content, and audits technical SEO across Reddit, LinkedIn, X, Hacker News and organic search — with every output queued for human review before anything goes live. It replaces the combined workflow of an SEO agency, a content writer, and a social media manager at a fraction of the cost.'
+    };
+    steps.forEach((_,i)=>done(i));
+    enterApp();
+    toast('Running in demo mode — data is illustrative.');
+  }
+}
+function hostOf(u){ try{return new URL(u).hostname.replace('www.','')}catch{return u} }
+
+function enterApp(){
+  document.getElementById('onboard').style.display='none';
+  const app = document.getElementById('app'); app.style.display='flex';
+  document.getElementById('companyDesc').textContent = S.profile.description || S.profile.positioning || '—';
+  document.getElementById('avatarInit').textContent = (hostOf(S.url)[0]||'c').toUpperCase();
+  renderDocs(); renderCompetitors(); renderAnalytics(); renderFeed(); seedChat(); startTermLog();
+}
+
+/* ================= TERMINAL STRIP ================= */
+const TERM_LINES = [
+  ['tl-p','$ cosmos run --daily'],
+  ['','> [seo] crawling sitemap… 214 pages'],
+  ['','> [seo] scoring keyword gaps against 3 competitors…'],
+  ['','> [reddit] scanning 14 subreddits for buying intent…'],
+  ['','> [geo] querying ChatGPT / Perplexity for brand citations…'],
+  ['','> [articles] researching 4 topic clusters…'],
+  ['','> [ugc video] applying motion synthesis and temporal coherence…'],
+  ['','> [ugc video] encoding output stream…'],
+  ['','> [ugc video] video generation complete — ready to preview'],
+  ['','> fetching analytics…'],
+  ['','> loading documents and initializing AI chat…'],
+  ['tl-ok','✓ AI CMO initialized — 9 agents reporting'],
+];
+function startTermLog(){
+  const el = document.getElementById('tlog');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduced){ el.innerHTML = TERM_LINES.map(l=>`<div class="${l[0]}">${esc(l[1])}</div>`).join(''); return; }
+  let i=0;
+  (function next(){
+    if(i>=TERM_LINES.length){ el.insertAdjacentHTML('beforeend','<div><span class="tl-p">cosmos@ai:~$</span> <span style="display:inline-block;width:7px;height:12px;background:var(--fg);vertical-align:-2px"></span></div>'); el.scrollTop=el.scrollHeight; return; }
+    const l = TERM_LINES[i++];
+    el.insertAdjacentHTML('beforeend',`<div class="${l[0]}">${esc(l[1])}</div>`);
+    el.scrollTop = el.scrollHeight;
+    setTimeout(next, 260 + Math.random()*300);
+  })();
+}
+document.getElementById('termToggle').onclick = function(){
+  const app = document.getElementById('app');
+  app.classList.toggle('term-collapsed');
+  this.textContent = app.classList.contains('term-collapsed') ? '[+] expand' : '[–] collapse';
+};
+
+/* ================= COMPANY COL ================= */
+function renderDocs(){
+  document.getElementById('docList').innerHTML = S.docs.map(d=>`
+    <button class="docrow" data-doc="${d.id}">
+      <span class="di">${d.icon}</span>${d.name}
+      ${d.tag?`<span class="new">NEW</span>`:''}${d.count?`<span class="cnt">${d.count}</span>`:''}
+    </button>`).join('');
+  document.querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>openDoc(b.dataset.doc));
+}
+function renderCompetitors(){
+  document.getElementById('compList').innerHTML = S.competitors.map(c=>`
+    <div class="comp-row"><span class="cdot" style="background:${c.c}22;border:1px solid ${c.c}55;color:${c.c}">●</span>${esc(c.n)}</div>`).join('');
+}
+document.getElementById('resetApp').onclick = ()=>{ if(confirm('Analyze a different website? Current session data will be cleared.')) location.reload(); };
+
+/* ================= ANALYTICS COL ================= */
+const CHART = {
+  '7d':{ labels:['7/5','7/6','7/7','7/8','7/9','7/10','7/11'],
+    visits:[2100,3050,2700,1900,2050,2350,2600], clicks:[420,510,480,390,410,460,520],
+    saw:'82.4K', sawD:'+12.3%', clicked:'3.9K', clickedD:'+48.2%', visited:'15.1K', visitedD:'+21.4%' },
+  '30d':{ labels:['6/12','6/17','6/22','6/27','7/2','7/7','7/11'],
+    visits:[1500,1800,2400,2200,2900,2600,3100], clicks:[280,330,450,410,520,480,560],
+    saw:'301K', sawD:'+9.8%', clicked:'13.2K', clickedD:'+31.5%', visited:'54.7K', visitedD:'+17.9%' },
+};
+document.getElementById('anTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); S.tab = t.dataset.tab; renderAnalytics();
+});
+function chartSVG(d){
+  const W=560,H=150,P=10;
+  const max = Math.max(...d.visits)*1.15;
+  const pt = (arr,i)=>[P+i*(W-2*P)/(arr.length-1), H-P-(arr[i]/max)*(H-2*P)];
+  const line = arr=>arr.map((_,i)=>pt(arr,i).map(n=>n.toFixed(1)).join(',')).join(' ');
+  const area = `${P},${H-P} ${line(d.visits)} ${W-P},${H-P}`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Traffic over time">
+    <polygon points="${area}" fill="rgba(205,166,242,.10)"/>
+    <polyline points="${line(d.visits)}" fill="none" stroke="#CDA6F2" stroke-width="2"/>
+    <polyline points="${line(d.clicks)}" fill="none" stroke="#55565E" stroke-width="1.5" stroke-dasharray="4 4"/>
+    ${d.visits.map((_,i)=>{const[x,y]=pt(d.visits,i);return `<circle cx="${x}" cy="${y}" r="2.6" fill="#CDA6F2"/>`}).join('')}
+  </svg>
+  <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9.5px;color:var(--faint);padding:0 2px">${d.labels.map(l=>`<span>${l}</span>`).join('')}</div>`;
+}
+function renderAnalytics(){
+  const el = document.getElementById('anBody');
+  if(S.tab!=='traffic'){
+    const msg = {
+      seo:['46 recommendations from the SEO agent','12 missing meta descriptions · 8 thin pages · 26 keyword gaps'],
+      links:['Backlink profile','142 referring domains · 12 new this week · 0 toxic'],
+      technical:['Technical health: 94/100','2 slow pages · 1 redirect chain · sitemap OK'],
+      geo:['AI search visibility','Cited in 4/15 tracked prompts · 11 citation gaps'],
+    }[S.tab];
+    el.innerHTML = `<div class="placeholder"><b style="color:var(--dim)">${msg[0]}</b><br><span class="mono" style="font-size:11px">${msg[1]}</span><br><br>full ${S.tab} view — coming in beta</div>`;
+    return;
+  }
+  const d = CHART[S.range];
+  el.innerHTML = `
+    <div class="rangebar">
+      <span class="rlabel">Showing</span>
+      <span class="pillset">
+        <button class="rpill ${S.range==='7d'?'on':''}" data-range="7d">Last 7 days</button>
+        <button class="rpill ${S.range==='30d'?'on':''}" data-range="30d">Last 30 days</button>
+      </span>
+    </div>
+
+    <div class="an-h">How people found you</div>
+    <div class="an-s">From a search result to a visit on your site</div>
+    <div class="statgrid" style="flex-direction:column">
+      <div style="display:flex">
+        <div class="stat"><div class="sl">Saw you in Google</div><div class="sv">${d.saw}</div><div class="sd">↗ ${d.sawD}</div></div>
+        <div class="stat"><div class="sl">Clicked through</div><div class="sv">${d.clicked}</div><div class="sd">↗ ${d.clickedD}</div></div>
+        <div class="stat"><div class="sl">Visited your site</div><div class="sv">${d.visited}</div><div class="sd">↗ ${d.visitedD}</div></div>
+      </div>
+      <div class="statfoot"><span><b>4.7%</b> click rate</span><span><b>4.1×</b> from other channels</span></div>
+    </div>
+
+    <div class="sect">
+      <div class="an-h">Traffic over time</div>
+      <div class="an-s">Visits vs. search clicks — last ${S.range==='7d'?'7':'30'} days</div>
+      <div class="chartbox">${chartSVG(d)}</div>
+      <div class="legend"><span><i></i>Visits</span><span class="l2"><i></i>Search clicks</span></div>
+    </div>
+
+    <div class="sect">
+      <div class="an-h">How well you're ranking</div>
+      <div class="an-s">Your position in Google and the queries bringing traffic</div>
+      <div style="margin-top:10px">
+        <div class="rankrow"><span class="rankpos">#3</span><span class="rq">ai cmo tool</span><span class="rt">↑2</span></div>
+        <div class="rankrow"><span class="rankpos">#7</span><span class="rq">ai marketing agents</span><span class="rt">↑5</span></div>
+        <div class="rankrow"><span class="rankpos">#11</span><span class="rq">marketing automation for startups</span><span class="rt">↑1</span></div>
+        <div class="rankrow"><span class="rankpos">#14</span><span class="rq">seo agency alternative</span><span class="rt">new</span></div>
+      </div>
+    </div>`;
+  el.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{ S.range=b.dataset.range; renderAnalytics(); });
+}
+
+/* ================= AGENTS FEED ================= */
+const ICONS = {
+  reddit:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="14" rx="8" ry="5.6"/><circle cx="19.5" cy="9.5" r="1.6"/><path d="M12 8.4l1.2-4.2 4 1.1" stroke-linecap="round"/><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" stroke-linecap="round"/></svg>',
+  geo:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><ellipse cx="12" cy="12" rx="3.6" ry="8.4"/><path d="M3.8 12h16.4"/></svg>',
+  seo:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.2"/><path d="M15.6 15.6L20 20"/><path d="M8.5 11h5M11 8.5v5"/></svg>',
+  x:       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z"/></svg>',
+  articles:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z"/><path d="M14.5 6.5l3 3"/></svg>',
+  hn:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="3.5"/><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" stroke-width="1.9" stroke-linecap="round"/></svg>',
+  linkedin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="3.5"/><circle cx="8" cy="8.3" r="1.25" fill="currentColor" stroke="none"/><path d="M8 11.2v6" stroke-width="2" stroke-linecap="round"/><path d="M12.2 17.2v-6" stroke-width="2" stroke-linecap="round"/><path d="M12.2 13.6a2.5 2.5 0 0 1 5 0v3.6" stroke-width="2" stroke-linecap="round"/></svg>',
+  ugc:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="4.8" width="18.4" height="14.4" rx="3"/><path d="M10.2 9.2l4.6 2.8-4.6 2.8V9.2z" fill="currentColor" stroke="none"/></svg>',
+  infl:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z"/></svg>',
+};
+function renderFeed(){
+  document.getElementById('feedBody').innerHTML = S.agents.map(a=>`
+    <div class="agent" id="ag-${a.id}">
+      <button class="agent-head" data-agent="${a.id}">
+        <span class="aico" style="--ac:${a.color}">${ICONS[a.id]||a.glyph}</span>
+        <span><div class="an">${a.name}</div><div class="as">${a.sum}</div></span>
+        <span class="chev">▾</span>
+      </button>
+      <div class="agent-body">
+        ${a.items.map(([t,act],i)=>`<div class="aitem"><span>${esc(t)}</span><button class="go2" data-work="${a.id}:${i}">${act}</button></div>`).join('')}
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('[data-agent]').forEach(b=>b.onclick=()=>document.getElementById('ag-'+b.dataset.agent).classList.toggle('open'));
+  document.querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>workItem(b.dataset.work, b));
+}
+async function workItem(key, btn){
+  const [aid, idx] = key.split(':');
+  const a = S.agents.find(x=>x.id===aid);
+  const item = a.items[+idx][0];
+  btn.textContent='…'; btn.disabled=true;
+  let body;
+  try{
+    body = await ai(
+`You are the ${a.name} inside cosmos, the AI CMO for ${S.profile.name} (${S.profile.oneLiner}). Voice: ${S.profile.voice}.
+Work item: ${item}
+Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
+  }catch{
+    body = `[demo draft — API unreachable]\n\n${a.name} · deliverable for:\n"${item}"\n\nRe-run when online for a real draft. In production this drawer holds the full drafted reply/post/fix, ready to copy or approve.`;
+  }
+  btn.textContent='View'; btn.disabled=false;
+  openDocRaw(item, body);
+  chatPush('ai', `Draft ready — "${item.slice(0,48)}…" is in the drawer. Nothing publishes until you approve.`);
+}
+
+/* ================= DOCS ================= */
+const DOC_DEMO = {
+  product:`# Product Information\n\nProduct: cosmos — the AI CMO\nOne-liner: paste your URL; cosmos runs your marketing and skips the busywork.\n\nCore loop:\n1. Reads your site, GA4 and Search Console\n2. Nine agents scan channels daily (SEO, GEO, Reddit, X, LinkedIn, HN, articles, UGC video, influencers)\n3. Low-value tasks get skipped with a reason attached\n4. The 1-2 things worth doing arrive drafted, for your approval\n\nPricing: $49/mo after a free month.`,
+  compet:`# Competitor Analysis\n\n[1] okara.ai — direct competitor, AI CMO category\n    · strengths: 10+ agents, strong social proof, $99/mo\n    · weakness: does everything; no prioritization story\n    · our angle: cosmos says NO — ruthless skip-list is the wedge\n\n[2] jasper.ai — AI content suite\n    · strengths: brand, enterprise features\n    · weakness: content-only; no strategy or channel execution\n\n[3] hubspot.com — incumbent suite\n    · strengths: distribution, CRM lock-in\n    · weakness: heavy, expensive, needs an operator\n\nPositioning: "the only marketing tool that tells you what NOT to do."`,
+  voice:`# Brand Voice\n\nAdjectives: clear · direct · quietly confident\n\nDo:\n· short declarative sentences\n· concrete numbers over adjectives\n· admit trade-offs plainly\n\nDon't:\n· hype words ("revolutionary", "10x")\n· exclamation marks\n· marketing-speak your buyer would roll eyes at\n\nReference line: "Cosmos skipped 4 tasks today and saved you ~27 hours."`,
+  strategy:`# Marketing Strategy\n\nObjective: 1,000 activated sites in 90 days.\n\nPillars:\n1. GEO first — win citations in ChatGPT/Perplexity for "ai cmo" queries before the category gets crowded\n2. Founder-led content on X + LinkedIn: publish the skip-lists publicly\n3. SEO: own the comparison surface (cosmos vs okara, vs agency, vs hiring)\n4. Reddit: answer high-intent threads with substance, product second\n\nWeekly cadence: 2 articles · 5 X posts · 2 LinkedIn posts · 3 Reddit replies · 1 Show HN when ready.`,
+  llms:`# llms.txt\n\n> generated for AI crawlers — helps ChatGPT, Perplexity and Google AI cite you correctly\n\nsite: cosmos.ai\npurpose: AI CMO — automated marketing strategy and execution for startups\nkey-pages:\n  /            — product overview\n  /pricing     — $49/mo, first month free\n  /how-it-works — connect → run → approve\nfacts:\n  - cosmos runs 9 marketing agents daily\n  - every output requires human approval\n  - it skips low-value tasks and explains why`,
+  articles:`# Articles (39)\n\nPublished (3):\n· "The $13,000/mo marketing stack you don't need" — ranking #14\n· "How AI search actually picks its citations"\n· "We say no to 80% of marketing tasks. Here's the math."\n\nDrafted, awaiting review (4)\nOutlined (12)\nTopic queue (20)\n\nOpen any article from the Articles agent in the feed.`,
+};
+function openDoc(id){
+  const d = S.docs.find(x=>x.id===id);
+  openDocRaw(d.name, DOC_DEMO[id] || '—');
+}
+function openDocRaw(title, body){
+  document.getElementById('docTitle').textContent = title;
+  document.getElementById('docBody').textContent = body;
+  document.getElementById('docwrap').classList.add('open');
+}
+document.getElementById('docClose').onclick = ()=>document.getElementById('docwrap').classList.remove('open');
+document.getElementById('docwrap').addEventListener('click', e=>{ if(e.target.id==='docwrap') e.currentTarget.classList.remove('open'); });
+addEventListener('keydown', e=>{ if(e.key==='Escape') document.getElementById('docwrap').classList.remove('open'); });
+document.getElementById('docCopy').onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(document.getElementById('docBody').textContent); toast('Copied to clipboard'); }
+  catch{ toast('Copy failed — select the text manually'); }
+};
+
+/* ================= CHAT ================= */
+function seedChat(){
+  S.chat = [
+    {who:'ai', text:`Morning. I ran the daily sweep on ${hostOf(S.url)} — 9 agents reported in.`},
+    {who:'ai', text:'Headline: 36 Reddit opportunities, 11 AI-search citation gaps, and one pricing-page fix that beats everything else on expected impact. Start there.'},
+  ];
+  renderChat();
+}
+function renderChat(){
+  const el = document.getElementById('chatBody');
+  el.innerHTML = S.chat.map(m=>`
+    <span class="msg-meta ${m.who==='me'?'me':''}">${m.who==='me'?'you':'AI CMO'}</span>
+    <div class="msg ${m.who}">${esc(m.text)}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function chatPush(who, text){ S.chat.push({who, text}); renderChat(); }
+async function sendChat(){
+  const inp = document.getElementById('chatIn');
+  const q = inp.value.trim(); if(!q) return;
+  inp.value=''; chatPush('me', q);
+  const el = document.getElementById('chatBody');
+  el.insertAdjacentHTML('beforeend','<span class="typing" id="typing">AI CMO is thinking…</span>');
+  el.scrollTop = el.scrollHeight;
+  let reply;
+  try{
+    reply = await ai(
+`You are the AI CMO for ${S.profile.name} — ${S.profile.oneLiner}. Audience: ${S.profile.audience}. Voice: ${S.profile.voice}.
+Today's context: 36 reddit opportunities, 11 AI-search citation gaps, 46 SEO recommendations, pricing page has 61% bounce.
+The founder asks: "${q}"
+Answer in 2-4 short sentences, specific and prioritized. No fluff.`);
+  }catch{
+    reply = 'Demo mode (API unreachable) — but my standing advice: fix the pricing page first, then close the top 3 AI-search citation gaps. Everything else this week is optional.';
+  }
+  document.getElementById('typing')?.remove();
+  chatPush('ai', reply);
+}
+document.getElementById('chatSend').onclick = sendChat;
+document.getElementById('chatIn').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+/* ================= UTIL ================= */
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 2600); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+/* ================= DOT GRID BG (onboarding) ================= */
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dcv=document.getElementById('dots'), dg=dcv.getContext('2d');
+let DW,DH,GAP,pts=[];
+function dsize(){ const r=dcv.parentElement.getBoundingClientRect();
+  DW=dcv.width=r.width*devicePixelRatio; DH=dcv.height=r.height*devicePixelRatio;
+  dcv.style.width=r.width+'px'; dcv.style.height=r.height+'px';
+  GAP=26*devicePixelRatio; pts=[];
+  for(let y=GAP/2;y<DH;y+=GAP)for(let x=GAP/2;x<DW;x+=GAP)pts.push({x,y,ph:x*.011+y*.017}); }
+dsize(); addEventListener('resize',dsize);
+function ddraw(t){ dg.clearRect(0,0,DW,DH); const tt=t*.00028;
+  for(const d of pts){ const w=Math.sin(d.x*.0016+d.y*.0011+tt*2+d.ph)*.5+.5;
+    const w2=Math.sin(d.y*.002-tt*1.4)*.5+.5; const b=w*.7+w2*.3;
+    const a=.03+b*.10, s=(1.1+b*1.9)*devicePixelRatio;
+    dg.fillStyle=`rgba(250,250,250,${a.toFixed(3)})`; dg.fillRect(d.x-s/2,d.y-s/2,s,s); }
+  if(!reduce && document.getElementById('onboard').style.display!=='none') requestAnimationFrame(ddraw); }
+if(reduce) ddraw(0); else requestAnimationFrame(ddraw);
+</script>
+</body>
+</html>
