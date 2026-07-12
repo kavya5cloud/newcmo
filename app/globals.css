@@ -1,0 +1,238 @@
+/* ===== shared base ===== */
+:root{
+  --bg:#0A0A0B; --panel:#0F0F11; --panel2:#131316;
+  --fg:#FAFAFA; --dim:#8F9099; --faint:#55565E;
+  --line:#1C1D21; --acc:#CDA6F2; --amberr:#E8B45A; --redd:#E86A6A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--acc);color:#000}
+.mono{font-family:'Geist Mono',monospace}
+.label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input{font-family:inherit}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#232428;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{opacity:.3}}
+@keyframes blink{50%{opacity:0}}
+
+/* =========================================================
+   LANDING  (scoped under .landing; --green here = lavender)
+   ========================================================= */
+.landing{--green:#CDA6F2;--red:#5A5B63;font-size:15px;line-height:1.6;display:block}
+.landing .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+.landing nav{position:sticky;top:0;z-index:40;background:rgba(10,10,11,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.landing .nav-in{max-width:960px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.landing .logo{font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.landing .nav-r{display:flex;gap:20px;align-items:center}
+.landing .nav-r a{color:var(--dim);text-decoration:none;font-size:13.5px}
+.landing .nav-r a:hover{color:var(--fg)}
+.landing .btn{display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:#000;text-decoration:none;font-weight:500;font-size:13.5px;padding:8px 16px;border-radius:6px;transition:opacity .15s}
+.landing .btn:hover{opacity:.85}
+.landing .btn .kbd{font-family:'Geist Mono',monospace;font-size:11px;background:rgba(0,0,0,.12);padding:1px 5px;border-radius:3px}
+.landing .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}
+@media(max-width:960px){.landing .agrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.landing .agrid{grid-template-columns:1fr}}
+.landing .acell{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;transition:border-color .15s,background .15s}
+.landing .acell:hover{border-color:rgba(205,166,242,.4);background:#131316}
+.landing .ahead{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+.landing .aic{--ac:#CDA6F2;color:var(--ac);display:inline-grid;place-items:center;width:36px;height:36px;flex:0 0 auto;background:color-mix(in srgb,var(--ac) 11%,transparent);border:1px solid color-mix(in srgb,var(--ac) 22%,transparent);border-radius:9px}
+.landing .aic svg{width:17px;height:17px;display:block}
+.landing .acell h3{font-size:15px;font-weight:600;margin:0}
+.landing .acell p{font-size:13.5px;color:var(--dim)}
+.landing .soon{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:var(--dim);border:1px solid var(--line);background:var(--bg);border-radius:5px;padding:2px 7px;margin-left:2px}
+.landing .cmp{margin-top:44px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.landing .cmp-row{display:grid;grid-template-columns:1.4fr 1fr .8fr;padding:14px 20px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
+.landing .cmp-row:last-child{border-bottom:0}
+.landing .cmp-row span:nth-child(2){color:var(--dim)}
+.landing .cmp-head{font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);background:var(--panel)}
+.landing .cmp-head span:nth-child(2){color:var(--faint)}
+.landing .cmp .hi{color:var(--green);text-align:right;font-weight:500}
+.landing .cmp .na{color:var(--faint);font-style:italic}
+.landing .cmp-total{background:var(--panel);font-weight:600;font-size:15px}
+.landing .cmp-total .strike{text-decoration:line-through;color:var(--faint);font-weight:400}
+.landing .cmp-total .hi{font-size:17px}
+@media(max-width:560px){.landing .cmp-row{grid-template-columns:1.2fr .9fr .6fr;padding:12px 14px;font-size:12.5px}}
+.landing header{padding:96px 0 72px;text-align:center;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.landing .dots{position:absolute;inset:0;width:100%;height:100%;z-index:0;-webkit-mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%);mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%)}
+.landing .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:100px;padding:5px 12px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--dim)}
+.landing .pill i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.landing h1{margin-top:28px;font-size:clamp(38px,5.4vw,64px);line-height:1.02;letter-spacing:-.04em;font-weight:600}
+.landing h1 .name{font-family:'Geist Mono',monospace;font-weight:500;letter-spacing:-.02em}
+.landing h1 .hdim{color:var(--faint)}
+.landing .sub{margin:22px auto 0;max-width:34em;color:var(--dim);font-size:16.5px}
+.landing .cta-row{margin-top:32px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.landing .btn-lg{padding:12px 22px;font-size:14.5px;border-radius:8px}
+.landing .btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.landing .btn-ghost:hover{opacity:1;background:var(--panel)}
+.landing .under{margin-top:16px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+.landing .term{max-width:760px;margin:64px auto 0;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 24px 60px -30px rgba(0,0,0,.9)}
+.landing .term-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.landing .term-bar b{width:10px;height:10px;border-radius:50%;background:#232428}
+.landing .term-bar span{margin-left:8px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
+.landing .term-body{padding:18px 20px 22px;font-family:'Geist Mono',monospace;font-size:13px;line-height:2.05;min-height:216px}
+.landing .ln{white-space:pre-wrap}
+.landing .ln.p{color:var(--green)}
+.landing .ln.skip{color:var(--red);text-decoration:line-through}
+.landing .ln.c{color:var(--faint)}
+.landing .ln.do{color:var(--green)}
+.landing .cursor{display:inline-block;width:7px;height:14px;background:var(--fg);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+.landing section{padding:88px 0;border-bottom:1px solid var(--line)}
+.landing h2{font-size:clamp(24px,3vw,34px);letter-spacing:-.03em;font-weight:600;line-height:1.15}
+.landing .grid{display:grid;grid-template-columns:repeat(3,1fr);margin-top:48px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media(max-width:780px){.landing .grid{grid-template-columns:1fr}}
+.landing .cell{padding:26px;border-right:1px solid var(--line);background:var(--panel)}
+.landing .cell:last-child{border-right:0}
+@media(max-width:780px){.landing .cell{border-right:0;border-bottom:1px solid var(--line)}.landing .cell:last-child{border-bottom:0}}
+.landing .cell h3{font-size:15px;font-weight:600;margin:14px 0 6px}
+.landing .cell p{font-size:13.5px;color:var(--dim)}
+.landing .price{margin-top:48px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:36px;display:flex;justify-content:space-between;align-items:center;gap:32px;flex-wrap:wrap}
+.landing .amt{font-size:44px;font-weight:600;letter-spacing:-.04em}
+.landing .amt small{font-size:14px;color:var(--dim);font-weight:400;letter-spacing:0}
+.landing .was{color:var(--faint);text-decoration:line-through;font-size:20px;margin-right:8px;font-weight:400}
+.landing .inc{margin-top:10px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--dim)}
+.landing footer{padding:32px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+@media(prefers-reduced-motion:reduce){.landing .cursor,.landing .pill i{animation:none}}
+
+/* =========================================================
+   APP  (scoped under .appui; --green here = real green)
+   ========================================================= */
+.appui{--green:#3ECF8E;font-size:13.5px;line-height:1.55;display:block}
+.appui .banner{display:flex;align-items:center;gap:10px;justify-content:center;padding:8px 14px;font-family:'Geist Mono',monospace;font-size:11.5px;background:rgba(232,180,90,.1);border-bottom:1px solid rgba(232,180,90,.3);color:var(--amberr)}
+.appui .banner a{color:var(--amberr);text-underline-offset:2px}
+
+.appui .onboard{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;position:relative;overflow:hidden}
+.appui .onboard .dots{position:absolute;inset:0;-webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 75%);mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 75%)}
+.appui .ob-in{position:relative;z-index:2;width:100%;max-width:520px}
+.appui .onboard h1{margin-top:34px;font-size:clamp(28px,4.4vw,40px);letter-spacing:-.03em;font-weight:600;line-height:1.1}
+.appui .onboard p.s{margin-top:12px;color:var(--dim);font-size:15px}
+.appui .urlbox{margin-top:32px;display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px}
+.appui .urlbox:focus-within{border-color:var(--acc)}
+.appui .urlbox input{flex:1;background:transparent;border:0;color:var(--fg);font-family:'Geist Mono',monospace;font-size:14px;padding:10px 12px;outline:none}
+.appui .urlbox input::placeholder{color:var(--faint)}
+.appui .go{background:var(--fg);color:#000;border:0;border-radius:7px;font-weight:600;font-size:13.5px;padding:0 20px;transition:opacity .15s}
+.appui .go:hover{opacity:.85}
+.appui .go:disabled{opacity:.4;cursor:default}
+.appui .ob-note{margin-top:14px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
+.appui .progress{margin-top:36px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:'Geist Mono',monospace;font-size:12.5px;line-height:2.1}
+.appui .progress .pl{color:var(--dim)}
+.appui .progress .pl.done{color:var(--green)}
+.appui .progress .pl .spin{display:inline-block;animation:rot 1s linear infinite}
+
+.appui .appshell{height:100svh;display:flex;flex-direction:column;overflow:hidden}
+.appui .topbar{height:50px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#000;border-bottom:1px solid var(--line)}
+.appui .tb-l{display:flex;align-items:center;gap:14px}
+.appui .tb-l img{height:13px;image-rendering:pixelated}
+.appui .tb-l .sep{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+.appui .tb-r{display:flex;align-items:center;gap:12px;font-family:'Geist Mono',monospace;font-size:11px;color:var(--dim)}
+.appui .tb-r .credits{color:var(--acc)}
+.appui .avatar{width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font-size:10px;color:var(--dim)}
+
+.appui .termstrip{flex:0 0 auto;height:150px;background:#000;border-bottom:1px solid var(--line);overflow:hidden;position:relative}
+.appui .tlog{position:absolute;inset:0;padding:10px 16px;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.85;overflow-y:auto;color:var(--dim)}
+.appui .tlog .tl-p{color:var(--acc)}
+.appui .tlog .tl-ok{color:var(--green)}
+.appui .term-toggle{position:absolute;top:6px;right:10px;z-index:2;background:transparent;border:0;color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+.appui .term-toggle:hover{color:var(--fg)}
+.appui .appshell.term-collapsed .termstrip{height:34px}
+.appui .appshell.term-collapsed .tlog{overflow:hidden}
+
+.appui .dash{flex:1;display:grid;grid-template-columns:250px minmax(340px,1fr) 300px 330px;min-height:0}
+.appui .col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+.appui .col:last-child{border-right:0}
+.appui .col-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.appui .col-head .ct{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.appui .col-head .ct .ic{color:var(--faint);font-family:'Geist Mono',monospace;font-size:12px}
+.appui .col-head .ca{display:flex;gap:10px;color:var(--faint);font-size:12px}
+.appui .col-head .ca button{background:none;border:0;color:var(--faint);font-size:12px}
+.appui .col-head .ca button:hover{color:var(--fg)}
+.appui .col-body{flex:1;overflow-y:auto;min-height:0;padding:14px}
+@media(max-width:1180px){.appui .dash{grid-template-columns:1fr 1fr;grid-auto-rows:minmax(320px,48svh);overflow-y:auto}.appui .col{border-bottom:1px solid var(--line)}.appui .col:nth-child(2n){border-right:0}}
+@media(max-width:720px){.appui .appshell{height:auto;overflow:visible}.appui .dash{grid-template-columns:1fr;grid-auto-rows:auto;overflow:visible}.appui .col{border-right:0;max-height:none}.appui .col-body{overflow:visible}}
+
+.appui .company-desc{color:var(--dim);font-size:12.5px;line-height:1.65}
+.appui .docrow{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;text-align:left;padding:7px 8px;border-radius:7px;color:var(--fg);font-size:12.5px;font-weight:500}
+.appui .docrow:hover{background:var(--panel)}
+.appui .docrow .di{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px}
+.appui .docrow .new{margin-left:auto;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--green);border:1px solid rgba(62,207,142,.35);border-radius:4px;padding:1px 6px}
+.appui .docrow .cnt{margin-left:auto;color:var(--faint);font-size:11px}
+.appui .comp-row{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12.5px;color:var(--dim)}
+.appui .comp-row .cdot{width:14px;height:14px;border-radius:4px;display:grid;place-items:center;font-size:8px;font-family:'Geist Mono',monospace}
+.appui .sect{margin-top:20px}
+.appui .sect .label{display:block;margin-bottom:8px}
+
+.appui .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 14px;flex:0 0 auto}
+.appui .tab{background:none;border:0;color:var(--faint);font-size:12.5px;font-weight:500;padding:9px 10px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.appui .tab:hover{color:var(--fg)}
+.appui .tab.on{color:var(--fg);border-bottom-color:var(--acc)}
+.appui .rangebar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.appui .rangebar .rlabel{color:var(--faint);font-size:12px}
+.appui .pillset{display:flex;gap:6px}
+.appui .rpill{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:100px;font-size:11.5px;font-weight:500;padding:4px 12px}
+.appui .rpill.on{background:var(--fg);color:#000;border-color:var(--fg)}
+.appui .an-h{font-size:14.5px;font-weight:600}
+.appui .an-s{color:var(--faint);font-size:12px;margin-top:2px}
+.appui .statgrid{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:14px;padding:16px 0}
+.appui .statrow{display:flex}
+.appui .stat{flex:1;text-align:center;padding:0 8px;border-right:1px solid var(--line)}
+.appui .stat:last-child{border-right:0}
+.appui .stat .sl{color:var(--faint);font-size:11px}
+.appui .stat .sv{font-size:22px;font-weight:600;letter-spacing:-.03em;margin-top:2px}
+.appui .stat .sd{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--green);margin-top:2px}
+.appui .statfoot{display:flex;gap:18px;justify-content:center;border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:11.5px;color:var(--faint)}
+.appui .statfoot b{color:var(--dim);font-weight:600}
+.appui .chartbox{margin-top:8px}
+.appui .chartbox svg{width:100%;height:150px;display:block}
+.appui .legend{display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--faint)}
+.appui .legend i{display:inline-block;width:14px;height:2px;background:var(--acc);vertical-align:middle;margin-right:5px}
+.appui .legend .l2 i{background:var(--faint);height:0;border-top:2px dashed var(--faint)}
+.appui .rankrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:12.5px}
+.appui .rankrow:last-child{border-bottom:0}
+.appui .rankpos{font-family:'Geist Mono',monospace;font-size:11px;color:var(--acc);background:rgba(205,166,242,.08);border:1px solid rgba(205,166,242,.25);border-radius:5px;padding:2px 7px;min-width:34px;text-align:center}
+.appui .rankrow .rq{flex:1;color:var(--dim)}
+.appui .rankrow .rt{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--green)}
+.appui .placeholder{border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--faint);font-size:12.5px;margin-top:14px}
+
+.appui .agent{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;overflow:hidden}
+.appui .agent-head{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:11px 12px;text-align:left}
+.appui .agent-head:hover{background:var(--panel2)}
+.appui .aico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;background:color-mix(in srgb,var(--ac,#CDA6F2) 12%,transparent);border:1px solid color-mix(in srgb,var(--ac,#CDA6F2) 24%,transparent);color:var(--ac,#CDA6F2)}
+.appui .aico svg{width:14px;height:14px;display:block}
+.appui .agent-head .an{font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg);font-weight:500}
+.appui .agent-head .as{color:var(--dim);font-size:12px;margin-top:1px}
+.appui .agent-head .chev{margin-left:auto;color:var(--faint);font-size:11px;transition:transform .15s}
+.appui .agent.open .chev{transform:rotate(180deg)}
+.appui .agent-body{border-top:1px solid var(--line);padding:6px 12px 10px}
+.appui .aitem{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.appui .aitem:last-child{border-bottom:0}
+.appui .aitem .go2{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;color:var(--dim);font-size:11px;padding:3px 10px;white-space:nowrap}
+.appui .aitem .go2:hover{color:var(--fg);border-color:var(--faint)}
+
+.appui .chat-body{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+.appui .msg{max-width:88%;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
+.appui .msg.ai{background:var(--panel);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;color:#C9CAD1}
+.appui .msg.me{background:var(--acc);color:#000;align-self:flex-end;border-bottom-right-radius:4px;font-weight:500}
+.appui .msg-meta{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);align-self:flex-start;margin:2px 2px -6px}
+.appui .msg-meta.me{align-self:flex-end}
+.appui .chat-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:10px 12px}
+.appui .chatbox{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 4px 4px 12px}
+.appui .chatbox:focus-within{border-color:var(--acc)}
+.appui .chatbox input{flex:1;background:transparent;border:0;outline:none;color:var(--fg);font-size:12.5px}
+.appui .chatbox input::placeholder{color:var(--faint)}
+.appui .send{background:var(--fg);color:#000;border:0;border-radius:7px;width:30px;height:30px;font-weight:600}
+.appui .send:hover{opacity:.85}
+.appui .typing{color:var(--faint);font-family:'Geist Mono',monospace;font-size:11px;align-self:flex-start;padding:2px}
+
+.appui .docwrap{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70}
+.appui .docpanel{position:absolute;top:0;right:0;bottom:0;width:min(600px,100%);background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+.appui .doc-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.appui .doc-head .dt{font-size:15px;font-weight:600;flex:1}
+.appui .doc-head button{background:none;border:0;color:var(--faint);font-size:13px;padding:4px 6px}
+.appui .doc-head button:hover{color:var(--fg)}
+.appui .doc-body{flex:1;overflow-y:auto;padding:22px 24px;font-size:13px;color:#C9CAD1;white-space:pre-wrap;line-height:1.75;font-family:'Geist Mono',monospace}
+.appui .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 18px;font-size:13px;z-index:90}
+@media(prefers-reduced-motion:reduce){.appui .progress .pl .spin{animation:none}}

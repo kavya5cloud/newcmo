@@ -2,34 +2,45 @@
 
 An AI CMO for teams that ship — it runs your marketing, skips the busywork, and only surfaces what actually moves your numbers.
 
-## Structure
+Now a **Next.js** app with real AI (Groq/OpenAI) and persistence.
 
-| File | What it is |
-|------|-----------|
-| `index.html` | Marketing landing page |
-| `app.html` | The product — onboarding + dashboard (Company, Analytics, Agents Feed, AI CMO chat) |
-| `server.py` | Dev server: serves the site **and** proxies AI calls to OpenAI (keeps the API key server-side) |
-| `logo.png` | Pixel wordmark (transparent) |
-
-## Running locally
+## Run locally
 
 ```bash
-python3 server.py
-# → http://localhost:4321
+npm install
+npm run dev
+# → http://localhost:3000
 ```
 
-## Enabling AI
+- `/` — marketing landing page
+- `/app` — the product: onboarding → dashboard (Company · Analytics · Agents Feed · AI CMO chat)
 
-The app falls back to demo data until an OpenAI key is present. To use real AI:
+## Configuration (`.env.local`)
 
-1. Put your key in `openai_key.txt` (one line) — or set the `OPENAI_API_KEY` env var.
-2. Make sure your OpenAI account has billing/credit enabled.
-3. Reload the app and hit **Analyze**. No restart needed.
+| Var | What it does |
+|-----|--------------|
+| `GROQ_API_KEY` | Free AI provider (default). Get one at console.groq.com |
+| `OPENAI_API_KEY` | Optional fallback provider |
+| `GROQ_MODEL` / `OPENAI_MODEL` | Override the model |
+| `DATABASE_URL` | Optional Neon Postgres connection string for cloud persistence |
 
-Model defaults to `gpt-4o-mini`; override with the `OPENAI_MODEL` env var.
+The app degrades gracefully:
+- **No AI key** → dashboard runs on demo data (a banner explains why).
+- **No `DATABASE_URL`** → state persists to the browser's localStorage (survives refresh). Add a Neon URL to sync to the cloud; the topbar shows `local` vs `cloud ✓`.
 
-> ⚠️ **Never commit your API key.** `openai_key.txt` is gitignored for this reason.
+> ⚠️ Never commit secrets. `.env.local`, `groq_key.txt`, and `openai_key.txt` are gitignored.
 
-## Status
+## Architecture
 
-Static prototype. Session state is in-memory (refresh clears it). Next steps: real persistence, auth, and a production host — at which point this moves to a framework (e.g. Next.js) with the OpenAI proxy as a serverless function.
+- **Next.js App Router** (`app/`) — `page.tsx` (landing), `app/page.tsx` (product).
+- **API routes** — `app/api/generate` proxies AI calls (key stays server-side); `app/api/state` reads/writes workspace state to Neon.
+- **Persistence** — `lib/store.ts`: localStorage source-of-truth with best-effort Neon sync.
+
+## Roadmap
+
+1. ✅ **Framework + persistence** (this) — Next.js, real AI, refresh-safe state.
+2. Replace remaining demo panels (Analytics numbers, agent feed items) with real generated/stored data.
+3. Real integrations — Google Search Console + GA4, Reddit API — for true analytics and opportunities.
+4. Scheduled agents ("running daily"), accounts/auth, cost controls.
+
+The original single-file prototype is preserved in [`prototype/`](prototype/).
