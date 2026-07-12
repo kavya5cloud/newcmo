@@ -13,6 +13,8 @@ export type Profile = {
 
 export type Draft = { id: string; title: string; channel: string; body: string; approved: boolean };
 export type ChatMsg = { who: "ai" | "me"; text: string };
+export type FeedEntry = { summary: string; items: [string, string][] };
+export type Ranking = { pos: string; query: string; trend: string };
 
 export type Saved = {
   url: string;
@@ -20,6 +22,9 @@ export type Saved = {
   competitors: { n: string; c: string }[];
   chat: ChatMsg[];
   drafts: Draft[];
+  feed?: Record<string, FeedEntry>;
+  rankings?: Ranking[];
+  docs?: Record<string, string>;
 };
 
 const LS_KEY = "cosmos.state";

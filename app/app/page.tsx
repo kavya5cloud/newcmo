@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadState, saveState, type Saved, type Profile, type Draft, type ChatMsg } from "@/lib/store";
+import { loadState, saveState, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
 async function ai(prompt: string, url?: string): Promise<string> {
@@ -63,6 +63,13 @@ const CHART = {
   "30d": { labels: ["6/12", "6/17", "6/22", "6/27", "7/2", "7/7", "7/11"], visits: [1500, 1800, 2400, 2200, 2900, 2600, 3100], clicks: [280, 330, 450, 410, 520, 480, 560], saw: "301K", sawD: "+9.8%", clicked: "13.2K", clickedD: "+31.5%", visited: "54.7K", visitedD: "+17.9%" },
 };
 
+const FALLBACK_RANKS: Ranking[] = [
+  { pos: "#3", query: "ai cmo tool", trend: "↑2" },
+  { pos: "#7", query: "ai marketing agents", trend: "↑5" },
+  { pos: "#11", query: "marketing automation for startups", trend: "↑1" },
+  { pos: "#14", query: "seo agency alternative", trend: "new" },
+];
+
 const DOC_DEMO: Record<string, string> = {
   product: "# Product Information\n\nGenerated once cosmos analyzes your site with a live AI key.\nUntil then this is a placeholder describing your product, its core loop, and pricing.",
   compet: "# Competitor Analysis\n\nYour top competitors and how cosmos positions against them appear here after analysis.",
@@ -82,6 +89,9 @@ export default function AppPage() {
   const [competitors, setCompetitors] = useState<{ n: string; c: string }[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [feed, setFeed] = useState<Record<string, FeedEntry>>({});
+  const [rankings, setRankings] = useState<Ranking[]>([]);
+  const [docCache, setDocCache] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [tab, setTab] = useState("traffic");
   const [range, setRange] = useState<"7d" | "30d">("7d");
@@ -109,7 +119,9 @@ export default function AppPage() {
       if (saved?.profile) {
         setUrl(saved.url); setProfile(saved.profile);
         setCompetitors(saved.competitors || []); setChat(saved.chat || []);
-        setDrafts(saved.drafts || []); setEntered(true);
+        setDrafts(saved.drafts || []); setFeed(saved.feed || {});
+        setRankings(saved.rankings || []); setDocCache(saved.docs || {});
+        setEntered(true);
       }
       hydrated.current = true;
     })();
@@ -118,9 +130,9 @@ export default function AppPage() {
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
     if (!hydrated.current || !entered || !profile) return;
-    const s: Saved = { url, profile, competitors, chat, drafts };
+    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache };
     saveState(s);
-  }, [url, profile, competitors, chat, drafts, entered]);
+  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, entered]);
 
   /* ---- onboarding dot canvas ---- */
   useEffect(() => {
@@ -192,6 +204,21 @@ export default function AppPage() {
       setProfile(p);
       const comps = (p.competitors || []).slice(0, 4).map((n, i) => ({ n, c: ["#E86A3A", "#5A8DE8", "#E8843A", "#9A6AE8"][i % 4] }));
       setCompetitors(comps);
+      // Phase 2: generate a company-specific agents feed + search rankings
+      try {
+        const insTxt = await ai(
+          `You are cosmos, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
+Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Exactly this shape:
+{"feed":{"reddit":{"summary":"36 opportunities ready","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"46 recommendations","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"11 citation gaps","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"137 ideas","items":[["short post idea","Draft"]]},"linkedin":{"summary":"3 posts ready","items":[["short post idea","Review"]]},"articles":{"summary":"32 topics ready","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
+Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
+        );
+        const ins = parseJSON(insTxt);
+        if (ins.feed) setFeed(ins.feed as Record<string, FeedEntry>);
+        if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]);
+      } catch {
+        setFeed({}); setRankings([]);
+      }
+      setDocCache({});
       setChat([
         { who: "ai", text: `Morning. I ran the daily sweep on ${hostOf(u)} — 9 agents reported in.` },
         { who: "ai", text: "Headline: 36 Reddit opportunities, 11 AI-search citation gaps, and one pricing-page fix that beats everything else on expected impact. Start there." },
@@ -202,6 +229,7 @@ export default function AppPage() {
       setProfile({ name: host, oneLiner: "(demo mode — no AI key or quota)", audience: "early-stage teams", positioning: "Demo data shown. Add a working key to analyze for real.", competitors: ["—"], voice: "clear, direct, useful", description: "Cosmos is your AI CMO for teams who cannot afford a full marketing department. It researches opportunities, drafts content, and audits technical SEO across Reddit, LinkedIn, X, Hacker News and organic search — with every output queued for human review before anything goes live." });
       setCompetitors([{ n: "okara.ai", c: "#E86A3A" }, { n: "jasper.ai", c: "#5A8DE8" }, { n: "hubspot.com", c: "#E8843A" }]);
       setChat([{ who: "ai", text: `Ran on ${host} in demo mode — add a working AI key to get real analysis.` }]);
+      setFeed({}); setRankings([]); setDocCache({});
       setDemo(true); setEntered(true);
     }
   }, [inputUrl]);
@@ -225,10 +253,12 @@ export default function AppPage() {
 
   /* ---- docs ---- */
   async function openDoc(id: string, name: string) {
-    setDoc({ title: name, body: "…generating…" });
+    if (docCache[id]) { setDoc({ title: name, body: docCache[id] }); return; }
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
+    setDoc({ title: name, body: "…generating…" });
     try {
       const body = await ai(`You are cosmos, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company. Be specific and practical. Use plain text with short sections. No preamble.`);
+      setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
     } catch {
       setDoc({ title: name, body: DOC_DEMO[id] || "—" });
@@ -361,7 +391,7 @@ export default function AppPage() {
                     </span>
                   </div>
                   <div className="an-h">How people found you</div>
-                  <div className="an-s">From a search result to a visit on your site</div>
+                  <div className="an-s">Sample figures — connect Google Search Console for live numbers</div>
                   <div className="statgrid">
                     <div className="statrow">
                       <div className="stat"><div className="sl">Saw you in Google</div><div className="sv">{d.saw}</div><div className="sd">↗ {d.sawD}</div></div>
@@ -380,8 +410,8 @@ export default function AppPage() {
                     <div className="an-h">How well you&apos;re ranking</div>
                     <div className="an-s">Your position in Google and the queries bringing traffic</div>
                     <div style={{ marginTop: 10 }}>
-                      {[["#3", "ai cmo tool", "↑2"], ["#7", "ai marketing agents", "↑5"], ["#11", "marketing automation for startups", "↑1"], ["#14", "seo agency alternative", "new"]].map(([p, q, t]) => (
-                        <div className="rankrow" key={q}><span className="rankpos">{p}</span><span className="rq">{q}</span><span className="rt">{t}</span></div>
+                      {(rankings.length ? rankings : FALLBACK_RANKS).map((r) => (
+                        <div className="rankrow" key={r.query}><span className="rankpos">{r.pos}</span><span className="rq">{r.query}</span><span className="rt">{r.trend}</span></div>
                       ))}
                     </div>
                   </div>
@@ -394,18 +424,21 @@ export default function AppPage() {
           <div className="col">
             <div className="col-head"><span className="ct"><span className="ic">≋</span>Agents Feed</span></div>
             <div className="col-body">
-              {AGENTS.map((a) => (
+              {AGENTS.map((a) => {
+                const fe = feed[a.id];
+                const items = fe?.items?.length ? fe.items : a.items;
+                return (
                 <div className={"agent" + (open[a.id] ? " open" : "")} key={a.id}>
                   <button className="agent-head" onClick={() => setOpen((o) => ({ ...o, [a.id]: !o[a.id] }))}>
                     <span className="aico" style={{ ["--ac" as string]: a.color } as React.CSSProperties}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
                     </span>
-                    <span><div className="an">{a.name}</div><div className="as">{a.sum}</div></span>
+                    <span><div className="an">{a.name}</div><div className="as">{fe?.summary || a.sum}</div></span>
                     <span className="chev">▾</span>
                   </button>
                   {open[a.id] && (
                     <div className="agent-body">
-                      {a.items.map(([t, act], i) => (
+                      {items.map(([t, act], i) => (
                         <div className="aitem" key={i}><span>{t}</span>
                           <button className="go2" disabled={busyItem === a.id + ":" + i} onClick={() => workItem(a.id, i, t, a.name)}>
                             {busyItem === a.id + ":" + i ? "…" : act}
@@ -415,7 +448,8 @@ export default function AppPage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

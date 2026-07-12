@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: provider.model,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1200,
+        max_tokens: 2048,
       }),
     });
     if (!r.ok) {
