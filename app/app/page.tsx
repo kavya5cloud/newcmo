@@ -103,6 +103,9 @@ export default function AppPage() {
   const [busyItem, setBusyItem] = useState<string>("");
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [authUser, setAuthUser] = useState<string | null>(null);
+  const [accountsEnabled, setAccountsEnabled] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
   const tlogRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
@@ -126,6 +129,19 @@ export default function AppPage() {
       hydrated.current = true;
     })();
   }, []);
+
+  /* ---- auth status ---- */
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => { setAuthUser(d.user?.email || null); setAccountsEnabled(!!d.accountsEnabled); })
+      .catch(() => {});
+  }, []);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    location.reload();
+  }
 
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
@@ -293,6 +309,13 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
     const steps = ["reading your site", "building product profile", "checking channels", "scoring opportunities", "writing today's plan"];
     return (
       <div className="appui">
+        {accountsEnabled && !authUser && (
+          <button className="authbtn" style={{ position: "fixed", top: 16, right: 16, zIndex: 5 }} onClick={() => setAuthOpen(true)}>Sign in</button>
+        )}
+        {authUser && (
+          <span className="who" style={{ position: "fixed", top: 18, right: 18, zIndex: 5 }}>{authUser}<button className="lo" onClick={logout}>logout</button></span>
+        )}
+        {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
         <div className="onboard">
           <canvas className="dots" ref={dotsRef} aria-hidden="true" />
           <div className="ob-in">
@@ -331,7 +354,12 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
           <div className="tb-r">
             <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
-            <span className="avatar">{(hostOf(url)[0] || "c").toUpperCase()}</span>
+            {authUser ? (
+              <span className="who">{authUser}<button className="lo" onClick={logout}>logout</button></span>
+            ) : accountsEnabled ? (
+              <button className="authbtn" onClick={() => setAuthOpen(true)}>Sign in</button>
+            ) : null}
+            <span className="avatar">{(authUser?.[0] || hostOf(url)[0] || "c").toUpperCase()}</span>
           </div>
         </div>
 
@@ -487,6 +515,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
         </div>
       )}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -515,3 +544,59 @@ function Chart({ data }: { data: (typeof CHART)["7d"] }) {
 }
 
 function esc(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+/* ---------- auth modal ---------- */
+const AUTH_ERR: Record<string, string> = {
+  email_taken: "That email is already registered — try signing in.",
+  invalid_credentials: "Wrong email or password.",
+  invalid_email: "Enter a valid email address.",
+  weak_password: "Use at least 8 characters.",
+  no_database: "Accounts aren't set up yet (no database connected).",
+};
+
+function AuthModal({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(mode === "signup" ? "/api/auth/signup" : "/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pw }),
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) { setErr(AUTH_ERR[d.error] || d.hint || "Something went wrong."); setBusy(false); return; }
+      location.reload();
+    } catch {
+      setErr("Network error — try again."); setBusy(false);
+    }
+  }
+
+  return (
+    <div className="authwrap" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="authcard">
+        <button className="xclose" onClick={onClose}>✕</button>
+        <h3>{mode === "signup" ? "Create your account" : "Welcome back"}</h3>
+        <div className="authsub">{mode === "signup" ? "Save your workspace across devices." : "Sign in to your cosmos workspace."}</div>
+        <label>Email</label>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="you@company.com" autoComplete="email" />
+        <label>Password</label>
+        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder={mode === "signup" ? "at least 8 characters" : "••••••••"} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+        {err && <div className="autherr">{err}</div>}
+        <button className="submit" onClick={submit} disabled={busy}>{busy ? "…" : mode === "signup" ? "Create account" : "Sign in"}</button>
+        <div className="toggle">
+          {mode === "signup" ? "Already have an account? " : "New here? "}
+          <button onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setErr(""); }}>
+            {mode === "signup" ? "Sign in" : "Create one"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
