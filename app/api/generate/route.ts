@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { isTrialActive } from "@/lib/trial";
 
 export const runtime = "nodejs";
 
@@ -53,6 +55,13 @@ export async function POST(req: NextRequest) {
     payload = await req.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+
+  // Enforce the free trial server-side: a signed-in account past its trial is blocked
+  // (anonymous/no-DB usage stays open as a demo).
+  const session = await getSession();
+  if (session && !(await isTrialActive(session.userId))) {
+    return NextResponse.json({ error: "trial_ended", hint: "your free month has ended — upgrade to continue" }, { status: 402 });
   }
 
   const { provider, key } = activeProvider();

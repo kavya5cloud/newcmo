@@ -106,6 +106,7 @@ export default function AppPage() {
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [accountsEnabled, setAccountsEnabled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [trial, setTrial] = useState<{ active: boolean; daysLeft: number; endsAt: string } | null>(null);
   const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
   const [gscData, setGscData] = useState<null | { site: string; impressions: string; clicks: string; ctr: string; position: string; series: { labels: string[]; impressions: number[]; clicks: number[] }; queries: { pos: string; query: string; trend: string }[] }>(null);
@@ -137,7 +138,7 @@ export default function AppPage() {
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((d) => { setAuthUser(d.user?.email || null); setAccountsEnabled(!!d.accountsEnabled); })
+      .then((d) => { setAuthUser(d.user?.email || null); setAccountsEnabled(!!d.accountsEnabled); setTrial(d.trial || null); })
       .catch(() => {});
   }, []);
 
@@ -389,12 +390,13 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
           <div className="tb-r">
             <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
+            {authUser && trial?.active && <a href="/account" className="trialchip">{trial.daysLeft}d left</a>}
             {authUser ? (
               <span className="who"><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
             ) : accountsEnabled ? (
               <button className="authbtn" onClick={() => setAuthOpen(true)}>Sign in</button>
             ) : null}
-            <span className="avatar">{(authUser?.[0] || hostOf(url)[0] || "c").toUpperCase()}</span>
+            <a href="/account" className="avatar" title="Account">{(authUser?.[0] || hostOf(url)[0] || "c").toUpperCase()}</a>
           </div>
         </div>
 
@@ -592,6 +594,21 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
         </div>
       )}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+      {authUser && trial && !trial.active && (
+        <div className="trial-lock">
+          <div className="trial-lock-card">
+            <img src="/logo.png" alt="cosmos.ai" style={{ height: 20, imageRendering: "pixelated", marginBottom: 18 }} />
+            <h2>Your free month has ended</h2>
+            <p>Upgrade to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
+            <button className="acct-btn pri" style={{ marginTop: 18 }} disabled title="Billing coming soon">Upgrade — $49/mo</button>
+            <div className="trial-lock-foot">
+              <a href="/account">Account</a>
+              <span> · </span>
+              <button onClick={logout}>Log out</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
