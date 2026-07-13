@@ -8,15 +8,31 @@ type Me = {
   trial?: { endsAt: string; daysLeft: number; active: boolean } | null;
 };
 
+type Site = { url?: string; profile?: { name?: string } | null } | null;
+
 export default function Account() {
   const [me, setMe] = useState<Me | null>(null);
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
+  const [site, setSite] = useState<Site>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => setMe({ user: null, accountsEnabled: false }));
     fetch("/api/google/status").then((r) => r.json()).then(setGsc).catch(() => {});
+    fetch("/api/state?wsid=account").then((r) => r.json()).then((d) => setSite(d.state || null)).catch(() => {});
   }, []);
+
+  async function changeWebsite() {
+    if (!confirm("Remove the current website and analyze a different one? This clears its analysis, drafts, and chat.")) return;
+    setBusy(true);
+    await fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wsid: "account", state: { url: "", profile: null, competitors: [], chat: [], drafts: [], feed: {}, rankings: [], docs: {} } }),
+    }).catch(() => {});
+    try { localStorage.removeItem("cosmos.state"); } catch {}
+    window.location.href = "/app";
+  }
 
   async function logout() {
     setBusy(true);
@@ -75,6 +91,22 @@ export default function Account() {
                 )
               ) : (
                 <p className="acct-dim">Free</p>
+              )}
+            </div>
+
+            <div className="acct-card">
+              <div className="acct-label">Website</div>
+              {site?.profile?.name || site?.url ? (
+                <>
+                  <div className="acct-row"><span className="acct-k">Analyzing</span><span className="acct-v">{site.profile?.name || site.url}</span></div>
+                  {site.url && <p className="acct-dim" style={{ marginTop: 8, wordBreak: "break-all" }}>{site.url}</p>}
+                  <button className="acct-btn" style={{ marginTop: 12 }} onClick={changeWebsite} disabled={busy}>Change website</button>
+                </>
+              ) : (
+                <>
+                  <p className="acct-dim">No website analyzed yet.</p>
+                  <a className="acct-btn" href="/app" style={{ marginTop: 12 }}>Analyze a website</a>
+                </>
               )}
             </div>
 

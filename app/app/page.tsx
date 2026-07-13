@@ -107,6 +107,7 @@ export default function AppPage() {
   const [accountsEnabled, setAccountsEnabled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [trial, setTrial] = useState<{ active: boolean; daysLeft: number; endsAt: string } | null>(null);
+  const [nudge, setNudge] = useState(false);
   const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
   const [gscData, setGscData] = useState<null | { site: string; impressions: string; clicks: string; ctr: string; position: string; series: { labels: string[]; impressions: number[]; clicks: number[] }; queries: { pos: string; query: string; trend: string }[] }>(null);
@@ -146,6 +147,14 @@ export default function AppPage() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     location.reload();
   }
+
+  /* nudge anonymous users to sign in so their workspace is saved to an account */
+  useEffect(() => {
+    if (!entered || authUser || !accountsEnabled) { setNudge(false); return; }
+    if (typeof window !== "undefined" && localStorage.getItem("cosmos.nudgeDismissed")) return;
+    const t = setTimeout(() => setNudge(true), 5000);
+    return () => clearTimeout(t);
+  }, [entered, authUser, accountsEnabled]);
 
   /* collapse the decorative terminal by default on small screens */
   useEffect(() => {
@@ -593,6 +602,18 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
         </div>
       )}
+      {nudge && (
+        <div className="nudge">
+          <div className="nudge-txt">
+            <strong>Save this workspace</strong>
+            <span>Create a free account so your analysis is tied to you, not just this browser.</span>
+          </div>
+          <div className="nudge-acts">
+            <button className="nudge-x" onClick={() => { setNudge(false); try { localStorage.setItem("cosmos.nudgeDismissed", "1"); } catch {} }}>Not now</button>
+            <button className="nudge-go" onClick={() => { setNudge(false); setAuthOpen(true); }}>Sign in</button>
+          </div>
+        </div>
+      )}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       {authUser && trial && !trial.active && (
         <div className="trial-lock">
@@ -666,6 +687,16 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       });
       const d = await r.json();
       if (!r.ok || d.error) { setErr(AUTH_ERR[d.error] || d.hint || "Something went wrong."); setBusy(false); return; }
+      // On signup, carry the anonymous workspace over so the just-analyzed site isn't lost.
+      if (mode === "signup") {
+        try {
+          const local = localStorage.getItem("cosmos.state");
+          if (local && JSON.parse(local)?.profile) {
+            await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wsid: "migrate", state: JSON.parse(local) }) });
+          }
+        } catch { /* best-effort */ }
+      }
+      try { localStorage.removeItem("cosmos.nudgeDismissed"); } catch {}
       location.reload();
     } catch {
       setErr("Network error — try again."); setBusy(false);

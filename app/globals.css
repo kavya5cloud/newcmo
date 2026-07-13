@@ -278,6 +278,18 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .appui .doc-body{flex:1;overflow-y:auto;padding:22px 24px;font-size:13px;color:#C9CAD1;white-space:pre-wrap;line-height:1.75;font-family:'Geist Mono',monospace}
 .appui .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 18px;font-size:13px;z-index:90}
 
+/* sign-in nudge */
+.appui .nudge{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:95;width:calc(100% - 32px);max-width:420px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 20px 50px -20px rgba(0,0,0,.8)}
+.appui .nudge-txt{display:flex;flex-direction:column;gap:3px}
+.appui .nudge-txt strong{font-size:14px;font-weight:600}
+.appui .nudge-txt span{color:var(--dim);font-size:12.5px;line-height:1.5}
+.appui .nudge-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.appui .nudge-x{background:none;border:0;color:var(--faint);font-size:12.5px;padding:8px 12px}
+.appui .nudge-x:hover{color:var(--fg)}
+.appui .nudge-go{background:var(--fg);color:#000;border:0;border-radius:7px;font-weight:600;font-size:12.5px;padding:8px 18px}
+.appui .nudge-go:hover{opacity:.85}
+@media(max-width:720px){.appui .nudge{bottom:74px}}
+
 /* auth */
 .appui .authbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;font-size:11px;font-family:'Geist Mono',monospace;padding:4px 12px}
 .appui .authbtn:hover{color:var(--fg);border-color:var(--faint)}
