@@ -106,6 +106,7 @@ export default function AppPage() {
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [accountsEnabled, setAccountsEnabled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
 
   const tlogRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
@@ -142,6 +143,11 @@ export default function AppPage() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     location.reload();
   }
+
+  /* collapse the decorative terminal by default on small screens */
+  useEffect(() => {
+    if (entered && typeof window !== "undefined" && window.innerWidth <= 720) setTermCollapsed(true);
+  }, [entered]);
 
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
@@ -313,7 +319,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           <button className="authbtn" style={{ position: "fixed", top: 16, right: 16, zIndex: 5 }} onClick={() => setAuthOpen(true)}>Sign in</button>
         )}
         {authUser && (
-          <span className="who" style={{ position: "fixed", top: 18, right: 18, zIndex: 5 }}>{authUser}<button className="lo" onClick={logout}>logout</button></span>
+          <span className="who" style={{ position: "fixed", top: 18, right: 18, zIndex: 5 }}><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
         )}
         {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
         <div className="onboard">
@@ -355,7 +361,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           <div className="tb-r">
             <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
             {authUser ? (
-              <span className="who">{authUser}<button className="lo" onClick={logout}>logout</button></span>
+              <span className="who"><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
             ) : accountsEnabled ? (
               <button className="authbtn" onClick={() => setAuthOpen(true)}>Sign in</button>
             ) : null}
@@ -376,7 +382,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
 
         <div className="dash">
           {/* COMPANY */}
-          <div className="col">
+          <div className={"col" + (mtab === "company" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">▤</span>Company</span><span className="ca"><button title="Reset" onClick={reset}>⚙</button></span></div>
             <div className="col-body">
               <p className="company-desc">{profile?.description || profile?.positioning || "—"}</p>
@@ -399,7 +405,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
 
           {/* ANALYTICS */}
-          <div className="col">
+          <div className={"col" + (mtab === "analytics" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">∿</span>Analytics</span></div>
             <div className="tabs">
               {["traffic", "seo", "links", "technical", "geo"].map((t) => (
@@ -449,7 +455,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
 
           {/* AGENTS FEED */}
-          <div className="col">
+          <div className={"col" + (mtab === "agents" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">≋</span>Agents Feed</span></div>
             <div className="col-body">
               {AGENTS.map((a) => {
@@ -482,7 +488,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
 
           {/* CHAT */}
-          <div className="col">
+          <div className={"col" + (mtab === "chat" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">◍</span>Talk to AI CMO</span></div>
             <div className="col-body chat-body" ref={chatBodyRef}>
               {chat.map((m, i) => (
@@ -500,6 +506,19 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mobilenav">
+          {([
+            ["company", "▤", "Company"],
+            ["analytics", "∿", "Analytics"],
+            ["agents", "≋", "Agents"],
+            ["chat", "◍", "Chat"],
+          ] as const).map(([id, ic, label]) => (
+            <button key={id} className={mtab === id ? "on" : ""} onClick={() => setMtab(id)}>
+              <span className="mi">{ic}</span>{label}
+            </button>
+          ))}
         </div>
       </div>
 
