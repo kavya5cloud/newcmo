@@ -37,7 +37,7 @@ export default function Terms() {
       <h2>3. Free trial &amp; billing</h2>
       <p>
         New accounts include a free trial period (currently 30 days). After the trial, continued use of paid features
-        requires a subscription (currently $49/month). Pricing and trial length may change with notice. You may stop using
+        requires a subscription (currently $15/month). Pricing and trial length may change with notice. You may stop using
         the Service at any time.
       </p>
 

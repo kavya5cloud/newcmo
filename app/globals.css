@@ -238,6 +238,15 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .appui .rankrow .rq{flex:1;color:var(--dim)}
 .appui .rankrow .rt{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--green)}
 .appui .placeholder{border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--faint);font-size:12.5px;margin-top:14px}
+.appui .gsc-card{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:18px;text-decoration:none;transition:border-color .15s,background .15s}
+.appui .gsc-card:hover{border-color:var(--acc);background:var(--panel2)}
+.appui .gsc-ic{width:38px;height:38px;flex:0 0 auto;border-radius:9px;display:grid;place-items:center;background:rgba(66,133,244,.12);border:1px solid rgba(66,133,244,.28);color:#4285F4}
+.appui .gsc-ic svg{width:19px;height:19px;display:block}
+.appui .gsc-txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.appui .gsc-txt strong{font-size:13.5px;font-weight:600;color:var(--fg)}
+.appui .gsc-txt span{font-size:12px;color:var(--dim);line-height:1.45}
+.appui .gsc-go{flex:0 0 auto;background:var(--fg);color:#000;font-weight:600;font-size:12.5px;border-radius:7px;padding:8px 16px;white-space:nowrap}
+@media(max-width:440px){.appui .gsc-card{flex-wrap:wrap}.appui .gsc-go{width:100%;text-align:center}}
 
 .appui .agent{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;overflow:hidden}
 .appui .agent-head{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:11px 12px;text-align:left}

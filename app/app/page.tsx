@@ -455,6 +455,18 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
                 <div className="placeholder"><b style={{ color: "var(--dim)" }}>{tab.toUpperCase()} view</b><br /><span className="mono" style={{ fontSize: 11 }}>connects to real data in a later phase</span></div>
               ) : (
                 <>
+                  {gsc.configured && authUser && !gscData && (
+                    <a href="/api/google/connect" className="gsc-card">
+                      <span className="gsc-ic">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="6.4" /><path d="M15.8 15.8L20 20" /><path d="M8.6 13.2v-2M11 13.2V8.8M13.4 13.2v-3.1" /></svg>
+                      </span>
+                      <span className="gsc-txt">
+                        <strong>Connect Google Search Console</strong>
+                        <span>Swap these samples for your real impressions, clicks &amp; top queries.</span>
+                      </span>
+                      <span className="gsc-go">Connect →</span>
+                    </a>
+                  )}
                   <div className="rangebar">
                     <span className="rlabel">Showing</span>
                     <span className="pillset">
@@ -466,7 +478,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
                   {gscData ? (
                     <div className="an-s">Live from Search Console · {gscData.site.replace(/^sc-domain:/, "").replace(/^https?:\/\//, "")}</div>
                   ) : gsc.configured && authUser ? (
-                    <div className="an-s">Sample figures — <a href="/api/google/connect" style={{ color: "var(--acc)" }}>connect Search Console</a> for live data</div>
+                    <div className="an-s">Sample figures — not your real numbers yet</div>
                   ) : gsc.configured ? (
                     <div className="an-s">Sample figures — sign in, then connect Search Console</div>
                   ) : (
@@ -617,7 +629,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
             <img src="/logo.png" alt="cosmos.ai" style={{ height: 20, imageRendering: "pixelated", marginBottom: 18 }} />
             <h2>Your free month has ended</h2>
             <p>Upgrade to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
-            <button className="acct-btn pri" style={{ marginTop: 18 }} disabled title="Billing coming soon">Upgrade — $49/mo</button>
+            <button className="acct-btn pri" style={{ marginTop: 18 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
             <div className="trial-lock-foot">
               <a href="/account">Account</a>
               <span> · </span>

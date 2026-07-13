@@ -79,14 +79,14 @@ export default function Account() {
                 me.trial.active ? (
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge ok">active</span></div>
-                    <p className="acct-dim">{me.trial.daysLeft} day{me.trial.daysLeft === 1 ? "" : "s"} left — ends {fmtDate(me.trial.endsAt)}. Then $49/mo.</p>
+                    <p className="acct-dim">{me.trial.daysLeft} day{me.trial.daysLeft === 1 ? "" : "s"} left — ends {fmtDate(me.trial.endsAt)}. Then $15/mo.</p>
                     <div className="acct-meter"><i style={{ width: `${Math.min(100, (me.trial.daysLeft / 30) * 100)}%` }} /></div>
                   </>
                 ) : (
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge end">ended</span></div>
                     <p className="acct-dim">Your free month ended {fmtDate(me.trial.endsAt)}. Upgrade to keep using cosmos.</p>
-                    <button className="acct-btn pri" style={{ marginTop: 12 }} disabled title="Billing coming soon">Upgrade — $49/mo</button>
+                    <button className="acct-btn pri" style={{ marginTop: 12 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
                   </>
                 )
               ) : (

@@ -189,7 +189,7 @@ export default function Landing() {
             ))}
             <div className="cmp-row"><span>AI-search visibility (GEO)</span><span className="na">not offered</span><span className="hi">✓</span></div>
             <div className="cmp-row"><span>Saying no to busywork</span><span className="na">rare</span><span className="hi">✓</span></div>
-            <div className="cmp-row cmp-total"><span>Total per month</span><span className="strike">$13,000+</span><span className="hi">$49/mo</span></div>
+            <div className="cmp-row cmp-total"><span>Total per month</span><span className="strike">$13,000+</span><span className="hi">$15/mo</span></div>
           </div>
         </div>
       </section>
@@ -200,7 +200,7 @@ export default function Landing() {
           <h2 style={{ marginTop: 14 }}>One plan. First month free.</h2>
           <div className="price">
             <div>
-              <div className="amt"><span className="was">$99</span>$49<small> /mo after your free month</small></div>
+              <div className="amt"><span className="was">$49</span>$15<small> /mo after your free month</small></div>
               <p className="inc">all channels · unlimited drafts · cancel anytime</p>
             </div>
             <a href="/app" className="btn btn-lg">Try free for a month</a>
