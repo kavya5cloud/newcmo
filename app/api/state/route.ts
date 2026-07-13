@@ -9,7 +9,9 @@ function db() {
   return neon(url);
 }
 
-async function ensureTable(sql: ReturnType<typeof neon>) {
+type Sql = NonNullable<ReturnType<typeof db>>;
+
+async function ensureTable(sql: Sql) {
   await sql`CREATE TABLE IF NOT EXISTS workspaces (
     wsid TEXT PRIMARY KEY,
     state JSONB NOT NULL,
