@@ -3,7 +3,7 @@
 An AI CMO for teams that ship — it runs your marketing, skips the busywork, and only surfaces what actually moves your numbers.
 
 Now a **Next.js** app with real AI (Groq/OpenAI) and persistence.
-
+     
 ## Run locally
 
 ```bash
