@@ -1,6 +1,9 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
+import { CHANNEL_LABELS, formatWindowLabel, type PublishChannel } from "@/lib/publish-times";
+import { matchGscSite, displaySite } from "@/lib/gsc-match";
+import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
 async function ai(prompt: string, url?: string): Promise<string> {
@@ -93,8 +96,11 @@ export default function AppPage() {
   const [rankings, setRankings] = useState<Ranking[]>([]);
   const [docCache, setDocCache] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [tab, setTab] = useState("traffic");
+  const [tab, setTab] = useState<"overview" | "seo">("overview");
   const [range, setRange] = useState<"7d" | "30d">("7d");
+  const [gscSite, setGscSite] = useState<string>("");
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
   const [doc, setDoc] = useState<{ title: string; body: string } | null>(null);
   const [toast, setToast] = useState("");
   const [termCollapsed, setTermCollapsed] = useState(false);
@@ -110,7 +116,14 @@ export default function AppPage() {
   const [authReady, setAuthReady] = useState(false);
   const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
-  const [gscData, setGscData] = useState<null | { site: string; impressions: string; clicks: string; ctr: string; position: string; series: { labels: string[]; impressions: number[]; clicks: number[] }; queries: { pos: string; query: string; trend: string }[] }>(null);
+  const [gscData, setGscData] = useState<null | {
+    site: string; impressions: string; clicks: string; ctr: string; position: string;
+    deltas: { impressions: string; clicks: string; ctr: string; position: string };
+    series: { labels: string[]; impressions: number[]; clicks: number[] };
+    queries: { pos: string; query: string; trend: string; clicks?: number; ctr?: string }[];
+    pages: { page: string; impressions: number; clicks: number; ctr: string; position: string }[];
+    hourClicks: { hour: number; clicks: number }[];
+  }>(null);
 
   const tlogRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
@@ -161,7 +174,13 @@ export default function AppPage() {
 
   /* ---- Google Search Console status (+ handle OAuth redirect) ---- */
   useEffect(() => {
-    fetch("/api/google/status").then((r) => r.json()).then(setGsc).catch(() => {});
+    fetch("/api/google/status").then((r) => r.json()).then((g) => {
+      setGsc(g);
+      if (g.connected && g.sites?.length && url) {
+        const matched = matchGscSite(g.sites, url);
+        if (matched) setGscSite(matched);
+      }
+    }).catch(() => {});
     const p = new URLSearchParams(window.location.search).get("gsc");
     if (p) {
       const msg: Record<string, string> = {
@@ -174,17 +193,30 @@ export default function AppPage() {
       if (msg[p]) { setToast(msg[p]); setTimeout(() => setToast(""), 3000); }
       window.history.replaceState({}, "", "/app");
     }
+    const qs = new URLSearchParams(window.location.search);
+    const t = qs.get("tab");
+    if (t === "agents" || t === "analytics" || t === "company" || t === "chat") setMtab(t);
+    const ch = qs.get("channel");
+    if (ch) setOpen((o) => ({ ...o, [ch]: true }));
+  }, [authUser, url]);
+
+  /* ---- push notification status ---- */
+  useEffect(() => {
+    if (!authUser) { setPushStatus(null); return; }
+    fetchPushStatus().then(setPushStatus).catch(() => {});
   }, [authUser]);
 
   /* ---- pull real Search Console data when connected ---- */
   useEffect(() => {
     if (!gsc.connected || !gsc.sites.length) { setGscData(null); return; }
-    const site = gsc.sites[0];
-    fetch(`/api/google/data?site=${encodeURIComponent(site)}&range=${range}`)
+    const site = gscSite || matchGscSite(gsc.sites, url) || gsc.sites[0];
+    if (site && site !== gscSite) setGscSite(site);
+    const q = new URLSearchParams({ site, range, url });
+    fetch(`/api/google/data?${q}`)
       .then((r) => r.json())
       .then((d) => setGscData(d.error ? null : d))
       .catch(() => setGscData(null));
-  }, [gsc, range]);
+  }, [gsc, range, gscSite, url]);
 
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
@@ -345,7 +377,53 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
     setChat([]); setDrafts([]); setCompetitors([]);
   }
 
+  const pendingDrafts = useMemo(() => drafts.filter((d) => !d.published), [drafts]);
+  const approvedDrafts = useMemo(() => pendingDrafts.filter((d) => d.approved), [pendingDrafts]);
+
+  const visibleAgents = useMemo(() => {
+    const withWork = AGENTS.filter((a) => {
+      const hasFeed = !!(feed[a.id]?.items?.length);
+      const hasDrafts = pendingDrafts.some((d) => d.channel === a.id);
+      return hasFeed || hasDrafts;
+    });
+    return withWork.length ? withWork : AGENTS.slice(0, 6);
+  }, [feed, pendingDrafts]);
+
+  async function togglePush() {
+    if (!pushStatus?.configured || pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushStatus.subscribed) {
+        await unsubscribePush();
+        setPushStatus((p) => p ? { ...p, subscribed: false, prefs: { ...p.prefs, enabled: false } } : p);
+        showToast("Reminders off");
+      } else {
+        const ok = await subscribePush(pushStatus.publicKey);
+        if (ok) {
+          const s = await fetchPushStatus();
+          setPushStatus(s);
+          showToast("Publish reminders on ✓");
+        } else showToast("Couldn't enable — check browser permissions");
+      }
+    } finally { setPushBusy(false); }
+  }
+
+  function approveDraft(id: string) {
+    setDrafts((ds) => ds.map((d) => d.id === id ? { ...d, approved: true, approvedAt: new Date().toISOString() } : d));
+    showToast("Approved — we'll remind you at the right time");
+  }
+
+  function markPublished(id: string) {
+    setDrafts((ds) => ds.map((d) => d.id === id ? { ...d, published: true } : d));
+    showToast("Marked published");
+  }
+
+  function openDraft(d: Draft) {
+    setDoc({ title: d.title, body: d.body });
+  }
+
   const d = CHART[range];
+  const geoGaps = feed.geo?.items?.length ? feed.geo.items : AGENTS.find((a) => a.id === "geo")?.items || [];
 
   /* ================= ONBOARDING ================= */
   if (!entered) {
@@ -397,6 +475,16 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           </div>
           <div className="tb-r">
             <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
+            {authUser && pushStatus?.configured && (
+              <button
+                className={"bell" + (pushStatus.subscribed ? " on" : "")}
+                onClick={togglePush}
+                disabled={pushBusy}
+                title={pushStatus.subscribed ? "Publish reminders on" : "Enable publish reminders"}
+              >
+                {pushStatus.subscribed ? "🔔" : "🔕"}
+              </button>
+            )}
             {authUser && trial?.active && <a href="/account" className="trialchip">{trial.daysLeft}d left</a>}
             {authUser ? (
               <span className="who"><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
@@ -446,51 +534,56 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
           <div className={"col" + (mtab === "analytics" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">∿</span>Analytics</span></div>
             <div className="tabs">
-              {["traffic", "seo", "links", "technical", "geo"].map((t) => (
-                <button key={t} className={"tab" + (tab === t ? " on" : "")} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+              {(["overview", "seo"] as const).map((t) => (
+                <button key={t} className={"tab" + (tab === t ? " on" : "")} onClick={() => setTab(t)}>{t === "overview" ? "Overview" : "SEO"}</button>
               ))}
             </div>
             <div className="col-body">
-              {tab !== "traffic" ? (
-                <div className="placeholder"><b style={{ color: "var(--dim)" }}>{tab.toUpperCase()} view</b><br /><span className="mono" style={{ fontSize: 11 }}>connects to real data in a later phase</span></div>
-              ) : (
+              {gsc.configured && authUser && !gsc.connected && (
+                <a href="/api/google/connect" className="gsc-card">
+                  <span className="gsc-ic">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="6.4" /><path d="M15.8 15.8L20 20" /><path d="M8.6 13.2v-2M11 13.2V8.8M13.4 13.2v-3.1" /></svg>
+                  </span>
+                  <span className="gsc-txt">
+                    <strong>Connect Google Search Console</strong>
+                    <span>Real impressions, clicks, queries — powers analytics and smarter publish timing.</span>
+                  </span>
+                  <span className="gsc-go">Connect →</span>
+                </a>
+              )}
+              {gsc.connected && gsc.sites.length > 1 && (
+                <div className="rangebar" style={{ marginBottom: 12 }}>
+                  <span className="rlabel">Property</span>
+                  <select className="sitesel" value={gscSite || gsc.sites[0]} onChange={(e) => setGscSite(e.target.value)}>
+                    {gsc.sites.map((s) => <option key={s} value={s}>{displaySite(s)}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="rangebar">
+                <span className="rlabel">Showing</span>
+                <span className="pillset">
+                  <button className={"rpill" + (range === "7d" ? " on" : "")} onClick={() => setRange("7d")}>Last 7 days</button>
+                  <button className={"rpill" + (range === "30d" ? " on" : "")} onClick={() => setRange("30d")}>Last 30 days</button>
+                </span>
+              </div>
+
+              {tab === "overview" && (
                 <>
-                  {gsc.configured && authUser && !gscData && (
-                    <a href="/api/google/connect" className="gsc-card">
-                      <span className="gsc-ic">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="6.4" /><path d="M15.8 15.8L20 20" /><path d="M8.6 13.2v-2M11 13.2V8.8M13.4 13.2v-3.1" /></svg>
-                      </span>
-                      <span className="gsc-txt">
-                        <strong>Connect Google Search Console</strong>
-                        <span>Swap these samples for your real impressions, clicks &amp; top queries.</span>
-                      </span>
-                      <span className="gsc-go">Connect →</span>
-                    </a>
-                  )}
-                  <div className="rangebar">
-                    <span className="rlabel">Showing</span>
-                    <span className="pillset">
-                      <button className={"rpill" + (range === "7d" ? " on" : "")} onClick={() => setRange("7d")}>Last 7 days</button>
-                      <button className={"rpill" + (range === "30d" ? " on" : "")} onClick={() => setRange("30d")}>Last 30 days</button>
-                    </span>
-                  </div>
                   <div className="an-h">How people found you</div>
                   {gscData ? (
-                    <div className="an-s">Live from Search Console · {gscData.site.replace(/^sc-domain:/, "").replace(/^https?:\/\//, "")}</div>
-                  ) : gsc.configured && authUser ? (
-                    <div className="an-s">Sample figures — not your real numbers yet</div>
-                  ) : gsc.configured ? (
-                    <div className="an-s">Sample figures — sign in, then connect Search Console</div>
+                    <div className="an-s">Live · {displaySite(gscData.site)}</div>
+                  ) : gsc.connected ? (
+                    <div className="an-s">Loading Search Console…</div>
                   ) : (
-                    <div className="an-s">Sample figures — connect Google Search Console for live numbers</div>
+                    <div className="an-s">Sample figures — connect Search Console for live data</div>
                   )}
                   <div className="statgrid">
                     <div className="statrow">
                       {gscData ? (
                         <>
-                          <div className="stat"><div className="sl">Impressions</div><div className="sv">{gscData.impressions}</div></div>
-                          <div className="stat"><div className="sl">Clicks</div><div className="sv">{gscData.clicks}</div></div>
-                          <div className="stat"><div className="sl">Click rate</div><div className="sv">{gscData.ctr}</div></div>
+                          <div className="stat"><div className="sl">Impressions</div><div className="sv">{gscData.impressions}</div><div className="sd">{gscData.deltas.impressions}</div></div>
+                          <div className="stat"><div className="sl">Clicks</div><div className="sv">{gscData.clicks}</div><div className="sd">{gscData.deltas.clicks}</div></div>
+                          <div className="stat"><div className="sl">Click rate</div><div className="sv">{gscData.ctr}</div><div className="sd">{gscData.deltas.ctr}</div></div>
                         </>
                       ) : (
                         <>
@@ -502,13 +595,12 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
                     </div>
                     <div className="statfoot">
                       {gscData
-                        ? <><span>avg. position <b>{gscData.position}</b></span><span>last {range === "7d" ? "7" : "30"} days</span></>
-                        : <><span><b>4.7%</b> click rate</span><span><b>4.1×</b> from other channels</span></>}
+                        ? <><span>avg. position <b>{gscData.position}</b> ({gscData.deltas.position})</span><span>vs prior {range === "7d" ? "7" : "30"} days</span></>
+                        : <><span><b>4.7%</b> click rate</span><span>sample data</span></>}
                     </div>
                   </div>
                   <div className="sect">
-                    <div className="an-h">{gscData ? "Impressions & clicks over time" : "Traffic over time"}</div>
-                    <div className="an-s">{gscData ? `Search Console — last ${range === "7d" ? "7" : "30"} days` : `Visits vs. search clicks — last ${range === "7d" ? "7" : "30"} days`}</div>
+                    <div className="an-h">{gscData ? "Impressions & clicks" : "Traffic over time"}</div>
                     <div className="chartbox">
                       <Chart
                         labels={gscData ? gscData.series.labels : d.labels}
@@ -518,15 +610,57 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
                     </div>
                     <div className="legend"><span><i />{gscData ? "Impressions" : "Visits"}</span><span className="l2"><i />{gscData ? "Clicks" : "Search clicks"}</span></div>
                   </div>
+                  {geoGaps.length > 0 && (
+                    <div className="sect">
+                      <div className="an-h">AI search visibility</div>
+                      <div className="an-s">Citation gaps from your GEO agent</div>
+                      {geoGaps.slice(0, 3).map(([t], i) => (
+                        <div className="georow" key={i}><span className="geodot" />{t}</div>
+                      ))}
+                    </div>
+                  )}
                   <div className="sect">
-                    <div className="an-h">{gscData ? "Top queries" : "How well you're ranking"}</div>
-                    <div className="an-s">{gscData ? "Your best-performing queries in Search Console" : "Your position in Google and the queries bringing traffic"}</div>
-                    <div style={{ marginTop: 10 }}>
-                      {(gscData ? gscData.queries : (rankings.length ? rankings : FALLBACK_RANKS)).map((r, i) => (
+                    <div className="an-h">Top queries</div>
+                    <div style={{ marginTop: 8 }}>
+                      {(gscData ? gscData.queries.slice(0, 5) : (rankings.length ? rankings : FALLBACK_RANKS).slice(0, 5)).map((r, i) => (
                         <div className="rankrow" key={i}><span className="rankpos">{r.pos}</span><span className="rq">{r.query}</span><span className="rt">{r.trend}</span></div>
                       ))}
                     </div>
                   </div>
+                </>
+              )}
+
+              {tab === "seo" && (
+                <>
+                  {!gscData ? (
+                    <div className="placeholder"><b style={{ color: "var(--dim)" }}>SEO details</b><br /><span className="mono" style={{ fontSize: 11 }}>Connect Search Console to see queries, pages, and CTR fixes</span></div>
+                  ) : (
+                    <>
+                      <div className="an-h">Top queries</div>
+                      <div className="an-s">Position trends vs prior period</div>
+                      <div style={{ marginTop: 8 }}>
+                        {gscData.queries.map((r, i) => (
+                          <div className="rankrow" key={i}>
+                            <span className="rankpos">{r.pos}</span>
+                            <span className="rq">{r.query}</span>
+                            <span className="rt">{r.trend}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {gscData.pages.length > 0 && (
+                        <div className="sect">
+                          <div className="an-h">Low CTR pages</div>
+                          <div className="an-s">High impressions but underperforming — quick wins</div>
+                          {gscData.pages.map((p, i) => (
+                            <div className="pagerow" key={i}>
+                              <span className="pgpath">{p.page}</span>
+                              <span className="pgmeta">{p.impressions} imp · {p.ctr} CTR · #{p.position}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -534,11 +668,37 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
 
           {/* AGENTS FEED */}
           <div className={"col" + (mtab === "agents" ? " mactive" : "")}>
-            <div className="col-head"><span className="ct"><span className="ic">≋</span>Agents Feed</span></div>
+            <div className="col-head">
+              <span className="ct"><span className="ic">≋</span>Agents Feed</span>
+              {pendingDrafts.length > 0 && <span className="draftbadge">{pendingDrafts.length}</span>}
+            </div>
             <div className="col-body">
-              {AGENTS.map((a) => {
+              {pendingDrafts.length > 0 && (
+                <div className="pubqueue">
+                  <div className="pq-head">
+                    <span className="label">Publish queue</span>
+                    <span className="pq-sub">{approvedDrafts.length} approved · {pendingDrafts.length - approvedDrafts.length} awaiting review</span>
+                  </div>
+                  {pendingDrafts.slice(0, 6).map((dr) => (
+                    <div className="pq-item" key={dr.id}>
+                      <span className="pq-ch">{(CHANNEL_LABELS as Record<string, string>)[dr.channel] || dr.channel}</span>
+                      <span className="pq-title">{dr.title}</span>
+                      <span className="pq-acts">
+                        {!dr.approved && <button className="go2" onClick={() => approveDraft(dr.id)}>Approve</button>}
+                        <button className="go2" onClick={() => openDraft(dr)}>View</button>
+                        {dr.approved && <button className="go2" onClick={() => markPublished(dr.id)}>Published ✓</button>}
+                      </span>
+                    </div>
+                  ))}
+                  {(["linkedin", "x", "reddit", "hn", "articles"] as PublishChannel[]).map((ch) => (
+                    <div className="pq-window" key={ch}>{formatWindowLabel(ch)}</div>
+                  ))}
+                </div>
+              )}
+              {visibleAgents.map((a) => {
                 const fe = feed[a.id];
                 const items = fe?.items?.length ? fe.items : a.items;
+                const draftN = pendingDrafts.filter((d) => d.channel === a.id).length;
                 return (
                 <div className={"agent" + (open[a.id] ? " open" : "")} key={a.id}>
                   <button className="agent-head" onClick={() => setOpen((o) => ({ ...o, [a.id]: !o[a.id] }))}>
@@ -546,6 +706,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
                     </span>
                     <span><div className="an">{a.name}</div><div className="as">{fe?.summary || a.sum}</div></span>
+                    {draftN > 0 && <span className="abadge">{draftN}</span>}
                     <span className="chev">▾</span>
                   </button>
                   {open[a.id] && (

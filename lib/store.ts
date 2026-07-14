@@ -11,7 +11,15 @@ export type Profile = {
   description: string;
 };
 
-export type Draft = { id: string; title: string; channel: string; body: string; approved: boolean };
+export type Draft = {
+  id: string;
+  title: string;
+  channel: string;
+  body: string;
+  approved: boolean;
+  approvedAt?: string;
+  published?: boolean;
+};
 export type ChatMsg = { who: "ai" | "me"; text: string };
 export type FeedEntry = { summary: string; items: [string, string][] };
 export type Ranking = { pos: string; query: string; trend: string };
