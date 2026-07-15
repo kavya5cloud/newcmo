@@ -124,12 +124,14 @@ export async function queryAnalytics(
   endDate: string,
   dimensions: string[]
 ): Promise<Row[]> {
+  const body: Record<string, unknown> = { startDate, endDate, rowLimit: 25 };
+  if (dimensions.length) body.dimensions = dimensions;
   const r = await fetch(
     `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
     {
       method: "POST",
       headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate, endDate, dimensions, rowLimit: 25 }),
+      body: JSON.stringify(body),
     }
   );
   if (!r.ok) return [];

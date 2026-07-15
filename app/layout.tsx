@@ -5,7 +5,11 @@ export const metadata: Metadata = {
   title: "cosmos — your CMO",
   description:
     "Introducing Cosmos, your CMO. Runs your marketing, skips the busywork. Try free for a month.",
-  icons: { icon: "/logo.png" },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

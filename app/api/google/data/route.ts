@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAccessToken, queryAnalytics, isoDaysAgo } from "@/lib/google";
 import { matchGscSite } from "@/lib/gsc-match";
+import { rateLimit, requestKey } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 
@@ -23,24 +24,26 @@ type Row = { keys?: string[]; clicks: number; impressions: number; ctr: number; 
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
+  const limit = rateLimit(requestKey(req.headers, session?.userId), session ? 40 : 20, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+  }
   const sql = db();
   if (!session || !sql) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   let site = req.nextUrl.searchParams.get("site");
   const analyzedUrl = req.nextUrl.searchParams.get("url") || "";
   const range = req.nextUrl.searchParams.get("range") === "30d" ? 30 : 7;
-  if (!site && analyzedUrl) {
-    const token = await getAccessToken(sql, session.userId);
-    if (token) {
-      const { listSites } = await import("@/lib/google");
-      const sites = await listSites(token);
-      site = matchGscSite(sites, analyzedUrl);
-    }
+  const token = await getAccessToken(sql, session.userId);
+  if (token) {
+    const { listSites } = await import("@/lib/google");
+    const sites = await listSites(token);
+    const match = matchGscSite(sites, analyzedUrl);
+    if (!site || !sites.includes(site)) site = match || site || sites[0] || null;
   }
   if (!site) return NextResponse.json({ error: "no_site" }, { status: 400 });
 
   try {
-    const token = await getAccessToken(sql, session.userId);
     if (!token) return NextResponse.json({ error: "not_connected" }, { status: 403 });
 
     const start = isoDaysAgo(range + 2);

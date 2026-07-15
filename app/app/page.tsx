@@ -25,6 +25,97 @@ function hostOf(u: string) {
   try { return new URL(u).hostname.replace("www.", ""); } catch { return u; }
 }
 
+const DAY_MS = 86_400_000;
+
+function trialSnapshot(trial: { active: boolean; daysLeft: number; endsAt: string } | null, nowMs: number) {
+  if (!trial) return null;
+  const endMs = Date.parse(trial.endsAt);
+  if (!Number.isFinite(endMs)) return trial;
+  const liveDaysLeft = Math.max(0, Math.ceil((endMs - nowMs) / DAY_MS));
+  return {
+    ...trial,
+    daysLeft: liveDaysLeft,
+    active: nowMs < endMs,
+  };
+}
+
+function feedText(entry?: FeedEntry) {
+  return (entry?.items || []).map(([t]) => t).join(" ").toLowerCase();
+}
+
+function feedLooksGeneric(entry?: FeedEntry) {
+  const text = feedText(entry);
+  return !text || /cosmos(?:\.ai)?|short (?:thread angle|keyword or fix|ai-search gap|post idea|article title)|draft reply|fix gap|review|open/.test(text) || text.length < 30;
+}
+
+function buildFallbackFeed(profile: Profile | null, url: string): Record<string, FeedEntry> {
+  const host = hostOf(url);
+  const brand = profile?.name || host;
+  const oneLiner = profile?.oneLiner || "your product";
+  const audience = profile?.audience || "buyers";
+  const position = profile?.positioning || `Position ${brand} around the main pain it solves.`;
+  return {
+    reddit: {
+      summary: `3 discussion angles for ${host}`,
+      items: [
+        [`Lead with the pain ${audience} feel before they buy`, "Draft reply"],
+        [`Reply with a concrete example from ${brand}`, "Draft reply"],
+      ],
+    },
+    seo: {
+      summary: `3 search opportunities for ${host}`,
+      items: [
+        [`Comparison page: ${brand} vs alternatives`, "Draft post"],
+        [`FAQ page based on "${oneLiner}"`, "Draft post"],
+      ],
+    },
+    geo: {
+      summary: `AI citation opportunities for ${host}`,
+      items: [
+        [`Add a crisp definition of ${brand} for AI answers`, "Fix gap"],
+        [`Use FAQ schema so ${position.slice(0, 48).replace(/\s+/g, " ")}…`, "Fix gap"],
+      ],
+    },
+    x: {
+      summary: `Social angles for ${host}`,
+      items: [
+        [`Thread: the one thing ${brand} does that others don't`, "Draft"],
+        [`Post: a before/after story for ${audience}`, "Draft"],
+      ],
+    },
+    linkedin: {
+      summary: `Founder posts for ${host}`,
+      items: [
+        [`Founder post: why ${brand} exists and what it refuses to do`, "Review"],
+        [`Post: one lesson from building ${oneLiner}`, "Review"],
+      ],
+    },
+    articles: {
+      summary: `Long-form topics for ${host}`,
+      items: [
+        [`"${brand} vs the old way: what changes"`, "Open"],
+        [`"How ${audience} should evaluate tools like ${brand}"`, "Open"],
+      ],
+    },
+    hn: {
+      summary: `Launch angles for ${host}`,
+      items: [
+        [`Show HN draft: ${brand} — ${oneLiner}`, "Review"],
+        [`Comment angle: explain the problem ${brand} removes`, "Review"],
+      ],
+    },
+  };
+}
+
+function normalizeFeed(feed: Record<string, FeedEntry> | undefined, profile: Profile | null, url: string) {
+  const fallback = buildFallbackFeed(profile, url);
+  const out: Record<string, FeedEntry> = { ...fallback, ...(feed || {}) };
+  for (const id of ["hn", "linkedin"] as const) {
+    if (feedLooksGeneric(out[id])) out[id] = fallback[id];
+  }
+  return out;
+}
+
 /* ---------- static agent + doc definitions ---------- */
 type AgentDef = { id: string; name: string; color: string; sum: string; items: [string, string][]; icon: React.ReactNode };
 const AGENTS: AgentDef[] = [
@@ -148,8 +239,10 @@ export default function AppPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [trial, setTrial] = useState<{ active: boolean; daysLeft: number; endsAt: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
+  const [gscError, setGscError] = useState<string | null>(null);
   const [verifyPopup, setVerifyPopup] = useState(false);
   const verifyShownRef = useRef(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -168,6 +261,12 @@ export default function AppPage() {
   const hydrated = useRef(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2600); };
+  const liveTrial = useMemo(() => trialSnapshot(trial, nowTick), [trial, nowTick]);
+
+  useEffect(() => {
+    const tick = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
 
   /* ---- hydrate from persistence on mount ---- */
   useEffect(() => {
@@ -180,6 +279,7 @@ export default function AppPage() {
         setDrafts(saved.drafts || []); setFeed(saved.feed || {});
         setRankings(saved.rankings || []); setDocCache(saved.docs || {});
         setEstTraffic(saved.estTraffic || null);
+        setGscSite(saved.gscSite || "");
         setEntered(true);
       }
       hydrated.current = true;
@@ -214,6 +314,7 @@ export default function AppPage() {
   useEffect(() => {
     fetch("/api/google/status").then((r) => r.json()).then((g) => {
       setGsc(g);
+      setGscError(null);
       if (g.connected && g.sites?.length && url) {
         const matched = matchGscSite(g.sites, url);
         if (matched) setGscSite(matched);
@@ -254,22 +355,33 @@ export default function AppPage() {
 
   /* ---- pull real Search Console data when connected ---- */
   useEffect(() => {
-    if (!gsc.connected || !gsc.sites.length) { setGscData(null); return; }
-    const site = gscSite || matchGscSite(gsc.sites, url) || gsc.sites[0];
+    if (!gsc.connected || !gsc.sites.length) { setGscData(null); setGscError(null); return; }
+    const site = (gscSite && gsc.sites.includes(gscSite) ? gscSite : null) || matchGscSite(gsc.sites, url) || gsc.sites[0];
     if (site && site !== gscSite) setGscSite(site);
     const q = new URLSearchParams({ site, range, url });
     fetch(`/api/google/data?${q}`)
       .then((r) => r.json())
-      .then((d) => setGscData(d.error ? null : d))
-      .catch(() => setGscData(null));
+      .then((d) => {
+        if (d.error) {
+          setGscData(null);
+          setGscError(d.error);
+        } else {
+          setGscData(d);
+          setGscError(null);
+        }
+      })
+      .catch((err) => {
+        setGscData(null);
+        setGscError(String(err).slice(0, 120));
+      });
   }, [gsc, range, gscSite, url]);
 
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
     if (!hydrated.current || !entered || !profile || demo) return;
-    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache, estTraffic };
+    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache, estTraffic, gscSite };
     saveState(s);
-  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, estTraffic, entered, demo]);
+  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, estTraffic, entered, demo, gscSite]);
 
   /* ---- onboarding dot canvas ---- */
   useEffect(() => {
@@ -327,7 +439,7 @@ export default function AppPage() {
   const analyze = useCallback(async () => {
     let u = inputUrl.trim(); if (!u) return;
     if (!/^https?:\/\//.test(u)) u = "https://" + u;
-    setUrl(u); setProgress(0);
+    setUrl(u); setProgress(0); setGscError(null); setGscSite("");
     const steps = 5;
     const bump = (n: number) => setProgress(n);
     try {
@@ -354,13 +466,13 @@ export default function AppPage() {
       // estimated-traffic figure. Kept as two calls so a failure in one can't break the other.
       const insP = ai(
         `You are cosmos, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
-Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Exactly this shape:
+Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention cosmos.ai unless the analyzed site is cosmos.ai. Exactly this shape:
 {"feed":{"reddit":{"summary":"36 opportunities ready","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"46 recommendations","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"11 citation gaps","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"137 ideas","items":[["short post idea","Draft"]]},"linkedin":{"summary":"3 posts ready","items":[["short post idea","Review"]]},"articles":{"summary":"32 topics ready","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
 Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
         try { const ins = parseJSON(t); if (ins.feed) setFeed(ins.feed as Record<string, FeedEntry>); if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]); }
-        catch { setFeed({}); setRankings([]); }
-      }).catch(() => { setFeed({}); setRankings([]); });
+        catch { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); }
+      }).catch(() => { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); });
 
       const trafP = ai(
         `Estimate realistic MONTHLY Google Search numbers for the website ${u} (${p.name} — ${p.oneLiner}). Consider how well-known and large the site is.
@@ -371,6 +483,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       }).catch(() => setEstTraffic(null));
 
       await Promise.allSettled([insP, trafP]);
+      setFeed((f) => normalizeFeed(f, p, u));
       setDocCache({});
       setChat([
         { who: "ai", text: `Morning. I ran the daily sweep on ${hostOf(u)} — 9 agents reported in.` },
@@ -382,7 +495,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       setProfile({ name: host, oneLiner: "(couldn't reach the AI)", audience: "—", positioning: `We couldn't analyze ${host} — the AI was unreachable.`, competitors: ["—"], voice: "—", description: `We couldn't reach the AI to build a profile for ${host}, so this is placeholder data. If you're on the live site, make sure GROQ_API_KEY is set in your hosting environment, then re-run the analysis.` });
       setCompetitors([{ n: "okara.ai", c: "#E86A3A" }, { n: "jasper.ai", c: "#5A8DE8" }, { n: "hubspot.com", c: "#E8843A" }]);
       setChat([{ who: "ai", text: `Ran on ${host} in demo mode — add a working AI key to get real analysis.` }]);
-      setFeed({}); setRankings([]); setDocCache({}); setEstTraffic(null);
+      setFeed(normalizeFeed(undefined, null, u)); setRankings([]); setDocCache({}); setEstTraffic(null);
       setDemo(true); setEntered(true);
     }
   }, [inputUrl]);
@@ -393,7 +506,20 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     setBusyItem(key);
     let body: string;
     try {
-      body = await ai(`You are the ${agentName} inside cosmos, the AI CMO for ${profile?.name} (${profile?.oneLiner}). Voice: ${profile?.voice}.\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
+      const brand = profile?.name || hostOf(url) || "the site";
+      const oneLiner = profile?.oneLiner || "this product";
+      const voice = profile?.voice || "clear, practical, specific";
+      const context = `Website: ${url || "unknown"}\nBrand: ${brand}\nSummary: ${oneLiner}\nVoice: ${voice}`;
+      const channelBrief: Record<string, string> = {
+        hn: `Write as a Hacker News launch artifact for ${brand}. Focus on the problem, the novelty, and the technical or product insight. Never mention cosmos.ai unless the analyzed site is cosmos.ai.`,
+        linkedin: `Write as a polished LinkedIn post for a founder or operator at ${brand}. Make it professional, concise, and credible. Never mention cosmos.ai unless the analyzed site is cosmos.ai.`,
+        reddit: `Write a high-signal Reddit reply or post for ${brand}. Sound helpful, specific, and non-promotional.`,
+        x: `Write a concise X post or thread starter for ${brand}.`,
+        seo: `Write an SEO deliverable for ${brand}.`,
+        geo: `Write an AI-search / GEO deliverable for ${brand}.`,
+        articles: `Write a long-form article brief or outline for ${brand}.`,
+      };
+      body = await ai(`You are the ${agentName} inside cosmos.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
       setDemo(false);
     } catch {
       body = `[demo draft — no AI key/quota]\n\n${agentName} · deliverable for:\n"${item}"\n\nAdd a working key for a real draft.`;
@@ -436,7 +562,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   function reset() {
     if (!confirm("Analyze a different website? Current session will be cleared.")) return;
     setEntered(false); setProfile(null); setInputUrl(""); setUrl(""); setProgress(-1);
-    setChat([]); setDrafts([]); setCompetitors([]);
+    setChat([]); setDrafts([]); setCompetitors([]); setGscSite(""); setGscError(null); setFeed({}); setRankings([]); setDocCache({}); setEstTraffic(null);
+    try { localStorage.removeItem("cosmos.state"); } catch {}
   }
 
   const pendingDrafts = useMemo(() => drafts.filter((d) => !d.published), [drafts]);
@@ -486,7 +613,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
   const estimated = !gscData && !!estTraffic;
   const d = estTraffic ? buildEstData(estTraffic, range, url || "cosmos") : CHART[range];
-  const geoGaps = feed.geo?.items?.length ? feed.geo.items : AGENTS.find((a) => a.id === "geo")?.items || [];
+  const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url]);
+  const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
 
   /* ================= ONBOARDING ================= */
   if (!entered) {
@@ -567,7 +695,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                 )}
               </button>
             )}
-            {authUser && trial?.active && <a href="/account" className="trialchip">{trial.daysLeft}d left</a>}
+            {authUser && liveTrial?.active && <a href="/account" className="trialchip">{liveTrial.daysLeft}d left</a>}
             {authUser ? (
               <span className="who"><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
             ) : accountsEnabled ? (
@@ -605,9 +733,17 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               </div>
               <div className="sect">
                 <span className="label">Competitors</span>
-                {competitors.map((c) => (
-                  <div className="comp-row" key={c.n}><span className="cdot" style={{ background: c.c + "22", border: `1px solid ${c.c}55`, color: c.c }}>●</span>{c.n}</div>
-                ))}
+                <p className="company-desc" style={{ marginBottom: 10 }}>
+                  These names drive comparison pages, objection handling, and positioning. Cosmos keeps them tied to the current website instead of reusing stale defaults.
+                </p>
+                {competitors.length ? competitors.map((c) => (
+                  <div className="comp-row" key={c.n}>
+                    <span className="cdot" style={{ background: c.c + "22", border: `1px solid ${c.c}55`, color: c.c }}>●</span>
+                    <span>{c.n}</span>
+                  </div>
+                )) : (
+                  <div className="placeholder" style={{ marginTop: 0 }}>No competitor set yet. Re-run analysis to refresh the comparison set.</div>
+                )}
               </div>
             </div>
           </div>
@@ -668,6 +804,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     <div className="an-s">Live · {displaySite(gscData.site)}</div>
                   ) : gsc.connected && gsc.sites.length === 0 ? (
                     <div className="an-s">Connected — no verified site, showing an estimate for {hostOf(url)}</div>
+                  ) : gscError ? (
+                    <div className="an-s">Search Console data did not load ({gscError}). Showing estimates for now.</div>
                   ) : gsc.connected ? (
                     <div className="an-s">Loading Search Console…</div>
                   ) : estimated ? (
@@ -779,12 +917,14 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                   </div>
                   {pendingDrafts.slice(0, 6).map((dr) => (
                     <div className="pq-item" key={dr.id}>
-                      <span className="pq-ch">{(CHANNEL_LABELS as Record<string, string>)[dr.channel] || dr.channel}</span>
-                      <span className="pq-title">{dr.title}</span>
+                      <div className="pq-main">
+                        <span className="pq-ch">{(CHANNEL_LABELS as Record<string, string>)[dr.channel] || dr.channel}</span>
+                        <span className="pq-title">{dr.title}</span>
+                      </div>
                       <span className="pq-acts">
-                        {!dr.approved && <button className="go2" onClick={() => approveDraft(dr.id)}>Approve</button>}
-                        <button className="go2" onClick={() => openDraft(dr)}>View</button>
-                        {dr.approved && <button className="go2" onClick={() => markPublished(dr.id)}>Published ✓</button>}
+                        {!dr.approved && <button className="go2 go2-pri" onClick={() => approveDraft(dr.id)}>Approve</button>}
+                        <button className="go2 go2-sec" onClick={() => openDraft(dr)}>View</button>
+                        {dr.approved && <button className="go2 go2-pri" onClick={() => markPublished(dr.id)}>Published ✓</button>}
                       </span>
                     </div>
                   ))}
@@ -795,7 +935,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               )}
               {visibleAgents.map((a) => {
                 const fe = feed[a.id];
-                const items = fe?.items?.length ? fe.items : a.items;
+                const items = fe?.items?.length ? fe.items : contextualFeed[a.id]?.items || a.items;
                 const draftN = pendingDrafts.filter((d) => d.channel === a.id).length;
                 return (
                 <div className={"agent" + (open[a.id] ? " open" : "")} key={a.id}>
@@ -811,7 +951,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     <div className="agent-body">
                       {items.map(([t, act], i) => (
                         <div className="aitem" key={i}><span>{t}</span>
-                          <button className="go2" disabled={busyItem === a.id + ":" + i} onClick={() => workItem(a.id, i, t, a.name)}>
+                          <button className="go2 go2-pri" disabled={busyItem === a.id + ":" + i} onClick={() => workItem(a.id, i, t, a.name)}>
                             {busyItem === a.id + ":" + i ? "…" : act}
                           </button>
                         </div>
@@ -905,7 +1045,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <div className="plancard">
               <div className="plan-head">
                 <div><strong>Content plan</strong><div className="plan-sub">What to post, at each channel&apos;s peak window</div></div>
-                <button className="xclose" onClick={() => setPlanOpen(false)}>✕</button>
+                <button className="xclose" onClick={() => setPlanOpen(false)} aria-label="Close">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
               </div>
               <div className="plan-week">
                 {week.map((d, i) => {
@@ -938,7 +1080,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         );
       })()}
       {authOpen && <AuthModal onClose={() => { if (!mustSignIn) setAuthOpen(false); }} forced={mustSignIn} />}
-      {authUser && trial && !trial.active && (
+      {authUser && liveTrial && !liveTrial.active && (
         <div className="trial-lock">
           <div className="trial-lock-card">
             <img src="/logo.png" alt="cosmos.ai" style={{ height: 20, imageRendering: "pixelated", marginBottom: 18 }} />

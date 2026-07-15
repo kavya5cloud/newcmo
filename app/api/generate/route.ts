@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isTrialActive } from "@/lib/trial";
+import { isSafePublicUrl, rateLimit, requestKey } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,15 @@ async function fetchSiteText(url: string, cap = 6000): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  const limit = rateLimit(requestKey(req.headers, session?.userId), session ? 20 : 8, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", hint: "slow down and try again" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   let payload: { prompt?: string; url?: string };
   try {
     payload = await req.json();
@@ -59,7 +69,6 @@ export async function POST(req: NextRequest) {
 
   // Enforce the free trial server-side: a signed-in account past its trial is blocked
   // (anonymous/no-DB usage stays open as a demo).
-  const session = await getSession();
   if (session && !(await isTrialActive(session.userId))) {
     return NextResponse.json({ error: "trial_ended", hint: "your free month has ended — upgrade to continue" }, { status: 402 });
   }
@@ -73,9 +82,13 @@ export async function POST(req: NextRequest) {
   }
 
   let prompt = (payload.prompt || "").trim();
+  if (prompt.length > 10_000) return NextResponse.json({ error: "prompt_too_large" }, { status: 413 });
   if (!prompt) return NextResponse.json({ error: "empty_prompt" }, { status: 400 });
 
   if (payload.url) {
+    if (!isSafePublicUrl(payload.url)) {
+      return NextResponse.json({ error: "unsafe_url", hint: "use a public http(s) website URL" }, { status: 400 });
+    }
     const site = await fetchSiteText(payload.url);
     prompt = site
       ? `Below is the text content of ${payload.url} (fetched just now):\n---\n${site}\n---\n\n${prompt}`
@@ -83,6 +96,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
     const r = await fetch(provider.url, {
       method: "POST",
       headers: {
@@ -90,12 +105,13 @@ export async function POST(req: NextRequest) {
         Authorization: "Bearer " + key,
         "User-Agent": "cosmos.ai/1.0",
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: provider.model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 2048,
       }),
-    });
+    }).finally(() => clearTimeout(timeout));
     if (!r.ok) {
       const detail = (await r.text()).slice(0, 400);
       return NextResponse.json(

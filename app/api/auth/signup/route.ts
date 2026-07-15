@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "@/lib/db";
 import { hashPassword, createSession } from "@/lib/auth";
+import { rateLimit, requestKey } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const limit = rateLimit(requestKey(req.headers), 6, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+  }
   const sql = db();
   if (!sql) return NextResponse.json({ error: "no_database", hint: "set DATABASE_URL to enable accounts" }, { status: 503 });
 

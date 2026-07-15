@@ -263,10 +263,35 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .appui .agent-head .chev{margin-left:auto;color:var(--faint);font-size:11px;transition:transform .15s}
 .appui .agent.open .chev{transform:rotate(180deg)}
 .appui .agent-body{border-top:1px solid var(--line);padding:6px 12px 10px}
-.appui .aitem{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.appui .aitem{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
 .appui .aitem:last-child{border-bottom:0}
-.appui .aitem .go2{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;color:var(--dim);font-size:11px;padding:3px 10px;white-space:nowrap}
-.appui .aitem .go2:hover{color:var(--fg);border-color:var(--faint)}
+.appui .aitem .go2,
+.appui .pq-acts .go2{
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:7px;
+  color:var(--fg);
+  font-size:11px;
+  font-weight:600;
+  padding:6px 12px;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.appui .aitem .go2:hover,
+.appui .pq-acts .go2:hover{border-color:var(--faint);background:#17171b}
+.appui .aitem .go2:disabled,
+.appui .pq-acts .go2:disabled{opacity:.55;cursor:default}
+.appui .go2-pri{background:rgba(205,166,242,.14)!important;border-color:rgba(205,166,242,.28)!important;color:var(--fg)!important}
+.appui .go2-pri:hover{background:rgba(205,166,242,.2)!important}
+.appui .go2-sec{background:var(--panel2)!important;color:var(--dim)!important}
+.appui .go2-sec:hover{color:var(--fg)!important}
+.appui .pq-item{display:flex;flex-direction:column;gap:10px;padding:12px 12px;border-bottom:1px solid var(--line)}
+.appui .pq-item:last-child{border-bottom:0}
+.appui .pq-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.appui .pq-ch{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)}
+.appui .pq-title{color:var(--fg);font-size:12.5px;line-height:1.5;word-break:break-word}
+.appui .pq-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+.appui .pq-window{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--faint);padding:8px 12px;border-top:1px solid var(--line)}
 
 .appui .chat-body{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
 .appui .msg{max-width:88%;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}

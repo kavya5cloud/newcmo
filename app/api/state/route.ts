@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { rateLimit, requestKey } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,11 @@ export async function POST(req: NextRequest) {
   const sql = db();
   if (!sql) return NextResponse.json({ enabled: false });
   try {
+    const session = await getSession();
+    const limit = rateLimit(requestKey(req.headers, session?.userId), session ? 60 : 30, 60_000);
+    if (!limit.allowed) {
+      return NextResponse.json({ enabled: false, error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+    }
     const { wsid, state } = await req.json();
     const key = await keyFor(wsid);
     if (!key) return NextResponse.json({ error: "no_key" }, { status: 400 });
