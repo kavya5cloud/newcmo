@@ -138,6 +138,7 @@ function buildChatPrompt(input: {
   };
   recentTurns: ChatMsg[];
   question: string;
+  mode: "strategy" | "copy";
 }) {
   const brand = input.profile?.name || hostOf(input.url) || "the site";
   const oneLiner = input.profile?.oneLiner || "the product";
@@ -161,11 +162,15 @@ function buildChatPrompt(input: {
     ? `Estimated search traffic: ${input.estTraffic.clicks} clicks from ${input.estTraffic.impressions} impressions, ${input.estTraffic.visits} visits.`
     : "Estimated search traffic: unavailable.";
   const history = input.recentTurns.slice(-6).map((m) => `${m.who === "me" ? "Founder" : "AI CMO"}: ${m.text}`).join("\n") || "none";
+  const modeBlock = input.mode === "copy"
+    ? "This is a copywriting request. Prioritize concrete draft language, hooks, headlines, and edits that can be pasted directly."
+    : "This is a strategy request. Prioritize direction, tradeoffs, sequencing, and the highest-leverage action.";
 
   return `You are the AI CMO for ${brand}.
 Be specific, concise, and pragmatic.
 Never be generic. Use the company's actual context. If the question is underspecified, ask one sharp follow-up and give one immediate recommendation.
 Prefer bullets when it improves clarity. Keep the answer to 2-5 short paragraphs or bullet groups.
+${modeBlock}
 
 Company:
 - URL: ${input.url || "unknown"}
@@ -308,6 +313,7 @@ export default function AppPage() {
   const [busyItem, setBusyItem] = useState<string>("");
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [chatMode, setChatMode] = useState<"strategy" | "copy">("strategy");
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [accountsEnabled, setAccountsEnabled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -341,6 +347,19 @@ export default function AppPage() {
     const tick = setInterval(() => setNowTick(Date.now()), 60_000);
     return () => clearInterval(tick);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("cosmos.chatMode");
+      if (stored === "copy" || stored === "strategy") setChatMode(stored);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("cosmos.chatMode", chatMode);
+    } catch {}
+  }, [chatMode]);
 
   /* ---- hydrate from persistence on mount ---- */
   useEffect(() => {
@@ -635,6 +654,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         gscData,
         recentTurns: chat,
         question: q,
+        mode: chatMode,
       });
       reply = await ai(prompt, url);
       setDemo(false);
@@ -701,6 +721,23 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   const d = estTraffic ? buildEstData(estTraffic, range, url || "cosmos") : CHART[range];
   const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url]);
   const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
+  const suggestedQuestions = useMemo(() => {
+    const brand = profile?.name || hostOf(url) || "this site";
+    const oneLiner = profile?.oneLiner || "the product";
+    return chatMode === "copy"
+      ? [
+          `Write a sharper homepage hero for ${brand}.`,
+          `Draft a LinkedIn post announcing ${oneLiner}.`,
+          `Turn the top draft into a stronger hook.`,
+          `Rewrite the value prop so it sounds more premium.`,
+        ]
+      : [
+          `What should we fix first for ${brand}?`,
+          `Which channel has the highest leverage right now?`,
+          `What would you pause this week?`,
+          `What is the next best move based on today's data?`,
+        ];
+  }, [chatMode, profile, url]);
 
   /* ================= ONBOARDING ================= */
   if (!entered) {
@@ -1054,6 +1091,18 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className={"col" + (mtab === "chat" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">◍</span>Talk to AI CMO</span></div>
             <div className="col-body chat-body" ref={chatBodyRef}>
+              <div className="chat-tools">
+                <div className="chat-mode" role="tablist" aria-label="Chat mode">
+                  <button type="button" className={chatMode === "strategy" ? "on" : ""} onClick={() => setChatMode("strategy")}>Strategy</button>
+                  <button type="button" className={chatMode === "copy" ? "on" : ""} onClick={() => setChatMode("copy")}>Copy</button>
+                </div>
+                <span className="chat-hint">{chatMode === "copy" ? "Draft-first mode" : "Decision mode"}</span>
+              </div>
+              <div className="chat-chips" aria-label="Suggested prompts">
+                {suggestedQuestions.map((s) => (
+                  <button key={s} type="button" className="chat-chip" onClick={() => setChatInput(s)}>{s}</button>
+                ))}
+              </div>
               {chat.map((m, i) => (
                 <div key={i} style={{ display: "contents" }}>
                   <span className={"msg-meta" + (m.who === "me" ? " me" : "")}>{m.who === "me" ? "you" : "AI CMO"}</span>

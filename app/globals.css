@@ -294,6 +294,14 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .appui .pq-window{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--faint);padding:8px 12px;border-top:1px solid var(--line)}
 
 .appui .chat-body{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+.appui .chat-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.appui .chat-mode{display:inline-flex;gap:4px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:999px}
+.appui .chat-mode button{background:none;border:0;color:var(--dim);font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px}
+.appui .chat-mode button.on{background:var(--fg);color:#000}
+.appui .chat-hint{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.appui .chat-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 2px}
+.appui .chat-chip{background:rgba(205,166,242,.08);border:1px solid rgba(205,166,242,.22);color:var(--fg);border-radius:999px;font-size:11px;line-height:1.3;padding:7px 10px;text-align:left}
+.appui .chat-chip:hover{border-color:rgba(205,166,242,.4);background:rgba(205,166,242,.12)}
 .appui .msg{max-width:88%;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
 .appui .msg.ai{background:var(--panel);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;color:#C9CAD1}
 .appui .msg.me{background:var(--acc);color:#000;align-self:flex-end;border-bottom-right-radius:4px;font-weight:500}
