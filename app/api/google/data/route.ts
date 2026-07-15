@@ -29,18 +29,16 @@ export async function GET(req: NextRequest) {
   let site = req.nextUrl.searchParams.get("site");
   const analyzedUrl = req.nextUrl.searchParams.get("url") || "";
   const range = req.nextUrl.searchParams.get("range") === "30d" ? 30 : 7;
-  if (!site && analyzedUrl) {
-    const token = await getAccessToken(sql, session.userId);
-    if (token) {
-      const { listSites } = await import("@/lib/google");
-      const sites = await listSites(token);
-      site = matchGscSite(sites, analyzedUrl);
-    }
+  const token = await getAccessToken(sql, session.userId);
+  if (token) {
+    const { listSites } = await import("@/lib/google");
+    const sites = await listSites(token);
+    const match = matchGscSite(sites, analyzedUrl);
+    if (!site || !sites.includes(site)) site = match || site || sites[0] || null;
   }
   if (!site) return NextResponse.json({ error: "no_site" }, { status: 400 });
 
   try {
-    const token = await getAccessToken(sql, session.userId);
     if (!token) return NextResponse.json({ error: "not_connected" }, { status: 403 });
 
     const start = isoDaysAgo(range + 2);

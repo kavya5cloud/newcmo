@@ -15,11 +15,17 @@ export default function Account() {
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
   const [site, setSite] = useState<Site>(null);
   const [busy, setBusy] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => setMe({ user: null, accountsEnabled: false }));
     fetch("/api/google/status").then((r) => r.json()).then(setGsc).catch(() => {});
     fetch("/api/state?wsid=account").then((r) => r.json()).then((d) => setSite(d.state || null)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const tick = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(tick);
   }, []);
 
   async function changeWebsite() {
@@ -47,6 +53,13 @@ export default function Account() {
   }
 
   const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—");
+  const liveTrial = me?.trial && Number.isFinite(Date.parse(me.trial.endsAt))
+    ? {
+        ...me.trial,
+        daysLeft: Math.max(0, Math.ceil((Date.parse(me.trial.endsAt) - nowTick) / 86_400_000)),
+        active: nowTick < Date.parse(me.trial.endsAt),
+      }
+    : me?.trial || null;
 
   return (
     <div className="appui">
@@ -75,17 +88,17 @@ export default function Account() {
 
             <div className="acct-card">
               <div className="acct-label">Plan</div>
-              {me.trial ? (
-                me.trial.active ? (
+              {liveTrial ? (
+                liveTrial.active ? (
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge ok">active</span></div>
-                    <p className="acct-dim">{me.trial.daysLeft} day{me.trial.daysLeft === 1 ? "" : "s"} left — ends {fmtDate(me.trial.endsAt)}. Then $15/mo.</p>
-                    <div className="acct-meter"><i style={{ width: `${Math.min(100, (me.trial.daysLeft / 30) * 100)}%` }} /></div>
+                    <p className="acct-dim">{liveTrial.daysLeft} day{liveTrial.daysLeft === 1 ? "" : "s"} left — ends {fmtDate(liveTrial.endsAt)}. Then $15/mo.</p>
+                    <div className="acct-meter"><i style={{ width: `${Math.min(100, (liveTrial.daysLeft / 30) * 100)}%` }} /></div>
                   </>
                 ) : (
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge end">ended</span></div>
-                    <p className="acct-dim">Your free month ended {fmtDate(me.trial.endsAt)}. Upgrade to keep using cosmos.</p>
+                    <p className="acct-dim">Your free month ended {fmtDate(liveTrial.endsAt)}. Upgrade to keep using cosmos.</p>
                     <button className="acct-btn pri" style={{ marginTop: 12 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
                   </>
                 )

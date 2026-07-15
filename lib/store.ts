@@ -34,6 +34,7 @@ export type Saved = {
   rankings?: Ranking[];
   docs?: Record<string, string>;
   estTraffic?: { impressions: number; clicks: number; visits: number } | null;
+  gscSite?: string | null;
 };
 
 const LS_KEY = "cosmos.state";
