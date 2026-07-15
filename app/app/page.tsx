@@ -116,6 +116,85 @@ function normalizeFeed(feed: Record<string, FeedEntry> | undefined, profile: Pro
   return out;
 }
 
+function summarizeItems(items: [string, string][] | undefined, limit = 2) {
+  return (items || []).slice(0, limit).map(([t]) => t).join(" | ");
+}
+
+function buildChatPrompt(input: {
+  profile: Profile | null;
+  url: string;
+  competitors: { n: string; c: string }[];
+  feed: Record<string, FeedEntry>;
+  rankings: Ranking[];
+  drafts: Draft[];
+  estTraffic: { impressions: number; clicks: number; visits: number } | null;
+  gscData: null | {
+    site: string; impressions: string; clicks: string; ctr: string; position: string;
+    deltas: { impressions: string; clicks: string; ctr: string; position: string };
+    series: { labels: string[]; impressions: number[]; clicks: number[] };
+    queries: { pos: string; query: string; trend: string; clicks?: number; ctr?: string }[];
+    pages: { page: string; impressions: number; clicks: number; ctr: string; position: string }[];
+    hourClicks: { hour: number; clicks: number }[];
+  };
+  recentTurns: ChatMsg[];
+  question: string;
+  mode: "strategy" | "copy";
+}) {
+  const brand = input.profile?.name || hostOf(input.url) || "the site";
+  const oneLiner = input.profile?.oneLiner || "the product";
+  const audience = input.profile?.audience || "buyers";
+  const positioning = input.profile?.positioning || "positioning not yet available";
+  const voice = input.profile?.voice || "clear, practical, concise";
+  const competitors = input.competitors.map((c) => c.n).filter(Boolean).join(", ") || "none";
+  const draftSummary = input.drafts
+    .filter((d) => !d.published)
+    .slice(0, 3)
+    .map((d) => `${CHANNEL_LABELS[d.channel as PublishChannel] || d.channel}: ${d.title}`)
+    .join(" | ") || "none";
+  const rankingSummary = input.rankings.slice(0, 4).map((r) => `${r.pos} ${r.query} (${r.trend})`).join(" | ") || "none";
+  const topFeed = Object.entries(input.feed)
+    .map(([k, v]) => `${k}: ${summarizeItems(v.items)}`)
+    .join("\n") || "none";
+  const gsc = input.gscData
+    ? `Live Search Console: ${input.gscData.clicks} clicks, ${input.gscData.impressions} impressions, CTR ${input.gscData.ctr}, position ${input.gscData.position}.`
+    : "Live Search Console: unavailable.";
+  const traffic = input.estTraffic
+    ? `Estimated search traffic: ${input.estTraffic.clicks} clicks from ${input.estTraffic.impressions} impressions, ${input.estTraffic.visits} visits.`
+    : "Estimated search traffic: unavailable.";
+  const history = input.recentTurns.slice(-6).map((m) => `${m.who === "me" ? "Founder" : "AI CMO"}: ${m.text}`).join("\n") || "none";
+  const modeBlock = input.mode === "copy"
+    ? "This is a copywriting request. Prioritize concrete draft language, hooks, headlines, and edits that can be pasted directly."
+    : "This is a strategy request. Prioritize direction, tradeoffs, sequencing, and the highest-leverage action.";
+
+  return `You are the AI CMO for ${brand}.
+Be specific, concise, and pragmatic.
+Never be generic. Use the company's actual context. If the question is underspecified, ask one sharp follow-up and give one immediate recommendation.
+Prefer bullets when it improves clarity. Keep the answer to 2-5 short paragraphs or bullet groups.
+${modeBlock}
+
+Company:
+- URL: ${input.url || "unknown"}
+- Brand: ${brand}
+- One-liner: ${oneLiner}
+- Audience: ${audience}
+- Positioning: ${positioning}
+- Voice: ${voice}
+- Competitors: ${competitors}
+
+Current state:
+- ${gsc}
+- ${traffic}
+- Open drafts: ${draftSummary}
+- Top rankings: ${rankingSummary}
+- Feed: ${topFeed}
+
+Recent conversation:
+${history}
+
+Founder question:
+${input.question}`;
+}
+
 /* ---------- static agent + doc definitions ---------- */
 type AgentDef = { id: string; name: string; color: string; sum: string; items: [string, string][]; icon: React.ReactNode };
 const AGENTS: AgentDef[] = [
@@ -234,6 +313,7 @@ export default function AppPage() {
   const [busyItem, setBusyItem] = useState<string>("");
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [chatMode, setChatMode] = useState<"strategy" | "copy">("strategy");
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [accountsEnabled, setAccountsEnabled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -267,6 +347,19 @@ export default function AppPage() {
     const tick = setInterval(() => setNowTick(Date.now()), 60_000);
     return () => clearInterval(tick);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("cosmos.chatMode");
+      if (stored === "copy" || stored === "strategy") setChatMode(stored);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("cosmos.chatMode", chatMode);
+    } catch {}
+  }, [chatMode]);
 
   /* ---- hydrate from persistence on mount ---- */
   useEffect(() => {
@@ -550,10 +643,23 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     setChatInput(""); setChat((c) => [...c, { who: "me", text: q }]); setTyping(true);
     let reply: string;
     try {
-      reply = await ai(`You are the AI CMO for ${profile?.name} — ${profile?.oneLiner}. Audience: ${profile?.audience}. Voice: ${profile?.voice}.\nToday's context: 36 reddit opportunities, 11 AI-search citation gaps, 46 SEO recommendations, pricing page has 61% bounce.\nThe founder asks: "${q}"\nAnswer in 2-4 short sentences, specific and prioritized. No fluff.`);
+      const prompt = buildChatPrompt({
+        profile,
+        url,
+        competitors,
+        feed,
+        rankings,
+        drafts,
+        estTraffic,
+        gscData,
+        recentTurns: chat,
+        question: q,
+        mode: chatMode,
+      });
+      reply = await ai(prompt, url);
       setDemo(false);
     } catch {
-      reply = "Demo mode (no AI key/quota) — standing advice: fix the pricing page first, then close the top 3 AI-search citation gaps. Everything else this week is optional.";
+      reply = `Demo mode — based on ${profile?.name || hostOf(url)} I would start with the highest-leverage item in the current queue, then answer the exact question once you give me more context.`;
       setDemo(true);
     }
     setTyping(false); setChat((c) => [...c, { who: "ai", text: reply }]);
@@ -615,6 +721,23 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   const d = estTraffic ? buildEstData(estTraffic, range, url || "cosmos") : CHART[range];
   const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url]);
   const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
+  const suggestedQuestions = useMemo(() => {
+    const brand = profile?.name || hostOf(url) || "this site";
+    const oneLiner = profile?.oneLiner || "the product";
+    return chatMode === "copy"
+      ? [
+          `Write a sharper homepage hero for ${brand}.`,
+          `Draft a LinkedIn post announcing ${oneLiner}.`,
+          `Turn the top draft into a stronger hook.`,
+          `Rewrite the value prop so it sounds more premium.`,
+        ]
+      : [
+          `What should we fix first for ${brand}?`,
+          `Which channel has the highest leverage right now?`,
+          `What would you pause this week?`,
+          `What is the next best move based on today's data?`,
+        ];
+  }, [chatMode, profile, url]);
 
   /* ================= ONBOARDING ================= */
   if (!entered) {
@@ -968,6 +1091,18 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className={"col" + (mtab === "chat" ? " mactive" : "")}>
             <div className="col-head"><span className="ct"><span className="ic">◍</span>Talk to AI CMO</span></div>
             <div className="col-body chat-body" ref={chatBodyRef}>
+              <div className="chat-tools">
+                <div className="chat-mode" role="tablist" aria-label="Chat mode">
+                  <button type="button" className={chatMode === "strategy" ? "on" : ""} onClick={() => setChatMode("strategy")}>Strategy</button>
+                  <button type="button" className={chatMode === "copy" ? "on" : ""} onClick={() => setChatMode("copy")}>Copy</button>
+                </div>
+                <span className="chat-hint">{chatMode === "copy" ? "Draft-first mode" : "Decision mode"}</span>
+              </div>
+              <div className="chat-chips" aria-label="Suggested prompts">
+                {suggestedQuestions.map((s) => (
+                  <button key={s} type="button" className="chat-chip" onClick={() => setChatInput(s)}>{s}</button>
+                ))}
+              </div>
               {chat.map((m, i) => (
                 <div key={i} style={{ display: "contents" }}>
                   <span className={"msg-meta" + (m.who === "me" ? " me" : "")}>{m.who === "me" ? "you" : "AI CMO"}</span>

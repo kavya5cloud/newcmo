@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   description:
     "Introducing Cosmos, your CMO. Runs your marketing, skips the busywork. Try free for a month.",
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/icon.svg?v=2",
+    shortcut: "/icon.svg?v=2",
+    apple: "/icon.svg?v=2",
   },
 };
 
