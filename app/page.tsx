@@ -104,7 +104,7 @@ export default function Landing() {
     <div className="landing">
       <nav>
         <div className="nav-in">
-          <span className="logo"><img src="/logo.png" alt="cosmos.ai" style={{ height: 16, imageRendering: "pixelated" }} /></span>
+          <a href="/" className="logo" aria-label="cosmos.ai home">cosmos.ai</a>
           <div className="nav-r">
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
@@ -210,9 +210,7 @@ export default function Landing() {
 
       <footer>
         <div className="wrap" style={{ display: "flex", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: 10 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <img src="/logo.png" alt="cosmos.ai" style={{ height: 12, imageRendering: "pixelated", opacity: 0.7 }} />
-          </span>
+          <a href="/" className="footer-logo" aria-label="cosmos.ai home">cosmos.ai</a>
           <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <a href="#how" style={{ color: "var(--faint)", textDecoration: "none" }}>how it works</a>
             <a href="#pricing" style={{ color: "var(--faint)", textDecoration: "none" }}>pricing</a>

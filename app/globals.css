@@ -24,16 +24,16 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
    LANDING  (scoped under .landing; --green here = lavender)
    ========================================================= */
 .landing{--green:#CDA6F2;--red:#5A5B63;font-size:15px;line-height:1.6;display:block}
-.landing .wrap{max-width:960px;margin:0 auto;padding:0 24px}
-.landing nav{position:sticky;top:0;z-index:40;background:rgba(10,10,11,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.landing .nav-in{max-width:960px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
-.landing .logo{font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
-.landing .nav-r{display:flex;gap:20px;align-items:center}
+.landing .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.landing nav{position:sticky;top:0;z-index:40;background:rgba(10,10,11,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.landing .nav-in{max-width:1180px;margin:0 auto;padding:0 24px;height:92px;display:flex;align-items:center;justify-content:space-between}
+.landing .logo{font-family:'Geist Mono',monospace;font-size:19px;font-weight:500;letter-spacing:-.04em;color:#d6d6f0;text-decoration:none;display:flex;align-items:center;gap:8px;text-shadow:0 0 18px rgba(205,166,242,.1)}
+.landing .nav-r{display:flex;gap:22px;align-items:center}
 .landing .nav-r a{color:var(--dim);text-decoration:none;font-size:13.5px}
 .landing .nav-r a:hover{color:var(--fg)}
-.landing .btn{display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:#000;text-decoration:none;font-weight:500;font-size:13.5px;padding:8px 16px;border-radius:6px;transition:opacity .15s}
+.landing .btn{display:inline-flex;align-items:center;gap:12px;background:var(--fg);color:#000;text-decoration:none;font-weight:500;font-size:13.5px;padding:14px 18px;border-radius:10px;transition:opacity .15s,transform .15s,box-shadow .15s;box-shadow:0 8px 18px rgba(255,255,255,.06)}
 .landing .btn:hover{opacity:.85}
-.landing .btn .kbd{font-family:'Geist Mono',monospace;font-size:11px;background:rgba(0,0,0,.12);padding:1px 5px;border-radius:3px}
+.landing .btn .kbd{font-family:'Geist Mono',monospace;font-size:11px;background:#ececf1;color:#7d7d88;padding:5px 8px;border-radius:6px;border:1px solid rgba(0,0,0,.06)}
 .landing .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}
 @media(max-width:960px){.landing .agrid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.landing .agrid{grid-template-columns:1fr}}
@@ -57,24 +57,24 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .landing .cmp-total .strike{text-decoration:line-through;color:var(--faint);font-weight:400}
 .landing .cmp-total .hi{font-size:17px}
 @media(max-width:560px){.landing .cmp-row{grid-template-columns:1.2fr .9fr .6fr;padding:12px 14px;font-size:12.5px}}
-.landing header{padding:96px 0 72px;text-align:center;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.landing header{padding:80px 0 72px;text-align:center;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
 .landing .dots{position:absolute;inset:0;width:100%;height:100%;z-index:0;-webkit-mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%);mask-image:radial-gradient(ellipse 90% 75% at 50% 30%, black 30%, transparent 78%)}
-.landing .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:100px;padding:5px 12px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--dim)}
-.landing .pill i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-.landing h1{margin-top:28px;font-size:clamp(38px,5.4vw,64px);line-height:1.02;letter-spacing:-.04em;font-weight:600}
+.landing .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:100px;padding:7px 14px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--dim);background:rgba(255,255,255,.015)}
+.landing .pill i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px rgba(205,166,242,.45);animation:pulse 2s infinite}
+.landing h1{margin-top:36px;font-size:clamp(52px,6.8vw,104px);line-height:.94;letter-spacing:-.07em;font-weight:600}
 .landing h1 .name{font-family:'Geist Mono',monospace;font-weight:500;letter-spacing:-.02em}
 .landing h1 .hdim{color:var(--faint)}
-.landing .sub{margin:22px auto 0;max-width:34em;color:var(--dim);font-size:16.5px}
-.landing .cta-row{margin-top:32px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.landing .btn-lg{padding:12px 22px;font-size:14.5px;border-radius:8px}
+.landing .sub{margin:26px auto 0;max-width:840px;color:var(--dim);font-size:18px;line-height:1.55}
+.landing .cta-row{margin-top:34px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.landing .btn-lg{padding:16px 28px;font-size:16px;border-radius:12px}
 .landing .btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 .landing .btn-ghost:hover{opacity:1;background:var(--panel)}
-.landing .under{margin-top:16px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
-.landing .term{max-width:760px;margin:64px auto 0;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 24px 60px -30px rgba(0,0,0,.9)}
+.landing .under{margin-top:20px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+.landing .term{max-width:1160px;margin:68px auto 0;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 28px 80px -42px rgba(0,0,0,.95)}
 .landing .term-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
 .landing .term-bar b{width:10px;height:10px;border-radius:50%;background:#232428}
-.landing .term-bar span{margin-left:8px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
-.landing .term-body{padding:18px 20px 22px;font-family:'Geist Mono',monospace;font-size:13px;line-height:2.05;min-height:216px}
+.landing .term-bar span{margin-left:8px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+.landing .term-body{padding:20px 24px 24px;font-family:'Geist Mono',monospace;font-size:13px;line-height:2.05;min-height:236px}
 .landing .ln{white-space:pre-wrap}
 .landing .ln.p{color:var(--green)}
 .landing .ln.skip{color:var(--red);text-decoration:line-through}
@@ -96,9 +96,10 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .landing .was{color:var(--faint);text-decoration:line-through;font-size:20px;margin-right:8px;font-weight:400}
 .landing .inc{margin-top:10px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--dim)}
 .landing footer{padding:32px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)}
+.landing .footer-logo{font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;color:#d6d6f0;text-decoration:none;letter-spacing:-.03em}
 .landing .foot-btn{color:var(--dim);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px;transition:border-color .15s,color .15s}
 .landing .foot-btn:hover{color:var(--fg);border-color:var(--faint)}
-@media(max-width:560px){.landing .nav-r a:not(.btn){display:none}.landing .nav-r{gap:0}}
+@media(max-width:560px){.landing .nav-r a:not(.btn){display:none}.landing .nav-r{gap:0}.landing .nav-in{height:72px}.landing .logo{font-size:16px}}
 @media(prefers-reduced-motion:reduce){.landing .cursor,.landing .pill i{animation:none}}
 
 /* =========================================================
