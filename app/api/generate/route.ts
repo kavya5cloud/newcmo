@@ -26,22 +26,31 @@ type LLMAttempt = {
   retried?: boolean;
 };
 
-// Providers are tried in order; the first configured one wins.
-// All speak the OpenAI chat-completions format, so one call path serves all.
 const PROVIDERS: ProviderConfig[] = [
-  {
-    name: "groq",
-    env: "GROQ_API_KEY",
-    prefix: "gsk_",
-    url: "https://api.groq.com/openai/v1/chat/completions",
-    model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-  },
   {
     name: "openai",
     env: "OPENAI_API_KEY",
     prefix: "sk-",
     url: "https://api.openai.com/v1/chat/completions",
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    authHeader: "Authorization",
+    kind: "openai_compatible",
+  },
+  {
+    name: "gemini",
+    env: "GEMINI_API_KEY",
+    prefix: "",
+    url: "https://generativelanguage.googleapis.com/v1beta/interactions",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+    authHeader: "x-goog-api-key",
+    kind: "gemini",
+  },
+  {
+    name: "groq",
+    env: "GROQ_API_KEY",
+    prefix: "gsk_",
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     authHeader: "Authorization",
     kind: "openai_compatible",
   },
@@ -55,6 +64,10 @@ function providerHasValidKey(provider: ProviderConfig, key: string) {
   if (!key) return false;
   if (!provider.prefix) return true;
   return key.startsWith(provider.prefix);
+}
+
+function isConfigured(provider: ProviderConfig, key: string) {
+  return providerHasValidKey(provider, key);
 }
 
 function activeProvider() {
@@ -79,10 +92,14 @@ function classifyUpstream(status: number, body: string) {
     if (/(quota|billing|insufficient|exceed|exhaust)/.test(text)) return "quota_exhausted";
     return "rate_limit";
   }
+  if (status === 500 || status === 502 || status === 503) {
+    if (/(model .*not found|model .*unavailable|unsupported model|does not exist)/.test(text)) return "model_unavailable";
+    return "transient_error";
+  }
   if (status === 401 || status === 403 || /(invalid api key|unauthorized|authentication|api key)/.test(text)) return "invalid_api_key";
   if (status === 400 || /(bad request|malformed|invalid request|missing parameter)/.test(text)) return "malformed_request";
   if (/(model .*not found|model .*unavailable|unsupported model|does not exist)/.test(text)) return "model_unavailable";
-  if (status >= 500) return "upstream_error";
+  if (status >= 500) return "transient_error";
   return "llm_error";
 }
 
@@ -90,6 +107,7 @@ function statusForKind(kind: string) {
   switch (kind) {
     case "rate_limit":
     case "quota_exhausted":
+    case "transient_error":
       return 429;
     case "invalid_api_key":
       return 401;
@@ -110,13 +128,26 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isTransientStatus(status: number) {
+  return status === 429 || status === 500 || status === 503;
+}
+
+function isUnsupportedModelAttempt(kind: string, body: string) {
+  if (kind === "model_unavailable") return true;
+  const text = body.toLowerCase();
+  return /(model .*not found|model .*unavailable|unsupported model|does not exist)/.test(text);
+}
+
 async function callProvider(provider: ProviderConfig, key: string, prompt: string, requestId: string, retried = false): Promise<{ ok: true; text: string } | { ok: false; attempt: LLMAttempt }> {
   const started = Date.now();
   logEvent("llm_generate_attempt", {
     requestId,
     provider: provider.name,
     model: provider.model,
+    endpoint: provider.url,
+    authHeader: provider.authHeader,
     envLoaded: true,
+    keyLoaded: Boolean(key),
     keyPrefixMatch: provider.prefix ? key.startsWith(provider.prefix) : true,
     retried,
     appUrlConfigured: Boolean(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL),
@@ -149,6 +180,15 @@ async function callProvider(provider: ProviderConfig, key: string, prompt: strin
     });
     const body = await response.text();
     const elapsedMs = Date.now() - started;
+    logEvent("llm_provider_health", {
+      requestId,
+      provider: provider.name,
+      model: provider.model,
+      latencyMs: elapsedMs,
+      status: response.status,
+      errorBody: response.ok ? null : body,
+      retried,
+    });
     if (!response.ok) {
       const kind = classifyUpstream(response.status, body);
       logEvent("llm_generate_failure", {
@@ -220,6 +260,15 @@ async function callProvider(provider: ProviderConfig, key: string, prompt: strin
     const elapsedMs = Date.now() - started;
     const body = error instanceof Error ? error.message : String(error);
     const kind = error instanceof Error && error.name === "AbortError" ? "timeout" : "network_error";
+    logEvent("llm_provider_health", {
+      requestId,
+      provider: provider.name,
+      model: provider.model,
+      latencyMs: elapsedMs,
+      status: 0,
+      errorBody: body,
+      retried,
+    });
     logEvent("llm_generate_failure", {
       requestId,
       provider: provider.name,
@@ -282,20 +331,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "trial_ended", hint: "your free month has ended — upgrade to continue" }, { status: 402 });
   }
 
-  const { provider, key } = activeProvider();
-  const openaiKey = envValue("OPENAI_API_KEY");
+  const configuredProviders = PROVIDERS.map((provider) => ({ provider, key: envValue(provider.env) }))
+    .filter(({ provider, key }) => isConfigured(provider, key));
   logEvent("llm_generate_request", {
     requestId,
     route: "/api/generate",
     appUrlConfigured: Boolean(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL),
     groqKeyLoaded: Boolean(envValue("GROQ_API_KEY")),
     geminiKeyLoaded: Boolean(envValue("GEMINI_API_KEY")),
-    openaiKeyLoaded: Boolean(openaiKey),
-    selectedProvider: provider?.name || null,
-    selectedModel: provider?.model || null,
+    openaiKeyLoaded: Boolean(envValue("OPENAI_API_KEY")),
+    providerChain: configuredProviders.map(({ provider }) => provider.name),
   });
 
-  if (!provider) {
+  if (!configuredProviders.length) {
     return NextResponse.json(
       { error: "no_api_key", hint: "set GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY in .env.local" },
       { status: 503 }
@@ -316,103 +364,96 @@ export async function POST(req: NextRequest) {
       : `(Note: ${payload.url} could not be fetched — infer what you can from the domain name.)\n\n${prompt}`;
   }
 
-  const primary = await callProvider(provider, key, prompt, requestId);
-  if (primary.ok) {
-    logEvent("llm_generate_complete", {
-      requestId,
-      provider: provider.name,
-      model: provider.model,
-      status: 200,
-      elapsedMs: Date.now() - started,
-    });
-    return NextResponse.json({ text: primary.text, provider: provider.name });
-  }
+  let lastAttempt: LLMAttempt | null = null;
 
-  const primaryAttempt = primary.attempt;
-  if (primaryAttempt.status === 429) {
-    await sleep(2000);
-    const retry = await callProvider(provider, key, prompt, requestId, true);
-    if (retry.ok) {
+  for (const { provider, key } of configuredProviders) {
+    let attempt = await callProvider(provider, key, prompt, requestId);
+    if (attempt.ok) {
       logEvent("llm_generate_complete", {
         requestId,
         provider: provider.name,
         model: provider.model,
         status: 200,
         elapsedMs: Date.now() - started,
-        retried: true,
       });
-      return NextResponse.json({ text: retry.text, provider: provider.name });
+      return NextResponse.json({ text: attempt.text, provider: provider.name });
     }
 
-    let fallbackAttempt = retry.attempt;
-    const remainingProviders = PROVIDERS.slice(PROVIDERS.findIndex((p) => p.name === provider.name) + 1);
-    for (const nextProvider of remainingProviders) {
-      const nextKey = envValue(nextProvider.env);
-      if (!providerHasValidKey(nextProvider, nextKey)) continue;
-      logEvent("llm_generate_fallback", {
+    let currentAttempt = attempt.attempt;
+    lastAttempt = currentAttempt;
+
+    if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+      logEvent("llm_provider_skip", {
         requestId,
-        fromProvider: provider.name,
-        toProvider: nextProvider.name,
-        fromStatus: fallbackAttempt.status,
-        fromKind: fallbackAttempt.kind,
-        elapsedMs: Date.now() - started,
+        provider: provider.name,
+        model: provider.model,
+        reason: "unsupported_model",
+        status: currentAttempt.status,
+        elapsedMs: currentAttempt.elapsedMs,
       });
-      const nextResult = await callProvider(nextProvider, nextKey, prompt, requestId);
-      if (nextResult.ok) {
+      continue;
+    }
+
+    if (!isTransientStatus(currentAttempt.status)) {
+      logEvent("llm_provider_skip", {
+        requestId,
+        provider: provider.name,
+        model: provider.model,
+        reason: currentAttempt.kind,
+        status: currentAttempt.status,
+        elapsedMs: currentAttempt.elapsedMs,
+      });
+      continue;
+    }
+
+    for (const delayMs of [2000, 4000]) {
+      await sleep(delayMs);
+      attempt = await callProvider(provider, key, prompt, requestId, true);
+      if (attempt.ok) {
         logEvent("llm_generate_complete", {
           requestId,
-          provider: nextProvider.name,
-          model: nextProvider.model,
+          provider: provider.name,
+          model: provider.model,
           status: 200,
           elapsedMs: Date.now() - started,
-          fallbackFrom: provider.name,
+          retried: true,
         });
-        return NextResponse.json({ text: nextResult.text, provider: nextProvider.name });
+        return NextResponse.json({ text: attempt.text, provider: provider.name });
       }
-      if (nextResult.attempt.status === 429) {
-        await sleep(2000);
-        const retriedNext = await callProvider(nextProvider, nextKey, prompt, requestId, true);
-        if (retriedNext.ok) {
-          logEvent("llm_generate_complete", {
-            requestId,
-            provider: nextProvider.name,
-            model: nextProvider.model,
-            status: 200,
-            elapsedMs: Date.now() - started,
-            fallbackFrom: provider.name,
-            retried: true,
-          });
-          return NextResponse.json({ text: retriedNext.text, provider: nextProvider.name });
-        }
-        fallbackAttempt = retriedNext.attempt;
-      } else {
-        fallbackAttempt = nextResult.attempt;
+      currentAttempt = attempt.attempt;
+      lastAttempt = currentAttempt;
+      if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+        logEvent("llm_provider_skip", {
+          requestId,
+          provider: provider.name,
+          model: provider.model,
+          reason: "unsupported_model",
+          status: currentAttempt.status,
+          elapsedMs: currentAttempt.elapsedMs,
+          retried: true,
+        });
+        break;
+      }
+      if (!isTransientStatus(currentAttempt.status)) {
+        break;
       }
     }
-
-    return NextResponse.json(
-      {
-        error: "llm_error",
-        provider: fallbackAttempt.provider,
-        model: fallbackAttempt.model,
-        status: fallbackAttempt.status,
-        kind: fallbackAttempt.kind,
-        detail: fallbackAttempt.body,
-        primary: primaryAttempt,
-      },
-      { status: statusForKind(fallbackAttempt.kind) }
-    );
   }
+
+  logEvent("llm_generate_complete", {
+    requestId,
+    provider: lastAttempt?.provider || null,
+    model: lastAttempt?.model || null,
+    status: lastAttempt?.status || 0,
+    elapsedMs: Date.now() - started,
+    exhaustedProviders: true,
+  });
 
   return NextResponse.json(
     {
-      error: "llm_error",
-      provider: primaryAttempt.provider,
-      model: primaryAttempt.model,
-      status: primaryAttempt.status,
-      kind: primaryAttempt.kind,
-      detail: primaryAttempt.body,
+      error: "ai_temporarily_unavailable",
+      message: "Our AI providers are temporarily busy. Please try again in a minute.",
     },
-    { status: statusForKind(primaryAttempt.kind) }
+    { status: 503 }
   );
 }
