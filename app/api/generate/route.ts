@@ -6,6 +6,7 @@ import { isSafePublicUrl, rateLimit, requestKey } from "@/lib/throttle";
 import { db } from "@/lib/db";
 import {
   sha256,
+  buildCacheKey,
   getCachedAnalysis,
   putCachedAnalysis,
   getCachedSite,
@@ -482,6 +483,16 @@ async function siteSummary(sql: Sql | null, url: string, requestId: string): Pro
   return html ? extractSummary(html) : null;
 }
 
+type GenResult =
+  | { ok: true; text: string; provider: string; model: string; retried: boolean }
+  | { ok: false; lastAttempt: LLMAttempt | null };
+
+// Per-instance in-flight de-duplication: concurrent requests for the same cacheKey share
+// one generation instead of each firing its own LLM chain (thundering-herd guard). This is
+// process-local — good enough on a warm instance; the Neon cache absorbs the rest across
+// instances. Entries are removed as soon as the generation settles.
+const inflight = new Map<string, Promise<GenResult>>();
+
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
   const started = Date.now();
@@ -515,9 +526,9 @@ export async function POST(req: NextRequest) {
   }
 
   const sql = db();
-  // Cache key covers URL + the exact prompt, so the same analysis of the same site
-  // (across users) is a hit — but a different section/prompt for that site is not.
-  const cacheKey = sha256((payload.url || "") + "\n" + rawPrompt);
+  // Versioned key covering URL + the exact prompt, so the same analysis of the same site
+  // (across users) is a hit — but a different section/prompt, or a new CACHE_VERSION, is not.
+  const cacheKey = buildCacheKey(payload.url || null, rawPrompt);
 
   // Fresh analysis cache → return instantly, no fetch and no LLM call at all.
   if (sql) {
@@ -554,99 +565,124 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let prompt = rawPrompt;
-  if (payload.url) {
-    const site = await siteSummary(sql, payload.url, requestId);
-    prompt = site
-      ? `Key page details for ${payload.url} (fetched just now):\n---\n${site}\n---\n\n${prompt}`
-      : `(Note: ${payload.url} could not be fetched — infer what you can from the domain name.)\n\n${prompt}`;
-  }
+  // The one generation for this cacheKey. Built by the first ("leader") request; any
+  // concurrent request for the same key awaits this same promise instead of re-running.
+  const runGeneration = async (): Promise<GenResult> => {
+    let prompt = rawPrompt;
+    if (payload.url) {
+      const site = await siteSummary(sql, payload.url, requestId);
+      prompt = site
+        ? `Key page details for ${payload.url} (fetched just now):\n---\n${site}\n---\n\n${prompt}`
+        : `(Note: ${payload.url} could not be fetched — infer what you can from the domain name.)\n\n${prompt}`;
+    }
 
-  // Store a successful analysis in the cache, then return it.
-  const succeed = async (text: string, providerName: string, model: string, retried: boolean) => {
-    if (sql) await putCachedAnalysis(sql, cacheKey, payload.url || null, text, providerName, model);
-    logEvent("llm_generate_complete", {
-      requestId,
-      provider: providerName,
-      model,
-      status: 200,
-      elapsedMs: Date.now() - started,
-      ...(retried ? { retried: true } : {}),
-    });
-    return NextResponse.json({ text, provider: providerName, cached: false });
-  };
+    let lastAttempt: LLMAttempt | null = null;
 
-  let lastAttempt: LLMAttempt | null = null;
+    // Provider fallback: Groq → Gemini → OpenAI. Within a provider we walk its model
+    // list (Groq: 8b-instant → llama-4-scout → compound-mini) so an unavailable/limited
+    // model drops to another before we abandon the provider entirely.
+    provider: for (const { provider, key } of configuredProviders) {
+      model: for (const model of provider.models) {
+        let attempt = await callProvider(provider, model, key, prompt, requestId);
+        if (attempt.ok) {
+          if (sql) await putCachedAnalysis(sql, cacheKey, payload.url || null, attempt.text, provider.name, model);
+          return { ok: true, text: attempt.text, provider: provider.name, model, retried: false };
+        }
 
-  // Provider fallback: Groq → Gemini → OpenAI. Within a provider we walk its model
-  // list (Groq: 8b-instant → llama-4-scout → compound-mini) so an unavailable/limited
-  // model drops to another before we abandon the provider entirely.
-  provider: for (const { provider, key } of configuredProviders) {
-    model: for (const model of provider.models) {
-      let attempt = await callProvider(provider, model, key, prompt, requestId);
-      if (attempt.ok) {
-        return succeed(attempt.text, provider.name, model, false);
-      }
+        let currentAttempt = attempt.attempt;
+        lastAttempt = currentAttempt;
 
-      let currentAttempt = attempt.attempt;
-      lastAttempt = currentAttempt;
+        // Model not available on this provider → try the next model in the chain.
+        if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+          logEvent("llm_model_skip", {
+            requestId,
+            provider: provider.name,
+            model,
+            reason: "unsupported_model",
+            status: currentAttempt.status,
+            elapsedMs: currentAttempt.elapsedMs,
+          });
+          continue model;
+        }
 
-      // Model not available on this provider → try the next model in the chain.
-      if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+        // Non-transient failure (bad key, malformed request, …) → whole provider is out.
+        if (!isTransientStatus(currentAttempt.status)) {
+          logEvent("llm_provider_skip", {
+            requestId,
+            provider: provider.name,
+            model,
+            reason: currentAttempt.kind,
+            status: currentAttempt.status,
+            elapsedMs: currentAttempt.elapsedMs,
+          });
+          continue provider;
+        }
+
+        // Transient (rate limit / quota / 5xx): short backoff-retry on the same model.
+        for (const delayMs of [2000, 4000]) {
+          await sleep(delayMs);
+          attempt = await callProvider(provider, model, key, prompt, requestId, true);
+          if (attempt.ok) {
+            if (sql) await putCachedAnalysis(sql, cacheKey, payload.url || null, attempt.text, provider.name, model);
+            return { ok: true, text: attempt.text, provider: provider.name, model, retried: true };
+          }
+          currentAttempt = attempt.attempt;
+          lastAttempt = currentAttempt;
+          if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+            continue model;
+          }
+          if (!isTransientStatus(currentAttempt.status)) {
+            continue provider;
+          }
+        }
+        // Still transient after retries → drop to the next (cheaper) model in the chain,
+        // which has its own quota bucket, before giving up on the provider.
         logEvent("llm_model_skip", {
           requestId,
           provider: provider.name,
           model,
-          reason: "unsupported_model",
+          reason: "transient_exhausted",
           status: currentAttempt.status,
           elapsedMs: currentAttempt.elapsedMs,
+          retried: true,
         });
-        continue model;
       }
-
-      // Non-transient failure (bad key, malformed request, …) → whole provider is out.
-      if (!isTransientStatus(currentAttempt.status)) {
-        logEvent("llm_provider_skip", {
-          requestId,
-          provider: provider.name,
-          model,
-          reason: currentAttempt.kind,
-          status: currentAttempt.status,
-          elapsedMs: currentAttempt.elapsedMs,
-        });
-        continue provider;
-      }
-
-      // Transient (rate limit / quota / 5xx): short backoff-retry on the same model.
-      for (const delayMs of [2000, 4000]) {
-        await sleep(delayMs);
-        attempt = await callProvider(provider, model, key, prompt, requestId, true);
-        if (attempt.ok) {
-          return succeed(attempt.text, provider.name, model, true);
-        }
-        currentAttempt = attempt.attempt;
-        lastAttempt = currentAttempt;
-        if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
-          continue model;
-        }
-        if (!isTransientStatus(currentAttempt.status)) {
-          continue provider;
-        }
-      }
-      // Still transient after retries → drop to the next (cheaper) model in the chain,
-      // which has its own quota bucket, before giving up on the provider.
-      logEvent("llm_model_skip", {
-        requestId,
-        provider: provider.name,
-        model,
-        reason: "transient_exhausted",
-        status: currentAttempt.status,
-        elapsedMs: currentAttempt.elapsedMs,
-        retried: true,
-      });
     }
+
+    return { ok: false, lastAttempt };
+  };
+
+  // Join an in-flight generation for this key, or start (and register) one. No await sits
+  // between the has-check and the set below, so exactly one request becomes the leader.
+  const leader = !inflight.has(cacheKey);
+  const gen = inflight.get(cacheKey) ?? runGeneration();
+  if (leader) {
+    inflight.set(cacheKey, gen);
+    gen.finally(() => {
+      if (inflight.get(cacheKey) === gen) inflight.delete(cacheKey);
+    });
+  }
+  const result = await gen;
+
+  if (result.ok) {
+    logEvent("llm_generate_complete", {
+      requestId,
+      provider: result.provider,
+      model: result.model,
+      status: 200,
+      elapsedMs: Date.now() - started,
+      ...(result.retried ? { retried: true } : {}),
+      ...(leader ? {} : { coalesced: true }),
+    });
+    return NextResponse.json({
+      text: result.text,
+      provider: result.provider,
+      cached: false,
+      ...(leader ? {} : { coalesced: true }),
+    });
   }
 
+  const lastAttempt = result.lastAttempt;
   logEvent("llm_generate_complete", {
     requestId,
     provider: lastAttempt?.provider || null,

@@ -22,6 +22,7 @@ import {
   type NotificationPrefs,
 } from "@/lib/publish-times";
 import { matchGscSite } from "@/lib/gsc-match";
+import { sweepExpiredCache } from "@/lib/ai-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -68,6 +69,10 @@ export async function GET(req: NextRequest) {
   await ensureSchema(sql);
   await ensurePushTables(sql);
   await ensureGoogleTable(sql);
+
+  // Deliberate periodic cleanup: drop expired analysis/scrape cache rows so the tables
+  // don't grow unbounded (in addition to the opportunistic sweep on cache writes).
+  await sweepExpiredCache(sql);
 
   const users = (await sql`SELECT id FROM users`) as { id: string }[];
   let sent = 0;

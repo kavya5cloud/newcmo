@@ -18,6 +18,15 @@ export function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+// Bump this whenever the prompt template or extraction format changes so old cached
+// analyses (built by a previous version) are treated as misses and regenerated.
+export const CACHE_VERSION = process.env.CACHE_VERSION || "v1";
+
+/** Namespaced, versioned cache key. url+prompt are what actually vary a result. */
+export function buildCacheKey(url: string | null, prompt: string): string {
+  return sha256(`${CACHE_VERSION}\n${url || ""}\n${prompt}`);
+}
+
 let tablesReady = false;
 async function ensureCacheTables(sql: Sql) {
   if (tablesReady) return;
@@ -40,7 +49,12 @@ async function ensureCacheTables(sql: Sql) {
 
 export type CachedAnalysis = { text: string; provider: string | null; model: string | null; ageMs: number };
 
-/** Return a cached analysis for this key no older than maxAgeMs, else null. */
+/**
+ * Return a cached analysis for this key no older than maxAgeMs, else null.
+ * DELIBERATE: a hit does NOT extend created_at — the analysis cache is a *fixed* TTL
+ * from generation time, so even a popular site's analysis is regenerated every TTL and
+ * can't go stale forever. (The scrape cache below uses the opposite, sliding policy.)
+ */
 export async function getCachedAnalysis(sql: Sql, key: string, maxAgeMs: number): Promise<CachedAnalysis | null> {
   try {
     await ensureCacheTables(sql);
@@ -76,6 +90,7 @@ export async function putCachedAnalysis(
       ON CONFLICT (cache_key) DO UPDATE SET
         result = EXCLUDED.result, provider = EXCLUDED.provider,
         model = EXCLUDED.model, created_at = now()`;
+    await maybeSweep(sql);
   } catch {
     /* best-effort */
   }
@@ -107,16 +122,42 @@ export async function putCachedSite(sql: Sql, url: string, htmlHash: string, sum
       VALUES (${url}, ${htmlHash}, ${summary}, now())
       ON CONFLICT (url) DO UPDATE SET
         html_hash = EXCLUDED.html_hash, summary = EXCLUDED.summary, fetched_at = now()`;
+    await maybeSweep(sql);
   } catch {
     /* best-effort */
   }
 }
 
-/** Refresh the fetched_at timestamp when HTML is unchanged (keeps summary "fresh"). */
+/**
+ * Refresh the fetched_at timestamp when HTML is unchanged (keeps summary "fresh").
+ * DELIBERATE: the scrape cache is a *sliding* window — as long as a page's HTML keeps
+ * matching, its summary is reused indefinitely without re-extraction.
+ */
 export async function touchCachedSite(sql: Sql, url: string): Promise<void> {
   try {
     await sql`UPDATE site_cache SET fetched_at = now() WHERE url = ${url}`;
   } catch {
     /* best-effort */
   }
+}
+
+// Delete rows past their max useful age. Site rows are kept a bit longer than their
+// sliding TTL so a still-valid (HTML-unchanged) summary isn't dropped prematurely.
+export async function sweepExpiredCache(sql: Sql): Promise<{ ok: boolean }> {
+  try {
+    await ensureCacheTables(sql);
+    const analysisSecs = Math.ceil(ANALYSIS_STALE_MS / 1000);
+    const siteSecs = Math.ceil(Math.max(SITE_TTL_MS * 6, 24 * 60 * 60_000) / 1000);
+    await sql`DELETE FROM analysis_cache WHERE created_at < now() - make_interval(secs => ${analysisSecs})`;
+    await sql`DELETE FROM site_cache WHERE fetched_at < now() - make_interval(secs => ${siteSecs})`;
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// Probabilistic GC: ~2% of writes trigger a sweep, so expired rows are reaped
+// continuously without a dedicated job. A cron can also call sweepExpiredCache directly.
+async function maybeSweep(sql: Sql): Promise<void> {
+  if (Math.random() < 0.02) await sweepExpiredCache(sql);
 }
