@@ -13,7 +13,7 @@ const PROVIDERS = [
     env: "GROQ_API_KEY",
     prefix: "gsk_",
     url: "https://api.groq.com/openai/v1/chat/completions",
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
   },
   {
     name: "openai",
