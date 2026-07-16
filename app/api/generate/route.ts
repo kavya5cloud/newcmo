@@ -32,10 +32,23 @@ type ProviderConfig = {
   kind: "openai_compatible" | "gemini";
 };
 
-// Cap on generated tokens. Small, cheap models + short output = far less quota burn.
-// 512 keeps CMO output (positioning, SEO, ideas, strategy, posts) tight but complete;
-// bump via MAX_OUTPUT_TOKENS only if a section is getting truncated.
-const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 512);
+// Cap on generated tokens. 1024 gives full deliverables (articles, docs, multi-part
+// analysis) room to finish without truncating mid-JSON; override via MAX_OUTPUT_TOKENS.
+const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 1024);
+
+// Sampling temperature. Low (0.4) keeps answers grounded and factual and makes the
+// JSON-shaped responses far more reliable than the provider default (1.0).
+const LLM_TEMPERATURE = Number(process.env.LLM_TEMPERATURE || 0.4);
+
+// Grounding system prompt sent with every generation. Forces the model to stay anchored
+// to the supplied page details and stop inventing facts — the main accuracy lever after
+// model choice.
+const SYSTEM_PROMPT =
+  "You are Populr, a precise AI CMO. Base every claim strictly on the page details and " +
+  "context provided in the user message. Never invent statistics, traffic numbers, " +
+  "competitors, features, or quotes that aren't supported by that input — if something " +
+  "isn't given, reason from the domain and say what's an estimate. Be specific, concrete, " +
+  "and concise. When asked for JSON, return only valid JSON with no markdown fences or prose.";
 
 function dedupe(list: string[]) {
   return [...new Set(list.filter(Boolean))];
@@ -58,20 +71,17 @@ type LLMAttempt = {
 
 const PROVIDERS: ProviderConfig[] = [
   {
-    name: "openai",
-    env: "OPENAI_API_KEY",
-    prefix: "sk-",
-    url: "https://api.openai.com/v1/chat/completions",
-    models: [process.env.OPENAI_MODEL || "gpt-4o-mini"],
-    authHeader: "Authorization",
-    kind: "openai_compatible",
-  },
-  {
+    // Primary when keyed: Google's free tier is generous and accurate, so it isn't
+    // starved by Groq's tiny 70b daily cap. Real generateContent API (see callProvider).
+    // The model name goes in the URL path per-model, so `url` here is just the base.
     name: "gemini",
     env: "GEMINI_API_KEY",
     prefix: "",
-    url: "https://generativelanguage.googleapis.com/v1beta/interactions",
-    models: [process.env.GEMINI_MODEL || "gemini-3.5-flash"],
+    url: "https://generativelanguage.googleapis.com/v1beta/models",
+    models: dedupe([
+      process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      "gemini-2.0-flash",
+    ]),
     authHeader: "x-goog-api-key",
     kind: "gemini",
   },
@@ -80,14 +90,25 @@ const PROVIDERS: ProviderConfig[] = [
     env: "GROQ_API_KEY",
     prefix: "gsk_",
     url: "https://api.groq.com/openai/v1/chat/completions",
-    // Cheap, small, fast models — most dependable first. 8b-instant is rock-solid and
-    // available on every Groq account; scout and compound-mini are newer fallbacks.
-    // Each is a fraction of llama-3.3-70b's cost/token, cutting Groq quota burn hard.
+    // Accuracy-first: the 70b model leads for the best answers, then falls back to the
+    // fast/cheap 8b-instant (and newer scout/compound-mini) on rate limits or quota so a
+    // request never dies — it just degrades. Override the lead model with GROQ_MODEL.
     models: dedupe([
-      process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
       "meta-llama/llama-4-scout-17b-16e-instruct",
       "groq/compound-mini",
     ]),
+    authHeader: "Authorization",
+    kind: "openai_compatible",
+  },
+  {
+    // Last-resort fallback (only if an OpenAI key with billing is set).
+    name: "openai",
+    env: "OPENAI_API_KEY",
+    prefix: "sk-",
+    url: "https://api.openai.com/v1/chat/completions",
+    models: [process.env.OPENAI_MODEL || "gpt-4o-mini"],
     authHeader: "Authorization",
     kind: "openai_compatible",
   },
@@ -200,16 +221,26 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
     const requestBody =
       provider.kind === "gemini"
         ? JSON.stringify({
-            model,
-            input: prompt,
-            generation_config: { temperature: 0.7 },
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            generationConfig: { temperature: LLM_TEMPERATURE, maxOutputTokens: MAX_OUTPUT_TOKENS },
           })
         : JSON.stringify({
             model,
-            messages: [{ role: "user", content: prompt }],
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: prompt },
+            ],
             max_tokens: MAX_OUTPUT_TOKENS,
+            temperature: LLM_TEMPERATURE,
           });
-    const response = await fetch(provider.url, {
+    // Gemini puts the model + method in the URL path; OpenAI-compatible providers put the
+    // model in the body and hit a single fixed endpoint.
+    const endpoint =
+      provider.kind === "gemini"
+        ? `${provider.url}/${encodeURIComponent(model)}:generateContent`
+        : provider.url;
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -251,16 +282,13 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
     const parsed = safeJson(body);
     const text =
       provider.kind === "gemini"
-        ? (typeof parsed?.output_text === "string"
-            ? parsed.output_text
-            : Array.isArray(parsed?.steps)
-              ? parsed.steps
-                  .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
-                  .reverse()
-                  .find((part: any) => typeof part?.text === "string")?.text
-              : null)
+        ? (Array.isArray(parsed?.candidates?.[0]?.content?.parts)
+            ? parsed.candidates[0].content.parts
+                .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+                .join("")
+            : null)
         : parsed?.choices?.[0]?.message?.content;
-    if (typeof text !== "string") {
+    if (typeof text !== "string" || !text.trim()) {
       const invalidKind = "invalid_json";
       logEvent("llm_generate_failure", {
         requestId,
@@ -391,7 +419,7 @@ async function fetchRawHtml(url: string): Promise<string | null> {
  * Aggressively strips scripts/styles, nav/header/footer, and cookie/legal boilerplate
  * so the LLM prompt stays tiny — the single biggest lever on Groq token/quota usage.
  */
-function extractSummary(rawHtml: string, cap = 1500): string | null {
+function extractSummary(rawHtml: string, cap = 2600): string | null {
   try {
     let html = rawHtml;
 
@@ -418,10 +446,14 @@ function extractSummary(rawHtml: string, cap = 1500): string | null {
     }
 
     const h1 = collect(html, /<h1[^>]*>([\s\S]*?)<\/h1>/gi, 1)[0] || "";
-    const headings = collect(html, /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi, 3);
-    // First substantial paragraph = hero/intro copy.
-    const hero =
-      collect(html, /<p[^>]*>([\s\S]*?)<\/p>/gi, 8).find((p) => p.length >= 40) || "";
+    const headings = collect(html, /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi, 8);
+    // Substantial paragraphs = hero/intro/value copy. Keep the first few real ones so the
+    // model actually sees what the product does, not just the tagline.
+    const paras = collect(html, /<p[^>]*>([\s\S]*?)<\/p>/gi, 16)
+      .filter((p) => p.length >= 40)
+      .slice(0, 4);
+    const hero = paras[0] || "";
+    const body = paras.slice(1).join(" ");
     // Key CTA: first button or prominent action link.
     const cta =
       collect(html, /<(?:button|a)[^>]*>([\s\S]*?)<\/(?:button|a)>/gi, 40).find(
@@ -434,6 +466,7 @@ function extractSummary(rawHtml: string, cap = 1500): string | null {
       h1 && `H1: ${h1}`,
       headings.length && `Headings: ${headings.join(" | ")}`,
       hero && `Hero: ${hero}`,
+      body && `Body: ${body}`,
       cta && `CTA: ${cta}`,
     ].filter(Boolean);
 
@@ -618,7 +651,22 @@ export async function POST(req: NextRequest) {
           continue provider;
         }
 
-        // Transient (rate limit / quota / 5xx): short backoff-retry on the same model.
+        // Daily/quota exhaustion (e.g. Groq TPD cap) won't recover for minutes — retrying
+        // the same model is wasted effort. Drop straight to the next model, which has its
+        // own separate quota bucket (8b's daily cap is far larger than 70b's).
+        if (currentAttempt.kind === "quota_exhausted") {
+          logEvent("llm_model_skip", {
+            requestId,
+            provider: provider.name,
+            model,
+            reason: "quota_exhausted",
+            status: currentAttempt.status,
+            elapsedMs: currentAttempt.elapsedMs,
+          });
+          continue model;
+        }
+
+        // Transient (short-term rate limit / 5xx): short backoff-retry on the same model.
         for (const delayMs of [2000, 4000]) {
           await sleep(delayMs);
           attempt = await callProvider(provider, model, key, prompt, requestId, true);
@@ -629,6 +677,10 @@ export async function POST(req: NextRequest) {
           currentAttempt = attempt.attempt;
           lastAttempt = currentAttempt;
           if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+            continue model;
+          }
+          // Quota drained mid-retry → stop retrying this model, drop to the next one.
+          if (currentAttempt.kind === "quota_exhausted") {
             continue model;
           }
           if (!isTransientStatus(currentAttempt.status)) {

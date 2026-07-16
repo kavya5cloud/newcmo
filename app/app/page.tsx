@@ -615,7 +615,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         geo: `Write an AI-search / GEO deliverable for ${brand}.`,
         articles: `Write a long-form article brief or outline for ${brand}.`,
       };
-      body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
+      body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nGround the deliverable in the real page details above. Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.`, url);
       setDemo(false);
     } catch (e) {
       showToast(`AI request failed: ${aiErrorText(e).slice(0, 160)}`);
@@ -633,7 +633,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
     setDoc({ title: name, body: "…generating…" });
     try {
-      const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company. Be specific and practical. Use plain text with short sections. No preamble.`);
+      const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.`, url);
       setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
     } catch (e) {
