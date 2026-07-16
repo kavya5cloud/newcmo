@@ -13,7 +13,12 @@ async function ai(prompt: string, url?: string): Promise<string> {
     body: JSON.stringify({ prompt, url: url || null }),
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.error) throw new Error(d.error || "api " + r.status);
+  if (!r.ok || d.error) {
+    const detail = [d.error, d.kind, d.provider, d.model, d.status, d.detail]
+      .filter(Boolean)
+      .join(" · ");
+    throw new Error(detail || "api " + r.status);
+  }
   return d.text as string;
 }
 function parseJSON(txt: string) {
@@ -341,6 +346,7 @@ export default function AppPage() {
   const hydrated = useRef(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2600); };
+  const aiErrorText = (err: unknown) => err instanceof Error ? err.message : String(err);
   const liveTrial = useMemo(() => trialSnapshot(trial, nowTick), [trial, nowTick]);
 
   useEffect(() => {
@@ -535,12 +541,12 @@ export default function AppPage() {
     setUrl(u); setProgress(0); setGscError(null); setGscSite("");
     const steps = 5;
     const bump = (n: number) => setProgress(n);
+    let lastErr: unknown = null;
     try {
       bump(1);
       // Retry once so a single flaky response / malformed JSON doesn't drop the whole
       // analysis into demo mode (and then get saved).
       let p: Profile | null = null;
-      let lastErr: unknown = null;
       for (let attempt = 0; attempt < 2 && !p; attempt++) {
         try {
           const txt = await ai(
@@ -583,13 +589,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         { who: "ai", text: "Headline: 36 Reddit opportunities, 11 AI-search citation gaps, and one pricing-page fix that beats everything else on expected impact. Start there." },
       ]);
       bump(5); setDemo(false); setEntered(true);
-    } catch {
-      const host = hostOf(u);
-      setProfile({ name: host, oneLiner: "(couldn't reach the AI)", audience: "—", positioning: `We couldn't analyze ${host} — the AI was unreachable.`, competitors: ["—"], voice: "—", description: `We couldn't reach the AI to build a profile for ${host}, so this is placeholder data. If you're on the live site, make sure GROQ_API_KEY is set in your hosting environment, then re-run the analysis.` });
-      setCompetitors([{ n: "okara.ai", c: "#E86A3A" }, { n: "jasper.ai", c: "#5A8DE8" }, { n: "hubspot.com", c: "#E8843A" }]);
-      setChat([{ who: "ai", text: `Ran on ${host} in demo mode — add a working AI key to get real analysis.` }]);
-      setFeed(normalizeFeed(undefined, null, u)); setRankings([]); setDocCache({}); setEstTraffic(null);
-      setDemo(true); setEntered(true);
+    } catch (e) {
+      setProgress(-1);
+      setDemo(false);
+      showToast(`Analysis failed: ${aiErrorText(e ?? lastErr).slice(0, 180)}`);
     }
   }, [inputUrl]);
 
@@ -614,9 +617,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       };
       body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
       setDemo(false);
-    } catch {
-      body = `[demo draft — no AI key/quota]\n\n${agentName} · deliverable for:\n"${item}"\n\nAdd a working key for a real draft.`;
-      setDemo(true);
+    } catch (e) {
+      showToast(`AI request failed: ${aiErrorText(e).slice(0, 160)}`);
+      setBusyItem("");
+      return;
     }
     setBusyItem("");
     setDrafts((d) => [...d, { id: key + ":" + Date.now(), title: item, channel: agentId, body, approved: false }]);
@@ -632,8 +636,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company. Be specific and practical. Use plain text with short sections. No preamble.`);
       setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
-    } catch {
-      setDoc({ title: name, body: DOC_DEMO[id] || "—" });
+    } catch (e) {
+      setDoc({ title: name, body: `AI request failed: ${aiErrorText(e).slice(0, 200)}` });
     }
   }
 
@@ -658,9 +662,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       });
       reply = await ai(prompt, url);
       setDemo(false);
-    } catch {
-      reply = `Demo mode — based on ${profile?.name || hostOf(url)} I would start with the highest-leverage item in the current queue, then answer the exact question once you give me more context.`;
-      setDemo(true);
+    } catch (e) {
+      reply = `AI request failed: ${aiErrorText(e).slice(0, 200)}`;
     }
     setTyping(false); setChat((c) => [...c, { who: "ai", text: reply }]);
   }
