@@ -1,29 +1,29 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — cosmos.ai",
-  description: "The terms that govern your use of cosmos.ai.",
+  title: "Terms of Service — Poplr",
+  description: "The terms that govern your use of Poplr.",
 };
 
 export default function Terms() {
   return (
     <div className="legal">
       <div className="legal-top">
-        <a href="/">← cosmos.ai</a>
-        <img src="/logo.png" alt="cosmos.ai" />
+        <a href="/">← Poplr</a>
+        <span className="legal-wordmark">Poplr.</span>
       </div>
 
       <h1>Terms of Service</h1>
       <div className="updated">Last updated: 13 July 2026</div>
 
       <p>
-        These Terms of Service (&quot;Terms&quot;) govern your access to and use of cosmos.ai (the &quot;Service&quot;).
+        These Terms of Service (&quot;Terms&quot;) govern your access to and use of Poplr (the &quot;Service&quot;).
         By creating an account or using the Service, you agree to these Terms.
       </p>
 
       <h2>1. The Service</h2>
       <p>
-        cosmos is an AI marketing assistant that analyzes a website you provide, generates marketing recommendations and
+        Poplr is an AI marketing assistant that analyzes a website you provide, generates marketing recommendations and
         drafts, and can display analytics from integrations you connect. Every output is provided for your review — nothing
         is published on your behalf without your action.
       </p>
@@ -76,7 +76,7 @@ export default function Terms() {
 
       <h2>9. Limitation of liability</h2>
       <p>
-        To the fullest extent permitted by law, cosmos will not be liable for any indirect, incidental, or consequential
+        To the fullest extent permitted by law, Poplr will not be liable for any indirect, incidental, or consequential
         damages, or for lost profits or data, arising from your use of the Service.
       </p>
 
@@ -90,7 +90,7 @@ export default function Terms() {
       <p>We may update these Terms; material changes will be reflected by the &quot;Last updated&quot; date above.</p>
 
       <h2>12. Contact</h2>
-      <p>Questions about these Terms? Email <a href="mailto:hello@cosmos.ai">hello@cosmos.ai</a>.</p>
+      <p>Questions about these Terms? Email <a href="mailto:team@poplr.in">team@poplr.in</a>.</p>
 
       <div className="note">
         This document is a good-faith template for an early-stage product and is not legal advice. Have it reviewed by a
@@ -100,7 +100,7 @@ export default function Terms() {
       <div className="legal-foot">
         <a href="/">Home</a>
         <a href="/privacy">Privacy Policy</a>
-        <a href="mailto:hello@cosmos.ai">Contact</a>
+        <a href="mailto:team@poplr.in">Contact</a>
       </div>
     </div>
   );

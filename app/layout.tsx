@@ -3,9 +3,9 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "cosmos — your CMO",
+  title: "Poplr — your CMO",
   description:
-    "Introducing Cosmos, your CMO. Runs your marketing, skips the busywork. Try free for a month.",
+    "Introducing Poplr, your CMO. Runs your marketing, skips the busywork. Try free for a month.",
   icons: {
     icon: "/icon.svg?v=2",
     shortcut: "/icon.svg?v=2",

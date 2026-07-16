@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — cosmos.ai",
-  description: "How cosmos.ai collects, uses, and protects your data.",
+  title: "Privacy Policy — Poplr",
+  description: "How Poplr collects, uses, and protects your data.",
 };
 
 export default function Privacy() {
   return (
     <div className="legal">
       <div className="legal-top">
-        <a href="/">← cosmos.ai</a>
-        <img src="/logo.png" alt="cosmos.ai" />
+        <a href="/">← Poplr</a>
+        <span className="legal-wordmark">Poplr.</span>
       </div>
 
       <h1>Privacy Policy</h1>
       <div className="updated">Last updated: 13 July 2026</div>
 
       <p>
-        This Privacy Policy explains how cosmos.ai (&quot;cosmos&quot;, &quot;we&quot;, &quot;us&quot;) collects, uses, and protects
+        This Privacy Policy explains how Poplr (&quot;Poplr&quot;, &quot;we&quot;, &quot;us&quot;) collects, uses, and protects
         information when you use our website and application (the &quot;Service&quot;). By using the Service you agree to
         this policy.
       </p>
@@ -39,7 +39,7 @@ export default function Privacy() {
 
       <h2>3. Google API Services User Data</h2>
       <p>
-        cosmos&apos;s use and transfer of information received from Google APIs adheres to the{" "}
+        Poplr&apos;s use and transfer of information received from Google APIs adheres to the{" "}
         <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
           Google API Services User Data Policy
         </a>
@@ -90,7 +90,7 @@ export default function Privacy() {
       <p>We may update this policy; material changes will be reflected by the &quot;Last updated&quot; date above.</p>
 
       <h2>10. Contact</h2>
-      <p>Questions about this policy? Email <a href="mailto:hello@cosmos.ai">hello@cosmos.ai</a>.</p>
+      <p>Questions about this policy? Email <a href="mailto:team@poplr.in">team@poplr.in</a>.</p>
 
       <div className="note">
         This document is a good-faith template for an early-stage product and is not legal advice. Have it reviewed by a
@@ -100,7 +100,7 @@ export default function Privacy() {
       <div className="legal-foot">
         <a href="/">Home</a>
         <a href="/terms">Terms of Service</a>
-        <a href="mailto:hello@cosmos.ai">Contact</a>
+        <a href="mailto:team@poplr.in">Contact</a>
       </div>
     </div>
   );

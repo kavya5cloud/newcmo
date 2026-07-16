@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const AGENTS: { c: string; name: string; desc: string; soon?: boolean; icon: React.ReactNode }[] = [
   { c: "#3ECF8E", name: "Influencer Agent", desc: "Finds creators who match your audience and drafts the outreach.", icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
@@ -17,8 +17,24 @@ const AGENTS: { c: string; name: string; desc: string; soon?: boolean; icon: Rea
   { c: "#5AC8E8", name: "Link Broker Agent", soon: true, desc: "High-quality backlink building, on autopilot.", icon: <><path d="M10.2 13.8a4.2 4.2 0 0 0 6.2.4l2.8-2.8a4.2 4.2 0 0 0-5.9-5.9l-1.5 1.5" /><path d="M13.8 10.2a4.2 4.2 0 0 0-6.2-.4l-2.8 2.8a4.2 4.2 0 0 0 5.9 5.9l1.5-1.5" /></> },
 ];
 
+const AGENT_DETAILS: Record<string, string> = {
+  "Influencer Agent": "Builds a short, qualified creator list with audience-fit notes and ready-to-edit outreach messages.",
+  "Reddit Agent": "Prioritizes conversations with buying intent, then gives you a helpful, on-brand response draft to review.",
+  "SEO Agent": "Finds practical search opportunities across your site, from page fixes to content topics worth ranking for.",
+  "Writer Agent": "Turns the highest-value opportunities into articles, landing-page copy, and campaign content in your voice.",
+  "X (Twitter) Agent": "Produces timely post and thread ideas based on your positioning, product insights, and active campaigns.",
+  "LinkedIn Agent": "Creates credible founder-led posts that turn a specific product or market insight into a useful narrative.",
+  "Hacker News Agent": "Frames your launch around the problem, how the product works, technical choices, and honest limitations.",
+  "GEO Agent": "Checks where AI search tools cite competitors and identifies the content or authority gaps to close.",
+  "Coding Agent": "Converts technical SEO recommendations into implementation-ready tasks and code changes for your site.",
+  "UGC Videos Agent": "Creates clear creative briefs for short product videos, social clips, and paid-ad variations.",
+  "Google Search Console": "Uses verified Search Console data to surface queries, pages, clicks, impressions, and ranking changes.",
+  "Google Analytics": "Turns GA4 behavior signals into focused recommendations about what is working and what needs attention.",
+  "Link Broker Agent": "Will identify relevant backlink opportunities and prepare outreach once the feature is available.",
+};
+
 const TERM_LINES = [
-  { t: "$ cosmos run --daily", cls: "p", d: 24 },
+  { t: "$ poplr run --daily", cls: "p", d: 24 },
   { t: "scanning: site, ga4, search-console … done", cls: "c", d: 10 },
   { t: 'skip  write 4 articles for "best crm"   # won\'t rank', cls: "skip", d: 10 },
   { t: "skip  daily linkedin posts              # buyers aren't there", cls: "skip", d: 10 },
@@ -33,7 +49,7 @@ function esc(s: string) {
 export default function Landing() {
   const dotsRef = useRef<HTMLCanvasElement>(null);
   const termRef = useRef<HTMLDivElement>(null);
-
+  const [flippedAgent, setFlippedAgent] = useState<string | null>(null);
   useEffect(() => {
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const body = termRef.current;
@@ -104,7 +120,7 @@ export default function Landing() {
     <div className="landing">
       <nav>
         <div className="nav-in">
-          <a href="/" className="logo" aria-label="cosmos.ai home">cosmos.ai</a>
+          <a href="/" className="logo" aria-label="Poplr home">Poplr.</a>
           <div className="nav-r">
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
@@ -117,15 +133,15 @@ export default function Landing() {
         <canvas className="dots" ref={dotsRef} aria-hidden="true" />
         <div className="wrap" style={{ position: "relative", zIndex: 2 }}>
           <span className="pill"><i />now in early access</span>
-          <h1>Introducing <span className="name">cosmos</span><span className="hdim"> —</span><br />your CMO.</h1>
-          <p className="sub">Paste your URL. Cosmos learns your product, runs SEO, AI search, Reddit and content daily — and only pings you for what actually moves your numbers.</p>
+          <h1>Meet <span className="name">Poplr.</span><br /><span className="headline-tail">Your AI CMO.</span></h1>
+          <p className="sub">Paste your URL. Poplr learns your product, runs SEO, AI search, Reddit and content daily — and only pings you for what actually moves your numbers.</p>
           <div className="cta-row">
             <a href="/app" className="btn btn-lg">Try free for a month</a>
             <a href="#how" className="btn btn-lg btn-ghost">See how it works</a>
           </div>
           <p className="under">no card · no setup · one URL</p>
-          <div className="term" role="img" aria-label="Terminal showing Cosmos skipping low-value tasks">
-            <div className="term-bar"><b /><b /><b /><span>cosmos · daily run</span></div>
+          <div className="term" role="img" aria-label="Terminal showing Poplr skipping low-value tasks">
+            <div className="term-bar"><b /><b /><b /><span>poplr · daily run</span></div>
             <div className="term-body" ref={termRef} />
           </div>
         </div>
@@ -137,9 +153,9 @@ export default function Landing() {
           <h2 style={{ marginTop: 14 }}>Three steps. No dashboard babysitting.</h2>
           <div className="grid">
             {[
-              ["01", "Connect", "One URL. Cosmos reads your site, GA4, and Search Console to learn what your business actually is and where revenue comes from."],
+              ["01", "Connect", "One URL. Poplr reads your site, GA4, and Search Console to learn what your business actually is and where revenue comes from."],
               ["02", "Run", "Agents work every channel daily — SEO, AI-search visibility, Reddit, content. Everything drafts in the background."],
-              ["03", "Approve", "Cosmos skips low-value work with a reason attached and sends you the few things worth doing. Nothing ships without you."],
+              ["03", "Approve", "Poplr skips low-value work with a reason attached and sends you the few things worth doing. Nothing ships without you."],
             ].map(([n, h, p]) => (
               <div className="cell" key={n}>
                 <span className="label" style={{ color: "var(--green)" }}>{n}</span>
@@ -160,16 +176,34 @@ export default function Landing() {
           </div>
           <div className="agrid">
             {AGENTS.map((a) => (
-              <div className="acell" key={a.name}>
-                <div className="ahead">
-                  <span className="aic" style={{ ["--ac" as string]: a.c } as React.CSSProperties}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
+              <button
+                className={"acell" + (flippedAgent === a.name ? " is-flipped" : "")}
+                key={a.name}
+                type="button"
+                onClick={() => setFlippedAgent((current) => current === a.name ? null : a.name)}
+                aria-pressed={flippedAgent === a.name}
+                aria-label={`${a.name}: ${flippedAgent === a.name ? "show overview" : "show details"}`}
+              >
+                <span className="aflip">
+                  <span className="aface afront">
+                    <span className="ahead">
+                      <span className="aic" style={{ ["--ac" as string]: a.c } as React.CSSProperties}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
+                      </span>
+                      <span className="agent-name">{a.name}</span>
+                      {a.soon && <span className="soon">SOON</span>}
+                    </span>
+                    <span className="agent-copy">{a.desc}</span>
+                    <span className="flip-hint">Click for details</span>
                   </span>
-                  <h3>{a.name}</h3>
-                  {a.soon && <span className="soon">SOON</span>}
-                </div>
-                <p>{a.desc}</p>
-              </div>
+                  <span className="aface aback">
+                    <span className="label">What it does</span>
+                    <span className="agent-name">{a.name}</span>
+                    <span className="agent-copy">{AGENT_DETAILS[a.name]}</span>
+                    <span className="flip-hint">Click to return</span>
+                  </span>
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -178,9 +212,9 @@ export default function Landing() {
       <section id="compare">
         <div className="wrap">
           <p className="label">The math</p>
-          <h2 style={{ marginTop: 14 }}>What cosmos replaces vs. what it costs.</h2>
+          <h2 style={{ marginTop: 14 }}>What Poplr replaces vs. what it costs.</h2>
           <div className="cmp">
-            <div className="cmp-row cmp-head"><span>What needs doing</span><span>Hiring it out</span><span className="hi">With cosmos</span></div>
+            <div className="cmp-row cmp-head"><span>What needs doing</span><span>Hiring it out</span><span className="hi">With Poplr</span></div>
             {[
               ["Marketing generalist", "$5,000/mo"], ["SEO agency", "$4,000/mo"], ["Content writer", "$1,500/mo"],
               ["Social media manager", "$1,500/mo"], ["Community & Reddit growth", "$1,000/mo"],
@@ -210,11 +244,11 @@ export default function Landing() {
 
       <footer>
         <div className="wrap" style={{ display: "flex", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: 10 }}>
-          <a href="/" className="footer-logo" aria-label="cosmos.ai home">cosmos.ai</a>
+          <a href="/" className="footer-logo" aria-label="Poplr home">Poplr.</a>
           <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <a href="#how" style={{ color: "var(--faint)", textDecoration: "none" }}>how it works</a>
             <a href="#pricing" style={{ color: "var(--faint)", textDecoration: "none" }}>pricing</a>
-            <a href="mailto:hello@cosmos.ai" style={{ color: "var(--faint)", textDecoration: "none" }}>contact</a>
+            <a href="mailto:team@poplr.in" style={{ color: "var(--faint)", textDecoration: "none" }}>contact</a>
             <a href="/privacy" className="foot-btn">Privacy Policy</a>
             <a href="/terms" className="foot-btn">Terms of Service</a>
           </span>

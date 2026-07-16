@@ -66,7 +66,7 @@ export default function Account() {
       <div className="acct">
         <div className="acct-top">
           <a href="/app" className="acct-back">← back to app</a>
-          <img src="/logo.png" alt="cosmos.ai" style={{ height: 14, imageRendering: "pixelated" }} />
+          <span className="app-wordmark">Poplr.</span>
         </div>
 
         {me && !me.user && (
@@ -98,7 +98,7 @@ export default function Account() {
                 ) : (
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge end">ended</span></div>
-                    <p className="acct-dim">Your free month ended {fmtDate(liveTrial.endsAt)}. Upgrade to keep using cosmos.</p>
+                    <p className="acct-dim">Your free month ended {fmtDate(liveTrial.endsAt)}. Upgrade to keep using Poplr.</p>
                     <button className="acct-btn pri" style={{ marginTop: 12 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
                   </>
                 )

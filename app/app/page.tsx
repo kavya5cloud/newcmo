@@ -45,7 +45,7 @@ function feedText(entry?: FeedEntry) {
 
 function feedLooksGeneric(entry?: FeedEntry) {
   const text = feedText(entry);
-  return !text || /cosmos(?:\.ai)?|short (?:thread angle|keyword or fix|ai-search gap|post idea|article title)|draft reply|fix gap|review|open/.test(text) || text.length < 30;
+  return !text || /cosmos(?:\.ai)?|poplr|short (?:thread angle|keyword or fix|ai-search gap|post idea|article title)|draft reply|fix gap|review|open/.test(text) || text.length < 30;
 }
 
 function buildFallbackFeed(profile: Profile | null, url: string): Record<string, FeedEntry> {
@@ -198,12 +198,12 @@ ${input.question}`;
 /* ---------- static agent + doc definitions ---------- */
 type AgentDef = { id: string; name: string; color: string; sum: string; items: [string, string][]; icon: React.ReactNode };
 const AGENTS: AgentDef[] = [
-  { id: "reddit", name: "Reddit Agent", color: "#FF4500", sum: "36 opportunities ready", items: [["Thread: \"tools for early-stage marketing?\" — high intent", "Draft reply"], ["Thread: \"is SEO dead in 2026?\" — position cosmos", "Draft reply"], ["Thread: \"AI CMO tools worth it?\" — direct match", "Draft reply"]], icon: <><ellipse cx="12" cy="14" rx="8" ry="5.6" /><circle cx="19.5" cy="9.5" r="1.6" /><path d="M12 8.4l1.2-4.2 4 1.1" strokeLinecap="round" /><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" strokeLinecap="round" /></> },
+  { id: "reddit", name: "Reddit Agent", color: "#FF4500", sum: "36 opportunities ready", items: [["Thread: \"tools for early-stage marketing?\" — high intent", "Draft reply"], ["Thread: \"is SEO dead in 2026?\" — share a practical perspective", "Draft reply"], ["Thread: \"AI CMO tools worth it?\" — direct match", "Draft reply"]], icon: <><ellipse cx="12" cy="14" rx="8" ry="5.6" /><circle cx="19.5" cy="9.5" r="1.6" /><path d="M12 8.4l1.2-4.2 4 1.1" strokeLinecap="round" /><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" strokeLinecap="round" /></> },
   { id: "geo", name: "GEO Agent", color: "#5A8DE8", sum: "11 citation gaps detected", items: [["Not cited for \"ai marketing automation\" in ChatGPT", "Fix gap"], ["Perplexity cites 2 competitors for your core query", "Fix gap"]], icon: <><circle cx="12" cy="12" r="8.4" /><ellipse cx="12" cy="12" rx="3.6" ry="8.4" /><path d="M3.8 12h16.4" /></> },
   { id: "seo", name: "SEO Agent", color: "#CDA6F2", sum: "46 recommendations ready", items: [["12 pages missing meta descriptions", "Review"], ["Keyword gap: \"marketing copilot\" — 2.1k/mo, low difficulty", "Draft post"]], icon: <><circle cx="11" cy="11" r="6.2" /><path d="M15.6 15.6L20 20" /><path d="M8.5 11h5M11 8.5v5" /></> },
   { id: "x", name: "X Agent", color: "#FAFAFA", sum: "137 ideas ready", items: [["Thread idea: \"we skipped 80% of our marketing tasks\"", "Draft"], ["Post: launch-week metrics recap", "Draft"]], icon: <path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z" fill="currentColor" stroke="none" /> },
   { id: "articles", name: "Articles Agent", color: "#9A6AE8", sum: "32 topics ready", items: [["\"AI CMO vs marketing agency: real math\" — outline ready", "Open"], ["\"how to get cited by ChatGPT\" — research done", "Open"]], icon: <><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></> },
-  { id: "hn", name: "Hacker News Agent", color: "#FF6600", sum: "1 post ready", items: [["Show HN draft: \"Cosmos — an AI CMO that says no\"", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" strokeWidth="1.9" strokeLinecap="round" /></> },
+  { id: "hn", name: "Hacker News Agent", color: "#FF6600", sum: "1 post ready", items: [["Show HN: a focused marketing operating system", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" strokeWidth="1.9" strokeLinecap="round" /></> },
   { id: "linkedin", name: "LinkedIn Agent", color: "#0A66C2", sum: "3 posts ready", items: [["Founder post: why we skip most marketing tasks", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><circle cx="8" cy="8.3" r="1.25" fill="currentColor" stroke="none" /><path d="M8 11.2v6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 17.2v-6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 13.6a2.5 2.5 0 0 1 5 0v3.6" strokeWidth="2" strokeLinecap="round" /></> },
   { id: "ugc", name: "UGC Videos Agent", color: "#E8843A", sum: "1 video · 1 completed", items: [["15s product clip — ready to preview", "Preview"]], icon: <><rect x="2.8" y="4.8" width="18.4" height="14.4" rx="3" /><path d="M10.2 9.2l4.6 2.8-4.6 2.8V9.2z" fill="currentColor" stroke="none" /></> },
   { id: "infl", name: "Influencer Campaigns", color: "#3ECF8E", sum: "Launch your first campaign", items: [["23 creators scored for audience fit", "Open list"]], icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
@@ -219,7 +219,7 @@ const DOCS = [
 ];
 
 const TERM_LINES: [string, string][] = [
-  ["tl-p", "$ cosmos run --daily"],
+  ["tl-p", "$ poplr run --daily"],
   ["", "> [seo] crawling sitemap… 214 pages"],
   ["", "> [seo] scoring keyword gaps against 3 competitors…"],
   ["", "> [reddit] scanning 14 subreddits for buying intent…"],
@@ -277,8 +277,8 @@ const FALLBACK_RANKS: Ranking[] = [
 ];
 
 const DOC_DEMO: Record<string, string> = {
-  product: "# Product Information\n\nGenerated once cosmos analyzes your site with a live AI key.\nUntil then this is a placeholder describing your product, its core loop, and pricing.",
-  compet: "# Competitor Analysis\n\nYour top competitors and how cosmos positions against them appear here after analysis.",
+  product: "# Product Information\n\nGenerated once Poplr analyzes your site with a live AI key.\nUntil then this is a placeholder describing your product, its core loop, and pricing.",
+  compet: "# Competitor Analysis\n\nYour top competitors and how Poplr positions against them appear here after analysis.",
   voice: "# Brand Voice\n\nAdjectives, do's and don'ts, and a reference line — learned from your site.",
   strategy: "# Marketing Strategy\n\nObjective, channel pillars, and weekly cadence — drafted from your positioning.",
   llms: "# llms.txt\n\nGenerated for AI crawlers so ChatGPT / Perplexity cite you correctly.",
@@ -517,7 +517,7 @@ export default function AppPage() {
     let i = 0; let timer: ReturnType<typeof setTimeout>;
     const next = () => {
       if (!tlogRef.current) return;
-      if (i >= TERM_LINES.length) { el.insertAdjacentHTML("beforeend", '<div><span class="tl-p">cosmos@ai:~$</span> <span style="display:inline-block;width:7px;height:12px;background:var(--fg);vertical-align:-2px"></span></div>'); el.scrollTop = el.scrollHeight; return; }
+      if (i >= TERM_LINES.length) { el.insertAdjacentHTML("beforeend", '<div><span class="tl-p">poplr@ai:~$</span> <span style="display:inline-block;width:7px;height:12px;background:var(--fg);vertical-align:-2px"></span></div>'); el.scrollTop = el.scrollHeight; return; }
       const [c, t] = TERM_LINES[i++];
       el.insertAdjacentHTML("beforeend", `<div class="${c}">${esc(t)}</div>`); el.scrollTop = el.scrollHeight;
       timer = setTimeout(next, 240 + Math.random() * 260);
@@ -558,8 +558,8 @@ export default function AppPage() {
       // Phase 2: generate a company-specific agents feed + rankings, and (separately) an
       // estimated-traffic figure. Kept as two calls so a failure in one can't break the other.
       const insP = ai(
-        `You are cosmos, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
-Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention cosmos.ai unless the analyzed site is cosmos.ai. Exactly this shape:
+        `You are Poplr, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
+Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention Poplr unless the analyzed site is Poplr. Exactly this shape:
 {"feed":{"reddit":{"summary":"36 opportunities ready","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"46 recommendations","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"11 citation gaps","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"137 ideas","items":[["short post idea","Draft"]]},"linkedin":{"summary":"3 posts ready","items":[["short post idea","Review"]]},"articles":{"summary":"32 topics ready","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
 Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
@@ -604,15 +604,15 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       const voice = profile?.voice || "clear, practical, specific";
       const context = `Website: ${url || "unknown"}\nBrand: ${brand}\nSummary: ${oneLiner}\nVoice: ${voice}`;
       const channelBrief: Record<string, string> = {
-        hn: `Write as a Hacker News launch artifact for ${brand}. Focus on the problem, the novelty, and the technical or product insight. Never mention cosmos.ai unless the analyzed site is cosmos.ai.`,
-        linkedin: `Write as a polished LinkedIn post for a founder or operator at ${brand}. Make it professional, concise, and credible. Never mention cosmos.ai unless the analyzed site is cosmos.ai.`,
+        hn: `Write a Show HN launch post for ${brand}. Use the brand name ${brand}, never Poplr, unless ${brand} itself is Poplr. State a concrete problem, how the product works, technical or product decisions, and honest limitations. Avoid hype, marketing clichés, and unsupported claims.`,
+        linkedin: `Write a polished LinkedIn post for a founder or operator at ${brand}. Use the brand name ${brand}, never Poplr, unless ${brand} itself is Poplr. Start with a specific insight, support it with a concrete example, and end without a hard sell.`,
         reddit: `Write a high-signal Reddit reply or post for ${brand}. Sound helpful, specific, and non-promotional.`,
         x: `Write a concise X post or thread starter for ${brand}.`,
         seo: `Write an SEO deliverable for ${brand}.`,
         geo: `Write an AI-search / GEO deliverable for ${brand}.`,
         articles: `Write a long-form article brief or outline for ${brand}.`,
       };
-      body = await ai(`You are the ${agentName} inside cosmos.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
+      body = await ai(`You are the ${agentName} inside Poplr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nProduce the complete, ready-to-use deliverable. No preamble — just the deliverable.`);
       setDemo(false);
     } catch {
       body = `[demo draft — no AI key/quota]\n\n${agentName} · deliverable for:\n"${item}"\n\nAdd a working key for a real draft.`;
@@ -629,7 +629,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
     setDoc({ title: name, body: "…generating…" });
     try {
-      const body = await ai(`You are cosmos, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company. Be specific and practical. Use plain text with short sections. No preamble.`);
+      const body = await ai(`You are Poplr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company. Be specific and practical. Use plain text with short sections. No preamble.`);
       setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
     } catch {
@@ -754,9 +754,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         <div className="onboard">
           <canvas className="dots" ref={dotsRef} aria-hidden="true" />
           <div className="ob-in">
-            <img src="/logo.png" alt="cosmos.ai" style={{ height: 28, imageRendering: "pixelated" }} />
+            <span className="app-wordmark app-wordmark-lg">Poplr.</span>
             <h1>What are we growing?</h1>
-            <p className="s">Paste your website. Cosmos reads it, figures out your positioning, and builds today&apos;s plan.</p>
+            <p className="s">Paste your website. Poplr reads it, figures out your positioning, and builds today&apos;s plan.</p>
             <div className="urlbox">
               <input value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && analyze()} type="url" placeholder="https://yourcompany.com" autoComplete="off" spellCheck={false} />
               <button className="go" onClick={analyze} disabled={progress >= 0}>Analyze →</button>
@@ -783,7 +783,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       <div className={"appshell" + (termCollapsed ? " term-collapsed" : "")}>
         <div className="topbar">
           <div className="tb-l">
-            <img src="/logo.png" alt="cosmos.ai" />
+            <span className="app-wordmark">Poplr.</span>
             <span className="sep">·</span>
             <span className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>AI CMO Terminal · running daily</span>
           </div>
@@ -857,7 +857,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               <div className="sect">
                 <span className="label">Competitors</span>
                 <p className="company-desc" style={{ marginBottom: 10 }}>
-                  These names drive comparison pages, objection handling, and positioning. Cosmos keeps them tied to the current website instead of reusing stale defaults.
+                  These names drive comparison pages, objection handling, and positioning. Poplr keeps them tied to the current website instead of reusing stale defaults.
                 </p>
                 {competitors.length ? competitors.map((c) => (
                   <div className="comp-row" key={c.n}>
@@ -1149,9 +1149,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       {mustSignIn && !authOpen && (
         <div className="trial-lock">
           <div className="trial-lock-card">
-            <img src="/logo.png" alt="cosmos.ai" style={{ height: 20, imageRendering: "pixelated", marginBottom: 18 }} />
+            <span className="app-wordmark app-wordmark-lg">Poplr.</span>
             <h2>Sign in to continue</h2>
-            <p>Create a free account to save your analysis and keep using cosmos. Your work carries over.</p>
+            <p>Create a free account to save your analysis and keep using Poplr. Your work carries over.</p>
             <button className="acct-btn pri" style={{ marginTop: 18 }} onClick={() => setAuthOpen(true)}>Sign in / Create account</button>
           </div>
         </div>
@@ -1218,7 +1218,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       {authUser && liveTrial && !liveTrial.active && (
         <div className="trial-lock">
           <div className="trial-lock-card">
-            <img src="/logo.png" alt="cosmos.ai" style={{ height: 20, imageRendering: "pixelated", marginBottom: 18 }} />
+            <span className="app-wordmark app-wordmark-lg">Poplr.</span>
             <h2>Your free month has ended</h2>
             <p>Upgrade to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
             <button className="acct-btn pri" style={{ marginTop: 18 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
@@ -1308,7 +1308,7 @@ function AuthModal({ onClose, forced }: { onClose: () => void; forced?: boolean 
       <div className="authcard">
         {!forced && <button className="xclose" onClick={onClose}>✕</button>}
         <h3>{mode === "signup" ? "Create your account" : "Welcome back"}</h3>
-        <div className="authsub">{mode === "signup" ? "Save your workspace across devices." : "Sign in to your cosmos workspace."}</div>
+        <div className="authsub">{mode === "signup" ? "Save your workspace across devices." : "Sign in to your Poplr workspace."}</div>
         <label>Email</label>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="you@company.com" autoComplete="email" />
         <label>Password</label>

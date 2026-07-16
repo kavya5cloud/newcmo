@@ -1,7 +1,7 @@
-/* cosmos.ai — web push service worker */
+/* Poplr web push service worker */
 
 self.addEventListener("push", (event) => {
-  let data = { title: "cosmos.ai", body: "Time to publish", url: "/app", tag: "cosmos" };
+  let data = { title: "Poplr", body: "Time to publish", url: "/app", tag: "poplr" };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
       body: data.body,
       icon: "/logo.png",
       badge: "/logo.png",
-      tag: data.tag || "cosmos",
+      tag: data.tag || "poplr",
       data: { url: data.url || "/app" },
     })
   );
