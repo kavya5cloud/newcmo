@@ -90,7 +90,7 @@ export default function Privacy() {
       <p>We may update this policy; material changes will be reflected by the &quot;Last updated&quot; date above.</p>
 
       <h2>10. Contact</h2>
-      <p>Questions about this policy? Email <a href="mailto:team@poplr.in">team@poplr.in</a>.</p>
+      <p>Questions about this policy? Email <a href="mailto:team@trypopulr.in">team@trypopulr.in</a>.</p>
 
       <div className="note">
         This document is a good-faith template for an early-stage product and is not legal advice. Have it reviewed by a
@@ -100,7 +100,7 @@ export default function Privacy() {
       <div className="legal-foot">
         <a href="/">Home</a>
         <a href="/terms">Terms of Service</a>
-        <a href="mailto:team@poplr.in">Contact</a>
+        <a href="mailto:team@trypopulr.in">Contact</a>
       </div>
     </div>
   );
