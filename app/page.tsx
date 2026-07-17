@@ -124,6 +124,7 @@ export default function Landing() {
           <div className="nav-r">
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
+            <a href="/early-access" className="btn btn-ghost btn-sm">Early access</a>
             <a href="/app" className="btn">Try free <span className="kbd">1 mo</span></a>
           </div>
         </div>
