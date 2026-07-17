@@ -83,13 +83,16 @@ export default function EarlyAccess() {
 
           <section id="why" className="ea-why">
             <p className="ea-eyebrow">Why join</p>
-            <div className="ea-cards">
-              {BENEFITS.map((b, i) => (
-                <div className="ea-card" key={i} style={{ animationDelay: `${i * 70}ms` }}>
-                  <span className="ea-ico">{b.icon}</span>
-                  <span className="ea-ctitle">{b.title}</span>
-                </div>
-              ))}
+            {/* Infinite marquee — BENEFITS rendered twice so the track loops seamlessly. */}
+            <div className="ea-marquee">
+              <div className="ea-mtrack">
+                {[...BENEFITS, ...BENEFITS].map((b, i) => (
+                  <span className="ea-pill" key={i} aria-hidden={i >= BENEFITS.length}>
+                    <span className="ea-pico">{b.icon}</span>
+                    <span className="ea-ptitle">{b.title}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </section>
 
