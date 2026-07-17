@@ -9,6 +9,8 @@ import {
   scoreConfidence,
   type SnapshotMetrics,
 } from "@/lib/intel";
+import { ensurePushTables, getPrefs, sendToUser, wasReminderSentToday, recordReminder } from "@/lib/push";
+import { displaySite } from "@/lib/gsc-match";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,6 +41,37 @@ function siteHost(siteUrl: string): string {
   }
 }
 
+/**
+ * The single most notification-worthy improvement between two weekly snapshots, or null.
+ * High-value only — a notification must tell the user WHY to open Populr, so generic
+ * "analysis completed" noise is never sent, and neither are tiny/noisy movements.
+ * Priority: query rank gains (most concrete) → CTR → clicks → impressions.
+ */
+function bestOutcomeNote(prev: SnapshotMetrics, cur: SnapshotMetrics, site: string): string | null {
+  // 1. A meaningful query climbed the rankings.
+  const prevQ = new Map((prev.topQueries || []).map((q) => [q.query, q]));
+  let bestGain: { query: string; gain: number } | null = null;
+  for (const q of cur.topQueries || []) {
+    const p = prevQ.get(q.query);
+    if (!p || q.impressions < 20) continue;
+    const gain = Math.round(p.position - q.position);
+    if (gain >= 2 && (!bestGain || gain > bestGain.gain)) bestGain = { query: q.query, gain };
+  }
+  if (bestGain) return `"${bestGain.query}" moved up ${bestGain.gain} positions on Google.`;
+
+  const pct = (b: number, a: number) => (b > 0 ? (a - b) / b : 0);
+  // 2. CTR jumped.
+  const ctrPct = pct(prev.ctr, cur.ctr);
+  if (ctrPct >= 0.1 && cur.impressions >= 100) return `Your CTR increased ${Math.round(ctrPct * 100)}% this week on ${displaySite(site)}.`;
+  // 3. Clicks jumped.
+  const clicksPct = pct(prev.clicks, cur.clicks);
+  if (clicksPct >= 0.15 && cur.clicks >= 10) return `Search clicks up ${Math.round(clicksPct * 100)}% this week (${prev.clicks} → ${cur.clicks}).`;
+  // 4. Visibility jumped.
+  const imprPct = pct(prev.impressions, cur.impressions);
+  if (imprPct >= 0.25 && cur.impressions >= 200) return `${displaySite(site)} was seen ${Math.round(imprPct * 100)}% more in Google this week.`;
+  return null;
+}
+
 async function captureSite(token: string, site: string): Promise<SnapshotMetrics | null> {
   const start = isoDaysAgo(9);
   const end = isoDaysAgo(2); // GSC data lags ~2 days
@@ -65,31 +98,61 @@ async function captureSite(token: string, site: string): Promise<SnapshotMetrics
 
 export async function GET(req: NextRequest) {
   if (!authCron(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const started = Date.now();
   const sql = db();
   if (!sql) return NextResponse.json({ enabled: false });
 
   await ensureGoogleTable(sql);
   await ensureIntelTables(sql);
 
-  /* ---- Phase 1: snapshots ---- */
+  /* ---- Phase 1: snapshots (+ high-value outcome notifications) ---- */
+  await ensurePushTables(sql);
   let snapshots = 0;
+  let notified = 0;
   const users = (await sql`SELECT user_id FROM google_tokens LIMIT 200`) as { user_id: string }[];
   for (const { user_id } of users) {
     try {
       const token = await getAccessToken(sql, user_id);
       if (!token) continue;
+      const wsKey = "user:" + user_id;
+      const notes: string[] = [];
       const sites = (await listSites(token)).slice(0, 5);
       for (const site of sites) {
         const metrics = await captureSite(token, site);
         if (!metrics) continue;
-        await saveOutcomeSnapshot(sql, "user:" + user_id, site, 7, metrics);
+        // Previous snapshot BEFORE inserting the new one — it's the comparison baseline.
+        const prevRows = (await sql`
+          SELECT metrics FROM outcome_snapshots
+          WHERE workspace_key = ${wsKey} AND site_url = ${site}
+          ORDER BY captured_at DESC LIMIT 1`) as { metrics: SnapshotMetrics }[];
+        await saveOutcomeSnapshot(sql, wsKey, site, 7, metrics);
         snapshots++;
+        if (prevRows[0]) {
+          const note = bestOutcomeNote(prevRows[0].metrics, metrics, site);
+          if (note) notes.push(note);
+        }
+      }
+      // At most ONE notification per user per run, and only if it's genuinely good news.
+      if (notes.length) {
+        const prefs = await getPrefs(sql, user_id);
+        if (prefs.enabled && !(await wasReminderSentToday(sql, user_id, "outcome"))) {
+          const sent = await sendToUser(sql, user_id, {
+            title: "Populr — your numbers moved",
+            body: notes[0],
+            url: "/app",
+            tag: "populr-outcome",
+          });
+          if (sent > 0) {
+            await recordReminder(sql, user_id, "outcome");
+            notified++;
+          }
+        }
       }
     } catch (e) {
       log("outcome_snapshot_error", { userId: user_id, detail: String(e).slice(0, 150) });
     }
   }
-  log("outcome_snapshots_captured", { users: users.length, snapshots });
+  log("outcome_snapshots_captured", { users: users.length, snapshots, notified });
 
   /* ---- Phase 2: attribution scores ---- */
   // Approved recommendations without a score yet, old enough to have an "after" window.
@@ -135,5 +198,6 @@ export async function GET(req: NextRequest) {
   }
   log("attribution_pass_complete", { candidates: candidates.length, scored });
 
-  return NextResponse.json({ ok: true, snapshots, candidates: candidates.length, scored });
+  log("outcome_cron_complete", { snapshots, notified, candidates: candidates.length, scored, durationMs: Date.now() - started });
+  return NextResponse.json({ ok: true, snapshots, notified, candidates: candidates.length, scored });
 }

@@ -30,6 +30,41 @@ function hostOf(u: string) {
   try { return new URL(u).hostname.replace("www.", ""); } catch { return u; }
 }
 
+/* ---------- growth sources: not everyone has a website ---------- */
+type SourceType = "website" | "instagram" | "linkedin" | "x" | "youtube" | "gbp";
+
+const SOURCES: { id: SourceType; label: string; placeholder: string }[] = [
+  { id: "website", label: "website", placeholder: "https://yourcompany.com" },
+  { id: "instagram", label: "instagram", placeholder: "@yourhandle" },
+  { id: "linkedin", label: "linkedin", placeholder: "company name or linkedin.com/company/…" },
+  { id: "x", label: "x", placeholder: "@yourhandle" },
+  { id: "youtube", label: "youtube", placeholder: "@yourchannel" },
+  { id: "gbp", label: "google business", placeholder: "business name, city" },
+];
+
+const SOURCE_LABEL: Record<SourceType, string> = {
+  website: "website", instagram: "Instagram profile", linkedin: "LinkedIn page",
+  x: "X profile", youtube: "YouTube channel", gbp: "Google Business Profile",
+};
+
+/** Turn whatever the user typed (handle, name, or URL) into a canonical public URL. */
+function canonicalSource(source: SourceType, raw: string): { url: string; display: string } {
+  const t = raw.trim();
+  if (source === "website" || /^https?:\/\//.test(t)) {
+    let u = t;
+    if (!/^https?:\/\//.test(u)) u = "https://" + u;
+    return { url: u, display: t.replace(/^https?:\/\//, "") };
+  }
+  const handle = t.replace(/^@/, "").replace(/\/+$/, "");
+  switch (source) {
+    case "instagram": return { url: `https://www.instagram.com/${handle}/`, display: "@" + handle };
+    case "x": return { url: `https://x.com/${handle}`, display: "@" + handle };
+    case "youtube": return { url: `https://www.youtube.com/@${handle}`, display: "@" + handle };
+    case "linkedin": return { url: `https://www.linkedin.com/company/${handle.toLowerCase().replace(/\s+/g, "-")}/`, display: t };
+    default: return { url: `https://www.google.com/maps/search/${encodeURIComponent(t)}`, display: t };
+  }
+}
+
 /* ---------- intelligence dataset logging (fire-and-forget, never blocks UI) ---------- */
 function logRecBatch(
   url: string,
@@ -76,6 +111,23 @@ function trialSnapshot(trial: { active: boolean; daysLeft: number; endsAt: strin
     daysLeft: liveDaysLeft,
     active: nowMs < endMs,
   };
+}
+
+/**
+ * No fake numbers, ever: if a channel summary contains a digit (AI models love inventing
+ * "36 opportunities ready"), replace it with the real item count. Summaries without
+ * numbers are kept — qualitative notes are fine, invented statistics are not.
+ */
+function withHonestSummaries(feed: Record<string, FeedEntry>): Record<string, FeedEntry> {
+  const out: Record<string, FeedEntry> = {};
+  for (const [ch, entry] of Object.entries(feed)) {
+    const n = entry.items?.length || 0;
+    const honest = entry.summary && !/\d/.test(entry.summary)
+      ? entry.summary
+      : `${n} ${n === 1 ? "opportunity" : "opportunities"} ready to review`;
+    out[ch] = { ...entry, summary: honest };
+  }
+  return out;
 }
 
 function feedText(entry?: FeedEntry) {
@@ -237,15 +289,15 @@ ${input.question}`;
 /* ---------- static agent + doc definitions ---------- */
 type AgentDef = { id: string; name: string; color: string; sum: string; items: [string, string][]; icon: React.ReactNode };
 const AGENTS: AgentDef[] = [
-  { id: "reddit", name: "Reddit Agent", color: "#FF4500", sum: "36 opportunities ready", items: [["Thread: \"tools for early-stage marketing?\" — high intent", "Draft reply"], ["Thread: \"is SEO dead in 2026?\" — share a practical perspective", "Draft reply"], ["Thread: \"AI CMO tools worth it?\" — direct match", "Draft reply"]], icon: <><ellipse cx="12" cy="14" rx="8" ry="5.6" /><circle cx="19.5" cy="9.5" r="1.6" /><path d="M12 8.4l1.2-4.2 4 1.1" strokeLinecap="round" /><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" strokeLinecap="round" /></> },
-  { id: "geo", name: "GEO Agent", color: "#5A8DE8", sum: "11 citation gaps detected", items: [["Not cited for \"ai marketing automation\" in ChatGPT", "Fix gap"], ["Perplexity cites 2 competitors for your core query", "Fix gap"]], icon: <><circle cx="12" cy="12" r="8.4" /><ellipse cx="12" cy="12" rx="3.6" ry="8.4" /><path d="M3.8 12h16.4" /></> },
-  { id: "seo", name: "SEO Agent", color: "#CDA6F2", sum: "46 recommendations ready", items: [["12 pages missing meta descriptions", "Review"], ["Keyword gap: \"marketing copilot\" — 2.1k/mo, low difficulty", "Draft post"]], icon: <><circle cx="11" cy="11" r="6.2" /><path d="M15.6 15.6L20 20" /><path d="M8.5 11h5M11 8.5v5" /></> },
-  { id: "x", name: "X Agent", color: "#FAFAFA", sum: "137 ideas ready", items: [["Thread idea: \"we skipped 80% of our marketing tasks\"", "Draft"], ["Post: launch-week metrics recap", "Draft"]], icon: <path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z" fill="currentColor" stroke="none" /> },
-  { id: "articles", name: "Articles Agent", color: "#9A6AE8", sum: "32 topics ready", items: [["\"AI CMO vs marketing agency: real math\" — outline ready", "Open"], ["\"how to get cited by ChatGPT\" — research done", "Open"]], icon: <><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></> },
-  { id: "hn", name: "Hacker News Agent", color: "#FF6600", sum: "1 post ready", items: [["Show HN: a focused marketing operating system", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" strokeWidth="1.9" strokeLinecap="round" /></> },
-  { id: "linkedin", name: "LinkedIn Agent", color: "#0A66C2", sum: "3 posts ready", items: [["Founder post: why we skip most marketing tasks", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><circle cx="8" cy="8.3" r="1.25" fill="currentColor" stroke="none" /><path d="M8 11.2v6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 17.2v-6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 13.6a2.5 2.5 0 0 1 5 0v3.6" strokeWidth="2" strokeLinecap="round" /></> },
-  { id: "ugc", name: "UGC Videos Agent", color: "#E8843A", sum: "1 video · 1 completed", items: [["15s product clip — ready to preview", "Preview"]], icon: <><rect x="2.8" y="4.8" width="18.4" height="14.4" rx="3" /><path d="M10.2 9.2l4.6 2.8-4.6 2.8V9.2z" fill="currentColor" stroke="none" /></> },
-  { id: "infl", name: "Influencer Campaigns", color: "#3ECF8E", sum: "Launch your first campaign", items: [["23 creators scored for audience fit", "Open list"]], icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
+  { id: "reddit", name: "Reddit Agent", color: "#FF4500", sum: "High-intent threads to reply to", items: [["Thread: \"tools for early-stage marketing?\" — high intent", "Draft reply"], ["Thread: \"is SEO dead in 2026?\" — share a practical perspective", "Draft reply"], ["Thread: \"AI CMO tools worth it?\" — direct match", "Draft reply"]], icon: <><ellipse cx="12" cy="14" rx="8" ry="5.6" /><circle cx="19.5" cy="9.5" r="1.6" /><path d="M12 8.4l1.2-4.2 4 1.1" strokeLinecap="round" /><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" strokeLinecap="round" /></> },
+  { id: "geo", name: "GEO Agent", color: "#5A8DE8", sum: "AI-search citation checks", items: [["Not cited for \"ai marketing automation\" in ChatGPT", "Fix gap"], ["Perplexity cites 2 competitors for your core query", "Fix gap"]], icon: <><circle cx="12" cy="12" r="8.4" /><ellipse cx="12" cy="12" rx="3.6" ry="8.4" /><path d="M3.8 12h16.4" /></> },
+  { id: "seo", name: "SEO Agent", color: "#CDA6F2", sum: "Search fixes & keyword plays", items: [["12 pages missing meta descriptions", "Review"], ["Keyword gap: \"marketing copilot\" — 2.1k/mo, low difficulty", "Draft post"]], icon: <><circle cx="11" cy="11" r="6.2" /><path d="M15.6 15.6L20 20" /><path d="M8.5 11h5M11 8.5v5" /></> },
+  { id: "x", name: "X Agent", color: "#FAFAFA", sum: "Post & thread ideas", items: [["Thread idea: \"we skipped 80% of our marketing tasks\"", "Draft"], ["Post: launch-week metrics recap", "Draft"]], icon: <path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z" fill="currentColor" stroke="none" /> },
+  { id: "articles", name: "Articles Agent", color: "#9A6AE8", sum: "Long-form topics & outlines", items: [["\"AI CMO vs marketing agency: real math\" — outline ready", "Open"], ["\"how to get cited by ChatGPT\" — research done", "Open"]], icon: <><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></> },
+  { id: "hn", name: "Hacker News Agent", color: "#FF6600", sum: "Launch post prep", items: [["Show HN: a focused marketing operating system", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" strokeWidth="1.9" strokeLinecap="round" /></> },
+  { id: "linkedin", name: "LinkedIn Agent", color: "#0A66C2", sum: "Founder post drafts", items: [["Founder post: why we skip most marketing tasks", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><circle cx="8" cy="8.3" r="1.25" fill="currentColor" stroke="none" /><path d="M8 11.2v6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 17.2v-6" strokeWidth="2" strokeLinecap="round" /><path d="M12.2 13.6a2.5 2.5 0 0 1 5 0v3.6" strokeWidth="2" strokeLinecap="round" /></> },
+  { id: "ugc", name: "UGC Videos Agent", color: "#E8843A", sum: "Short product clips", items: [["Storyboard a 15s product clip", "Plan"]], icon: <><rect x="2.8" y="4.8" width="18.4" height="14.4" rx="3" /><path d="M10.2 9.2l4.6 2.8-4.6 2.8V9.2z" fill="currentColor" stroke="none" /></> },
+  { id: "infl", name: "Influencer Campaigns", color: "#3ECF8E", sum: "Launch your first campaign", items: [["Build a scored creator shortlist for your niche", "Open list"]], icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
 ];
 
 const DOCS = [
@@ -351,6 +403,8 @@ export default function AppPage() {
   const [progress, setProgress] = useState<number>(-1);
   const [busyItem, setBusyItem] = useState<string>("");
   const [recIds, setRecIds] = useState<Record<string, string>>({});
+  const [source, setSource] = useState<SourceType>("website");
+  const [sourceDesc, setSourceDesc] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [chatMode, setChatMode] = useState<"strategy" | "copy">("strategy");
@@ -572,8 +626,8 @@ export default function AppPage() {
 
   /* ---- analyze ---- */
   const analyze = useCallback(async () => {
-    let u = inputUrl.trim(); if (!u) return;
-    if (!/^https?:\/\//.test(u)) u = "https://" + u;
+    if (!inputUrl.trim()) return;
+    const { url: u, display } = canonicalSource(source, inputUrl);
     setUrl(u); setProgress(0); setGscError(null); setGscSite(""); setRecIds({});
     const steps = 5;
     const bump = (n: number) => setProgress(n);
@@ -585,9 +639,12 @@ export default function AppPage() {
       let p: Profile | null = null;
       for (let attempt = 0; attempt < 2 && !p; attempt++) {
         try {
+          const subject = source === "website" ? `the website ${u}` : `the ${SOURCE_LABEL[source]} ${display} (${u})`;
+          const srcNote = source === "website" ? "" : " Social pages expose limited content — infer carefully from what's available, never invent specifics.";
+          const descLine = sourceDesc.trim() ? `\nThe owner describes the business as: "${sourceDesc.trim().slice(0, 300)}". Treat this as the primary source of truth.` : "";
           const txt = await ai(
-            `Analyze the website ${u} using the page content above.\nRespond ONLY with JSON, no markdown fences, no preamble:\n{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`,
-            u
+            `Analyze ${subject} using the page content above.${srcNote}${descLine}\nRespond ONLY with JSON, no markdown fences, no preamble:\n{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`,
+            source === "gbp" ? undefined : u
           );
           p = parseJSON(txt) as Profile;
         } catch (e) { lastErr = e; }
@@ -599,25 +656,20 @@ export default function AppPage() {
       setCompetitors(comps);
       // Phase 2: generate a company-specific agents feed + rankings, and (separately) an
       // estimated-traffic figure. Kept as two calls so a failure in one can't break the other.
+      let genFeed: Record<string, FeedEntry> | null = null;
       const insP = ai(
         `You are Populr, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
-Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention Populr unless the analyzed site is Populr. Exactly this shape:
-{"feed":{"reddit":{"summary":"36 opportunities ready","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"46 recommendations","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"11 citation gaps","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"137 ideas","items":[["short post idea","Draft"]]},"linkedin":{"summary":"3 posts ready","items":[["short post idea","Review"]]},"articles":{"summary":"32 topics ready","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
+Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention Populr unless the analyzed site is Populr. Never invent counts or statistics anywhere. Exactly this shape:
+{"feed":{"reddit":{"summary":"short channel note, no numbers","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"short channel note, no numbers","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"short channel note, no numbers","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"short channel note, no numbers","items":[["short post idea","Draft"]]},"linkedin":{"summary":"short channel note, no numbers","items":[["short post idea","Review"]]},"articles":{"summary":"short channel note, no numbers","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
 Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
         try {
           const ins = parseJSON(t);
-          if (ins.feed) {
-            const f = ins.feed as Record<string, FeedEntry>;
-            setFeed(f);
-            // Append this generation to the intelligence dataset (fire-and-forget) and
-            // keep the returned UUID map so approve/publish events can reference them.
-            logRecBatch(u, p, f).then((ids) => { if (Object.keys(ids).length) setRecIds(ids); });
-          }
+          if (ins.feed) genFeed = ins.feed as Record<string, FeedEntry>;
           if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]);
         }
-        catch { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); }
-      }).catch(() => { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); });
+        catch { setRankings([]); }
+      }).catch(() => { setRankings([]); });
 
       const trafP = ai(
         `Estimate realistic MONTHLY Google Search numbers for the website ${u} (${p.name} — ${p.oneLiner}). Consider how well-known and large the site is.
@@ -628,11 +680,19 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       }).catch(() => setEstTraffic(null));
 
       await Promise.allSettled([insP, trafP]);
-      setFeed((f) => normalizeFeed(f, p, u));
+      // Honest numbers only: the feed shown, the counts spoken, and the dataset logged
+      // all come from the same real items — no invented "36 opportunities" copy.
+      const finalFeed = withHonestSummaries(normalizeFeed(genFeed ?? undefined, p, u));
+      setFeed(finalFeed);
+      logRecBatch(u, p, finalFeed).then((ids) => { if (Object.keys(ids).length) setRecIds(ids); });
       setDocCache({});
+      const chCount = Object.keys(finalFeed).length;
+      const total = Object.values(finalFeed).reduce((n, e) => n + (e.items?.length || 0), 0);
+      const top = Object.entries(finalFeed).sort((a, b) => (b[1].items?.length || 0) - (a[1].items?.length || 0))[0];
+      const firstItem = top?.[1]?.items?.[0]?.[0];
       setChat([
-        { who: "ai", text: `Morning. I ran the daily sweep on ${hostOf(u)} — 9 agents reported in.` },
-        { who: "ai", text: "Headline: 36 Reddit opportunities, 11 AI-search citation gaps, and one pricing-page fix that beats everything else on expected impact. Start there." },
+        { who: "ai", text: `Morning. I analyzed ${p.name || hostOf(u)} — ${chCount} agents reported in.` },
+        { who: "ai", text: `Headline: ${total} opportunities across ${chCount} channels.${firstItem ? ` Highest expected impact: "${firstItem}" — start there.` : " Start with the feed below."}` },
       ]);
       bump(5); setDemo(false); setEntered(true);
     } catch (e) {
@@ -640,7 +700,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       setDemo(false);
       showToast(`Analysis failed: ${aiErrorText(e ?? lastErr).slice(0, 180)}`);
     }
-  }, [inputUrl]);
+  }, [inputUrl, source, sourceDesc]);
 
   /* ---- agent work item ---- */
   async function workItem(agentId: string, idx: number, item: string, agentName: string) {
@@ -810,10 +870,54 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className="ob-in">
             <span className="app-wordmark app-wordmark-lg">Populr.</span>
             <h1>What are we growing?</h1>
-            <p className="s">Paste your website. Populr reads it, figures out your positioning, and builds today&apos;s plan.</p>
+            <p className="s">
+              {source === "website"
+                ? <>Paste your website. Populr reads it, figures out your positioning, and builds today&apos;s plan.</>
+                : <>No website needed — point Populr at where your business lives and it builds today&apos;s plan.</>}
+            </p>
             <div className="urlbox">
-              <input value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && analyze()} type="url" placeholder="https://yourcompany.com" autoComplete="off" spellCheck={false} />
+              <input
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && analyze()}
+                type={source === "website" ? "url" : "text"}
+                placeholder={SOURCES.find((s) => s.id === source)?.placeholder}
+                autoComplete="off"
+                spellCheck={false}
+              />
               <button className="go" onClick={analyze} disabled={progress >= 0}>Analyze →</button>
+            </div>
+            {source !== "website" && (
+              <div className="urlbox src-desc">
+                <input
+                  value={sourceDesc}
+                  onChange={(e) => setSourceDesc(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && analyze()}
+                  type="text"
+                  placeholder="what do you do? (optional)"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+            <div className="src-row" role="tablist" aria-label="What are you growing?">
+              <span className="src-lead">grow a</span>
+              {SOURCES.map((s, i) => (
+                <span key={s.id}>
+                  {i > 0 && <span className="src-sep" aria-hidden="true">·</span>}
+                  <button
+                    role="tab"
+                    aria-selected={source === s.id}
+                    className={"src-opt" + (source === s.id ? " on" : "")}
+                    onClick={() => { setSource(s.id); setInputUrl(""); }}
+                  >
+                    {s.label}
+                  </button>
+                </span>
+              ))}
+              <span style={{ whiteSpace: "nowrap" }}>
+                <span className="src-sep" aria-hidden="true">·</span>
+                <span className="src-soon">more soon</span>
+              </span>
             </div>
             <p className="ob-note">read-only · nothing publishes without you</p>
             {progress >= 0 && (
@@ -1010,7 +1114,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     <div className="statfoot">
                       {gscData
                         ? <><span>avg. position <b>{gscData.position}</b> ({gscData.deltas.position})</span><span>vs prior {range === "7d" ? "7" : "30"} days</span></>
-                        : <><span><b>{estTraffic ? ((estTraffic.clicks / Math.max(estTraffic.impressions, 1)) * 100).toFixed(1) + "%" : "4.7%"}</b> click rate</span><span>{estimated ? "estimated" : "sample data"}</span></>}
+                        : estimated
+                          ? <><span><b>{((estTraffic!.clicks / Math.max(estTraffic!.impressions, 1)) * 100).toFixed(1)}%</b> click rate</span><span>AI-estimated</span></>
+                          : <><span>example data — not your traffic</span><span>connect Search Console for real numbers</span></>}
                     </div>
                   </div>
                   <div className="sect">

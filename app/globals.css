@@ -565,3 +565,23 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .worked .w-empty{border:1px dashed var(--line);border-radius:12px;padding:28px;color:var(--dim);font-size:13.5px;line-height:1.7}
 .worked .w-note{margin-top:26px;font-family:'Geist Mono',monospace;font-size:11px;color:var(--faint);line-height:1.8}
 .worked .w-scroll{overflow-x:auto}
+
+/* ---------- onboarding source row ---------- */
+.appui .src-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;row-gap:4px;margin:16px 0 0;font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.05em;color:var(--faint)}
+.appui .src-lead{margin-right:9px}
+.appui .src-sep{margin:0 8px;color:var(--line)}
+.appui .src-opt{background:none;border:0;padding:2px 0;font:inherit;letter-spacing:inherit;color:var(--dim);cursor:pointer;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
+.appui .src-opt:hover{color:var(--fg)}
+.appui .src-opt.on{color:var(--green);border-bottom-color:rgba(213,255,114,.45)}
+.appui .src-soon{opacity:.45}
+.appui .src-desc{margin-top:10px}
+.appui .src-desc input{font-size:13px}
+@media(max-width:560px){
+  /* Mobile: drop the middot separators (they strand at line starts when wrapping) and
+     lay the sources out as an evenly spaced wrap with bigger touch targets. */
+  .appui .src-row{font-size:11px;column-gap:16px;row-gap:2px;max-width:340px;margin-left:auto;margin-right:auto}
+  .appui .src-sep{display:none}
+  .appui .src-lead{width:100%;text-align:center;margin:0 0 4px}
+  .appui .src-opt{padding:6px 2px}
+  .appui .src-soon{padding:6px 2px;display:inline-block}
+}
