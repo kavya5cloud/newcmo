@@ -248,6 +248,7 @@ export default function Landing() {
           <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <a href="#how" style={{ color: "var(--faint)", textDecoration: "none" }}>how it works</a>
             <a href="#pricing" style={{ color: "var(--faint)", textDecoration: "none" }}>pricing</a>
+            <a href="/early-access" style={{ color: "var(--faint)", textDecoration: "none" }}>early access</a>
             <a href="mailto:team@trypopulr.in" style={{ color: "var(--faint)", textDecoration: "none" }}>contact</a>
             <a href="/privacy" className="foot-btn">Privacy Policy</a>
             <a href="/terms" className="foot-btn">Terms of Service</a>
