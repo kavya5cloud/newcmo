@@ -55,6 +55,11 @@ export default function Terms() {
         to process your content solely to provide the Service. You are responsible for reviewing all AI-generated output
         before using or publishing it.
       </p>
+      <p>
+        We may use aggregated and de-identified usage and outcome data — such as which types of recommendations were
+        acted on and how measured metrics changed afterwards — to improve the Service for all customers. This data does
+        not include your name, email, content, or any information that identifies you or your business.
+      </p>
 
       <h2>6. AI output</h2>
       <p>

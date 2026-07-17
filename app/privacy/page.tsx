@@ -35,6 +35,11 @@ export default function Privacy() {
         <li>To provide the Service — analyze the sites you submit, generate marketing recommendations and drafts, and display your analytics.</li>
         <li>To create and secure your account and keep you signed in.</li>
         <li>To operate, maintain, and improve the Service.</li>
+        <li>
+          To improve recommendations for all customers using <strong>aggregated, de-identified</strong> usage and
+          outcome data (e.g. which categories of recommendations were acted on and how metrics changed afterwards) —
+          never your name, email, content, or anything that identifies you or your business.
+        </li>
       </ul>
 
       <h2>3. Google API Services User Data</h2>

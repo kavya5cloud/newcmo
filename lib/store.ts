@@ -19,6 +19,9 @@ export type Draft = {
   approved: boolean;
   approvedAt?: string;
   published?: boolean;
+  /** Intelligence-dataset recommendation UUID, stamped at draft creation so later
+   *  approve/publish events can never mislink after a re-analysis replaces the map. */
+  recId?: string;
 };
 export type ChatMsg = { who: "ai" | "me"; text: string };
 export type FeedEntry = { summary: string; items: [string, string][] };
@@ -35,6 +38,8 @@ export type Saved = {
   docs?: Record<string, string>;
   estTraffic?: { impressions: number; clicks: number; visits: number } | null;
   gscSite?: string | null;
+  /** clientKey ("channel:index") → recommendation UUID in the intelligence dataset. */
+  recIds?: Record<string, string>;
 };
 
 const LS_KEY = "cosmos.state";

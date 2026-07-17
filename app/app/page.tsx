@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadState, saveState, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
+import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
 import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
@@ -28,6 +28,40 @@ function parseJSON(txt: string) {
 }
 function hostOf(u: string) {
   try { return new URL(u).hostname.replace("www.", ""); } catch { return u; }
+}
+
+/* ---------- intelligence dataset logging (fire-and-forget, never blocks UI) ---------- */
+function logRecBatch(
+  url: string,
+  profile: Profile,
+  feed: Record<string, FeedEntry>
+): Promise<Record<string, string>> {
+  const items = Object.entries(feed).flatMap(([channel, entry]) =>
+    (entry.items || []).map(([title, action], i) => ({ channel, title, action, clientKey: `${channel}:${i}` }))
+  );
+  if (!items.length) return Promise.resolve({});
+  return fetch("/api/intel/recommendations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wsid: workspaceId(), url, profile, items }),
+  })
+    .then((r) => r.json())
+    .then((d) => (d?.ids && typeof d.ids === "object" ? (d.ids as Record<string, string>) : {}))
+    .catch(() => ({}));
+}
+
+function logRecEvent(
+  recId: string | undefined,
+  event: string,
+  asset?: { title: string; body: string; channel: string },
+  metadata?: Record<string, unknown>
+) {
+  if (!recId) return;
+  fetch("/api/intel/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wsid: workspaceId(), recommendationId: recId, event, asset, metadata }),
+  }).catch(() => {});
 }
 
 const DAY_MS = 86_400_000;
@@ -316,6 +350,7 @@ export default function AppPage() {
   const [demo, setDemo] = useState(false);
   const [progress, setProgress] = useState<number>(-1);
   const [busyItem, setBusyItem] = useState<string>("");
+  const [recIds, setRecIds] = useState<Record<string, string>>({});
   const [chatInput, setChatInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [chatMode, setChatMode] = useState<"strategy" | "copy">("strategy");
@@ -379,6 +414,7 @@ export default function AppPage() {
         setRankings(saved.rankings || []); setDocCache(saved.docs || {});
         setEstTraffic(saved.estTraffic || null);
         setGscSite(saved.gscSite || "");
+        setRecIds(saved.recIds || {});
         setEntered(true);
       }
       hydrated.current = true;
@@ -478,9 +514,9 @@ export default function AppPage() {
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
     if (!hydrated.current || !entered || !profile || demo) return;
-    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache, estTraffic, gscSite };
+    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache, estTraffic, gscSite, recIds };
     saveState(s);
-  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, estTraffic, entered, demo, gscSite]);
+  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, estTraffic, entered, demo, gscSite, recIds]);
 
   /* ---- onboarding dot canvas ---- */
   useEffect(() => {
@@ -538,7 +574,7 @@ export default function AppPage() {
   const analyze = useCallback(async () => {
     let u = inputUrl.trim(); if (!u) return;
     if (!/^https?:\/\//.test(u)) u = "https://" + u;
-    setUrl(u); setProgress(0); setGscError(null); setGscSite("");
+    setUrl(u); setProgress(0); setGscError(null); setGscSite(""); setRecIds({});
     const steps = 5;
     const bump = (n: number) => setProgress(n);
     let lastErr: unknown = null;
@@ -569,7 +605,17 @@ Output ONLY compact valid JSON (no markdown, no prose). Each item's first string
 {"feed":{"reddit":{"summary":"36 opportunities ready","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"46 recommendations","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"11 citation gaps","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"137 ideas","items":[["short post idea","Draft"]]},"linkedin":{"summary":"3 posts ready","items":[["short post idea","Review"]]},"articles":{"summary":"32 topics ready","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
 Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
-        try { const ins = parseJSON(t); if (ins.feed) setFeed(ins.feed as Record<string, FeedEntry>); if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]); }
+        try {
+          const ins = parseJSON(t);
+          if (ins.feed) {
+            const f = ins.feed as Record<string, FeedEntry>;
+            setFeed(f);
+            // Append this generation to the intelligence dataset (fire-and-forget) and
+            // keep the returned UUID map so approve/publish events can reference them.
+            logRecBatch(u, p, f).then((ids) => { if (Object.keys(ids).length) setRecIds(ids); });
+          }
+          if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]);
+        }
         catch { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); }
       }).catch(() => { setFeed(normalizeFeed(undefined, p, u)); setRankings([]); });
 
@@ -623,8 +669,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       return;
     }
     setBusyItem("");
-    setDrafts((d) => [...d, { id: key + ":" + Date.now(), title: item, channel: agentId, body, approved: false }]);
+    setDrafts((d) => [...d, { id: key + ":" + Date.now(), title: item, channel: agentId, body, approved: false, recId: recIds[key] }]);
     setDoc({ title: item, body });
+    logRecEvent(recIds[key], "drafted", { title: item, body, channel: agentId });
   }
 
   /* ---- docs ---- */
@@ -671,7 +718,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   function reset() {
     if (!confirm("Analyze a different website? Current session will be cleared.")) return;
     setEntered(false); setProfile(null); setInputUrl(""); setUrl(""); setProgress(-1);
-    setChat([]); setDrafts([]); setCompetitors([]); setGscSite(""); setGscError(null); setFeed({}); setRankings([]); setDocCache({}); setEstTraffic(null);
+    setChat([]); setDrafts([]); setCompetitors([]); setGscSite(""); setGscError(null); setFeed({}); setRankings([]); setDocCache({}); setEstTraffic(null); setRecIds({});
     try { localStorage.removeItem("cosmos.state"); } catch {}
   }
 
@@ -707,11 +754,15 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   }
 
   function approveDraft(id: string) {
+    // Use the UUID stamped on the draft at creation — never the current recIds map,
+    // which may belong to a newer generation (mislinked events would corrupt the dataset).
+    logRecEvent(drafts.find((d) => d.id === id)?.recId, "approved");
     setDrafts((ds) => ds.map((d) => d.id === id ? { ...d, approved: true, approvedAt: new Date().toISOString() } : d));
     showToast("Approved — we'll remind you at the right time");
   }
 
   function markPublished(id: string) {
+    logRecEvent(drafts.find((d) => d.id === id)?.recId, "published");
     setDrafts((ds) => ds.map((d) => d.id === id ? { ...d, published: true } : d));
     showToast("Marked published");
   }
@@ -791,6 +842,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <span className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>AI CMO Terminal · running daily</span>
           </div>
           <div className="tb-r">
+            <a href="/worked" className="credits" style={{ textDecoration: "none", color: "inherit" }} title="Recommendations ranked by measured outcome">worked ↗</a>
             <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
             {authUser && (
               <button className="bell" onClick={() => setPlanOpen(true)} title="Today's posting plan">
