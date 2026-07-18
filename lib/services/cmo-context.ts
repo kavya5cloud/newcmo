@@ -62,22 +62,43 @@ export function confidenceOf(s: ContextSignals): Confidence {
 
 function n(v: unknown): number { const x = Number(v); return Number.isFinite(x) ? x : 0; }
 
+/**
+ * The canonical business profile — the latest server-persisted version from
+ * business_profiles. This is the source of truth. A browser-supplied profile is NEVER
+ * trusted for reads; it may only seed the record before the first analysis persists one.
+ */
+export async function loadCanonicalProfile(sql: Sql, wsKey: string): Promise<CmoProfile | null> {
+  try {
+    const rows = (await sql`
+      SELECT profile FROM business_profiles
+      WHERE workspace_key = ${wsKey} ORDER BY version DESC LIMIT 1`) as unknown as { profile: CmoProfile }[];
+    return rows[0]?.profile ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- assembly (deterministic I/O, no LLM) --------------------------------
 
-export async function assembleCmoContext(sql: Sql, wsKey: string, profile: CmoProfile, url: string): Promise<CmoContext> {
-  await ensureIntelTables(sql);
-  await ensureCampaignTables(sql);
+// `seedProfile` is the browser-supplied profile. It is used ONLY as a fallback when the
+// workspace has no canonical profile yet (cold start, before the first analysis persists
+// one). Whenever a canonical profile exists, it wins — the request body cannot override it.
+export async function assembleCmoContext(sql: Sql, wsKey: string, seedProfile: CmoProfile, url: string, ensureTables = true): Promise<CmoContext> {
+  if (ensureTables) {
+    await ensureIntelTables(sql);
+    await ensureCampaignTables(sql);
+  }
 
   const safe = async <T>(p: Promise<T>, fallback: T): Promise<T> => { try { return await p; } catch { return fallback; } };
 
-  const [missionsRaw, ranking, workedRaw, dismissedRaw, snapRaw, assetsRaw] = await Promise.all([
+  const [missionsRaw, ranking, workedRaw, dismissedRaw, snapRaw, assetsRaw, canonicalProfile] = await Promise.all([
     safe(sql`
       SELECT c.title, c.goal, c.status, jsonb_array_length(c.tasks) AS total,
              COALESCE((SELECT COUNT(DISTINCT (e.metadata->>'taskIndex'))
                        FROM campaign_events e WHERE e.campaign_id = c.id AND e.event = 'task_done'), 0) AS done
       FROM campaigns c WHERE c.workspace_key = ${wsKey} AND c.status != 'archived'
       ORDER BY c.created_at DESC LIMIT 5` as unknown as Promise<{ title: string; goal: string; status: string; total: number; done: number }[]>, []),
-    safe(rankChannels(sql, wsKey), []),
+    safe(rankChannels(sql, wsKey, ensureTables), []),
     safe(sql`
       SELECT r.title, r.channel, s.association_score, s.delta
       FROM recommendation_scores s JOIN recommendations r ON r.id = s.recommendation_id
@@ -93,7 +114,12 @@ export async function assembleCmoContext(sql: Sql, wsKey: string, profile: CmoPr
     safe(sql`
       SELECT asset_type, title, status FROM content_assets
       WHERE workspace_key = ${wsKey} ORDER BY created_at DESC LIMIT 6` as unknown as Promise<{ asset_type: string; title: string; status: string }[]>, []),
+    safe(loadCanonicalProfile(sql, wsKey), null),
   ]);
+
+  // Canonical (server-persisted) profile wins; the browser seed is only used until the
+  // first analysis persists a canonical record. The request body can never override state.
+  const profile: CmoProfile = canonicalProfile ?? seedProfile ?? {};
 
   const missions = missionsRaw.map((m) => ({ title: m.title, goal: m.goal, status: m.status, done: n(m.done), total: n(m.total) }));
   const whatWorked = workedRaw.map((w) => ({

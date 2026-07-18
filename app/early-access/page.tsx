@@ -105,7 +105,7 @@ export default function EarlyAccess() {
                 <div className="ea-row">
                   <label className="ea-field">
                     <span>Full name *</span>
-                    <input name="name" required autoComplete="name" placeholder="Kavya Sharma" />
+                    <input name="name" required autoComplete="name" placeholder="John Doe" />
                   </label>
                   <label className="ea-field">
                     <span>Work email *</span>
