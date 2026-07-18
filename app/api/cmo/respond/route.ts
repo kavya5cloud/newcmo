@@ -4,13 +4,12 @@ import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { assembleCmoContext, confidenceOf, type CmoProfile } from "@/lib/services/cmo-context";
-import { classifyRequest, decide, renderPrompt, verifyResponse } from "@/lib/cmo/pipeline";
+import { classifyRequest, decide } from "@/lib/cmo/pipeline";
+import { renderCmoPrompt, sanitizeCmoText } from "@/lib/cmo/renderer";
 import type { CmoRequest, CmoResponse } from "@/lib/cmo/contracts";
 import { buildContentPrompt } from "@/lib/services/content-engine";
 import { buildEditPrompt } from "@/lib/services/editor-engine";
 import { buildTransformPrompt } from "@/lib/services/transformation-engine";
-import { buildAnalysisPrompt } from "@/lib/services/analysis-engine";
-import { buildStrategyPrompt } from "@/lib/services/strategy-engine";
 import { generateText } from "@/lib/services/llm";
 import { projectBusinessGraph } from "@/lib/business-graph";
 import { fingerprint, persistGraph, persistDecision, appendDecisionEvent, readCachedCmoResponse, writeCachedCmoResponse } from "@/lib/cmo/store";
@@ -48,31 +47,26 @@ export async function POST(req: NextRequest) {
     if (hit) return NextResponse.json({ ...hit, cached: true });
 
     const asset = routed.asset || "x_post";
+    const recentTurns = String(body.recentTurns || "").slice(0, 4000);
+    // Content/edit/transform render bare deliverables from their engines. Everything
+    // conversational (strategy/campaign/analysis/general) goes through the CMO renderer,
+    // which owns the voice and never exposes reasoning artifacts.
     const prompt = routed.intent === "content"
       ? buildContentPrompt(ctx, asset, question)
       : routed.intent === "edit" && body.source
         ? buildEditPrompt(ctx, question, body.source)
         : routed.intent === "transform" && body.source && routed.target
           ? buildTransformPrompt(ctx, routed.target, body.source)
-          : routed.intent === "analysis"
-            ? buildAnalysisPrompt(ctx, question, String(body.recentTurns || "").slice(0, 4000))
-            : routed.intent === "campaign"
-              ? buildStrategyPrompt(ctx, question, String(body.recentTurns || "").slice(0, 4000))
-              : renderPrompt({ ...body, question }, routed, decision, evidence);
+          : renderCmoPrompt({ context: ctx, decision, evidence, question, recentTurns });
 
     // Render via the LLM service directly — no HTTP self-call. Context is already in the
     // prompt (assembled state), so we don't re-scrape the URL here.
-    let rendered = "";
-    let provider: string | undefined;
-    let model: string | undefined;
-    if (decision.status === "recommended") {
-      const gen = await generateText({ prompt, sql });
-      if (!gen.ok) throw new Error(gen.error);
-      rendered = gen.text;
-      provider = gen.provider;
-      model = gen.model;
-    }
-    const text = verifyResponse(rendered, decision, evidence);
+    const gen = await generateText({ prompt, sql });
+    if (!gen.ok) throw new Error(gen.error);
+    const provider: string | undefined = gen.provider;
+    const model: string | undefined = gen.model;
+    // The renderer/sanitizer is the presentation guarantee: no artifact ever reaches the UI.
+    const text = sanitizeCmoText(gen.text);
     const response: CmoResponse = { text, intent: routed.intent, confidence: confidenceOf(ctx.signals), decision, evidence: Object.values(evidence).flat(), cached: false };
 
     // Persist the decision artifact + evidence (append-only), with model/response metadata,

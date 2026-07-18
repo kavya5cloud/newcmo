@@ -11,6 +11,7 @@ import { buildEditPrompt } from "@/lib/services/editor-engine";
 import { buildTransformPrompt } from "@/lib/services/transformation-engine";
 import { buildAnalysisPrompt } from "@/lib/services/analysis-engine";
 import { generateText } from "@/lib/services/llm";
+import { sanitizeCmoText } from "@/lib/cmo/renderer";
 
 export const runtime = "nodejs";
 
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, prompt, intent: routed.intent, asset: routed.asset, reasoning, confidence, nudge: routed.intent === "campaign" ? "/app/campaigns" : null });
     }
     return NextResponse.json({
-      ok: true, answer: gen.text, prompt, intent: routed.intent, asset: routed.asset, reasoning, confidence,
+      ok: true, answer: sanitizeCmoText(gen.text), prompt, intent: routed.intent, asset: routed.asset, reasoning, confidence,
       nudge: routed.intent === "campaign" ? "/app/campaigns" : null,
     });
   } catch (e) {
