@@ -29,9 +29,8 @@ export default function StudioNav() {
   return (
     <nav className="st-nav" aria-label="Creative Studio sections">
       <Link href="/studio" className="st-brand">
-        <span className="st-brand-mark" aria-hidden="true">P</span>
+        <span className="st-brand-word">Populr<span className="st-brand-acc">.</span></span>
         <span className="st-brand-name">Creative Studio</span>
-        <span className="st-brand-dot" aria-hidden="true" />
       </Link>
 
       <div className="st-navlabel">Sections</div>
