@@ -4,7 +4,8 @@ import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { assembleCmoContext, confidenceOf, type CmoProfile } from "@/lib/services/cmo-context";
-import { classifyRequest, decide } from "@/lib/cmo/pipeline";
+import { classifyRequest } from "@/lib/cmo/pipeline";
+import { planDecision, planToArtifact } from "@/lib/cmo/planner";
 import { renderCmoPrompt, sanitizeCmoText } from "@/lib/cmo/renderer";
 import type { CmoRequest, CmoResponse } from "@/lib/cmo/contracts";
 import { buildContentPrompt } from "@/lib/services/content-engine";
@@ -39,7 +40,11 @@ export async function POST(req: NextRequest) {
     const graphVersion = graph.version;
 
     const routed = classifyRequest({ ...body, question });
-    const decision = decide(ctx, evidence);
+    // The Decision Planner (deterministic, no LLM) reads the graph, generates + scores
+    // multiple candidate strategies, and selects the best → a structured DecisionPlan.
+    // It is projected onto the DecisionArtifact the renderer + persistence already consume.
+    const plan = planDecision(ctx, evidence, routed, question);
+    const decision = planToArtifact(plan, ctx);
 
     // Cache keyed on graph version — a stale-context reply can never be served.
     const cacheKey = fingerprint(`${workspace}:${graphVersion}:${routed.intent}:${body.source || ""}:${question}`);
@@ -72,9 +77,17 @@ export async function POST(req: NextRequest) {
     // Persist the decision artifact + evidence (append-only), with model/response metadata,
     // then cache the response against the graph version.
     const decisionId = await persistDecision(sql, workspace, graphVersion, routed.intent, question, decision, response.evidence);
+    // Persist the full structured plan (append-only) alongside the rendered event.
+    await appendDecisionEvent(sql, decisionId, "planned", { plan });
     await appendDecisionEvent(sql, decisionId, "rendered", { provider: provider || "none", model: model || "none", textLength: text.length, decisionStatus: decision.status });
     await writeCachedCmoResponse(sql, cacheKey, workspace, graphVersion, response);
 
+    console.info(JSON.stringify({
+      event: "cmo_plan", workspace, intent: routed.intent, planId: plan.decisionId,
+      recommended: plan.recommendedStrategy?.channel, score: plan.recommendedStrategy?.score.total,
+      alternatives: plan.alternativeStrategies.map((s) => s.channel), candidates: plan.alternativeStrategies.length + 1,
+      expectedImpact: plan.expectedImpact, confidence: plan.confidence, missing: plan.missingInformation.length,
+    }));
     console.info(JSON.stringify({ event: "cmo_response", workspace, intent: routed.intent, decision: decision.status, confidence: response.confidence, evidence: response.evidence.length, graphVersion: graphVersion.slice(0, 12), decisionId, model: model || "none", cached: false }));
     return NextResponse.json(response);
   } catch (error) {
