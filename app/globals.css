@@ -1098,3 +1098,8 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .lw-rel-asset{background:var(--bg);color:var(--dim)}
 .lw-rel-arrow{color:var(--faint)}
 @media(max-width:640px){.lw-grid2{grid-template-columns:1fr}}
+
+/* ---- Publishing dashboard helpers (Milestone 9) ---- */
+.pub-count{font-family:'Geist Mono',monospace;color:var(--acc);font-weight:600}
+.pub-plat{font-family:'Geist Mono',monospace;font-size:9px;color:var(--faint);text-transform:uppercase;margin-left:4px}
+.pub-health{font-size:13px;color:var(--acc);margin:4px 0}

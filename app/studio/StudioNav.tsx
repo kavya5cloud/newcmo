@@ -48,6 +48,14 @@ export default function StudioNav() {
         })}
       </div>
 
+      <div className="st-navlabel">Execution</div>
+      <div className="st-links">
+        <Link href="/studio/publishing" className={"st-link" + (path === "/studio/publishing" ? " on" : "")} aria-current={path === "/studio/publishing" ? "page" : undefined}>
+          <span className="st-link-ic">{svg(<><path d="M4 4h16v12H5.2L4 18z" /><path d="M8 9h8M8 12h5" /></>)}</span>
+          <span className="st-link-label">Publishing</span>
+        </Link>
+      </div>
+
       <Link href="/app" className="st-back">
         <span className="st-link-ic">{svg(<path d="M15 5l-7 7 7 7" />)}</span>
         <span className="st-link-label">Back to app</span>
