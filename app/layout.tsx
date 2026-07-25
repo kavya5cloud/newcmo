@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   description:
     "Introducing Populr, your CMO. Runs your marketing, skips the busywork. Try free for a month.",
   icons: {
-    icon: "/icon.svg?v=3",
-    shortcut: "/icon.svg?v=3",
-    apple: "/icon.svg?v=3",
+    icon: "/icon.svg?v=4",
+    shortcut: "/icon.svg?v=4",
+    apple: "/icon.svg?v=4",
   },
 };
 
