@@ -103,3 +103,65 @@ workspace-scoped). Repository pattern: `InMemoryLaunchRepo` + `NeonLaunchRepo`.
 - **Provider-agnostic**: the Launch Engine never touches a generation provider; producing
   assets is the Content Studio's job (Milestone 6), which is itself vendor-neutral.
 - Deterministic throughout; additive (no existing route/schema/behavior changed).
+
+---
+
+## Launch Workspace — execution layer
+
+The plan the Launch Engine produces is deterministic and it stays that way. What a founder
+*does* to a plan — mark an asset done, pause an item, edit the mission, let Populr schedule
+unattended — is execution state, and it lives in a separate overlay so the plan can always be
+recomputed without losing progress.
+
+| File | Responsibility |
+| ---- | -------------- |
+| `lib/launch/workspace.ts` | `WorkspaceState` (item statuses, automation, mission edits), pure transitions, derived `campaignProgress` / `workspaceSummary` / `effectiveMission` |
+| `lib/launch/workspace-store.ts` | `InMemoryWorkspaceStateRepo` + `NeonWorkspaceStateRepo` (`launch_workspace_state`) |
+| `lib/launch/command.ts` | Deterministic command-bar parsing → intent + params |
+| `lib/launch/shared.ts` | Process-wide state repo + `resolvePlan` (persisted launch, else the deterministic default) |
+
+**Transitions never mutate.** Every action returns a new state, so the UI can apply a server
+response wholesale without reconciling. `reset` deletes the override rather than writing a
+"todo" — absence is the default, and storing it would be a lie about intent.
+
+**The command bar is not an LLM call.** It drives real side effects (scheduling, generation,
+research), so it parses deterministically and reports `unknown` with examples rather than
+guessing. `POST /api/launch/command { preview: true }` returns the parse without executing.
+
+**Automation defaults are conservative.** `approvalWorkflow` on, `campaignExecution` off:
+Populr does not run someone's launch until they ask it to.
+
+**Degradation is visible.** If plan storage hiccups, `resolvePlan` falls back to the
+deterministic plan and logs it; if execution state can't be read, `GET /api/launch/workspace`
+returns `degraded: true` and the dashboard says so — nobody should mistake a storage outage
+for "nothing done yet". Writes never pretend: a failed save returns 503.
+
+### Wiring, not duplication
+
+The workspace is a cockpit over services that already exist:
+
+- Publishing → `/api/social/dashboard`, `/api/social/retry`, `/api/social/drafts` (M12)
+- Market intelligence → `/api/market/research` (M13), with "add to campaign" creating a draft
+- Performance → `/api/learning/dashboard` (M10)
+- Generation → `/api/content/generate` (M6)
+- Recommendations → `analyzeLaunch`, shown only on the campaign whose evidence cites it
+
+### APIs
+
+`GET /api/launch/workspace` · `POST /api/launch/workspace` (`op`: `item` | `bulkItems` |
+`automation` | `mission`) · `POST /api/launch/command`.
+
+### Entry point
+
+The home page closes with a Launch Workspace section linking to the existing
+`/studio/launch`. No new route, no second workspace.
+
+### Database
+
+`db/migrations/20260729_launch_workspace_state.sql`.
+
+### Tests
+
+`tests/launch-workspace.test.ts` — 17 tests: immutability, reset semantics, campaign
+completion and next-publish derivation, automation defaults, mission layering, store
+scoping, and command parsing (horizons, platform ids, determinism, honest `unknown`).

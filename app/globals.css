@@ -1215,3 +1215,49 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .landing .lwx-cell p{font-size:13.5px;color:var(--dim);line-height:1.55}
 @media(max-width:860px){.landing .lwx-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.landing .lwx-grid{grid-template-columns:1fr}.landing .lwx-lede{font-size:15.5px}}
+
+/* ---- Launch Workspace actions (command bar, item controls, automation) ---- */
+.lwa-cmd{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.lwa-cmd-in{flex:1;min-width:240px}
+.lwa-examples{margin-top:8px}
+.lwa-chip-btn{cursor:pointer;font-family:inherit;transition:border-color .15s ease,color .15s ease}
+.lwa-chip-btn:hover:not(:disabled){border-color:var(--acc);color:var(--fg)}
+.lwa-chip-btn:disabled{opacity:.5;cursor:default}
+.lwa-cmdout,.lwa-note{margin-top:12px}
+.lwa-note{font-size:13px;color:var(--dim);border-left:3px solid var(--acc)}
+.lwa-summary{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+/* .job-bar is a span sized by its grid parent in the Jobs dashboard; inside a card it
+   needs explicit block sizing or the fill's height:100% resolves against an inline box. */
+.lwa-bar{display:block;width:100%;height:6px;margin-top:10px}
+.lwa-summary .lwa-bar{margin-top:0}
+.lwa-cardtop{gap:10px;align-items:flex-start}
+.lwa-cardtop .lw-card-h{margin-bottom:0}
+.lwa-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.lwa-btn{font-size:11.5px;font-weight:500;color:var(--dim);background:var(--bg);border:1px solid var(--line);
+  border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;transition:border-color .15s ease,color .15s ease}
+.lwa-btn:hover:not(:disabled){border-color:var(--acc);color:var(--fg)}
+.lwa-btn:disabled{opacity:.5;cursor:default}
+.lwa-h2-btn{margin-left:12px;vertical-align:2px}
+.lwa-rec{color:var(--faint);border-top:1px solid var(--line);padding-top:8px}
+.lwa-detail{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+/* An opened campaign spans the grid so its item rows get room to breathe. */
+.lw-card.lwa-open{grid-column:1/-1}
+.lwa-detail-row{display:grid;grid-template-columns:minmax(140px,1.4fr) minmax(70px,.6fr) auto;align-items:center;gap:10px;font-size:12.5px}
+.lwa-detail-row .lwa-actions{margin-top:0;justify-content:flex-end}
+@media(max-width:720px){.lwa-detail-row{grid-template-columns:1fr auto}.lwa-detail-row .lwa-actions{grid-column:1/-1;justify-content:flex-start}}
+.lwa-assets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lwa-item-done{opacity:.55;text-decoration:line-through}
+.lwa-dep{font-size:10.5px;margin-left:8px}
+.lwa-fail{margin-top:14px;border-left:3px solid var(--redd)}
+.lwa-edit{display:flex;flex-direction:column}
+.lwa-edit .mkt-input{width:100%}
+.lwa-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.lwa-narrow{min-width:120px;flex:0 1 160px}
+.lwa-area{width:100%;resize:vertical;line-height:1.5}
+.lwa-toggle{width:40px;height:22px;border-radius:100px;border:1px solid var(--line);background:var(--bg);
+  position:relative;cursor:pointer;padding:0;transition:background .18s ease,border-color .18s ease}
+.lwa-toggle.on{background:var(--acc);border-color:var(--acc)}
+.lwa-toggle:disabled{opacity:.5;cursor:default}
+.lwa-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dim);transition:transform .18s ease,background .18s ease}
+.lwa-toggle.on .lwa-knob{transform:translateX(18px);background:#0b0b0b}
+@media(max-width:620px){.lwa-detail-row{align-items:flex-start}.lwa-cmd-in{min-width:0}}
