@@ -28,6 +28,8 @@ const FLOWS: Record<JobType, JobState[]> = {
   ads: FULL,
   publishing: ["queued", "waiting_for_resources", "approval", "publishing", "learning_update", "completed"],
   learning: ["queued", "waiting_for_resources", "learning_update", "completed"],
+  // Market research collects + analyses, then feeds the learning update. No generation.
+  market_research: ["queued", "waiting_for_resources", "planning", "learning_update", "completed"],
 };
 
 /** The concrete stage path for a job, inserting the optional publishing stage. */

@@ -70,6 +70,10 @@ export default function StudioNav() {
           <span className="st-link-ic">{svg(<path d="M4 12l16-8-7 16-2-6-7-2Z" />)}</span>
           <span className="st-link-label">Cross-Post</span>
         </Link>
+        <Link href="/studio/market" className={"st-link" + (path === "/studio/market" ? " on" : "")} aria-current={path === "/studio/market" ? "page" : undefined}>
+          <span className="st-link-ic">{svg(<><path d="M4 19V5M4 19h16" /><path d="M8 16l4-6 3 3 5-7" /></>)}</span>
+          <span className="st-link-label">Market Intel</span>
+        </Link>
       </div>
 
       <Link href="/app" className="st-back">

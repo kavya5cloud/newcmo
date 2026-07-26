@@ -1194,3 +1194,9 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .job-meta{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--faint);text-align:right}
 .lw-chip.job-warn{border-color:rgba(242,191,112,.4);color:var(--amberr)}
 @media(max-width:720px){.job-row{grid-template-columns:1fr 1fr;gap:8px}.job-bar,.job-meta{grid-column:1/-1;text-align:left}}
+
+/* ---- Market Intelligence dashboard (Milestone 13) ---- */
+.mkt-input{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--fg);padding:8px 11px;font-family:inherit;font-size:13px;min-width:200px}
+.mkt-input:focus{outline:none;border-color:var(--acc)}
+.lw-subnav a.mkt-tab-on{border-color:var(--acc);color:var(--fg);background:rgba(213,255,114,.10)}
+.mkt-evidence{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint);margin-top:8px;line-height:1.5}

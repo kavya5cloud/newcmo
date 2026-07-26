@@ -7,7 +7,7 @@
 export const JOB_TYPES = [
   "strategy", "decision", "mission_planning", "campaign_planning", "creative_brief",
   "image_generation", "video_generation", "motion_graphics", "ugc", "document",
-  "ads", "publishing", "learning",
+  "ads", "publishing", "learning", "market_research",
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
