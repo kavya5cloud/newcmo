@@ -8,12 +8,30 @@ import { AIProcessing } from "@/app/components/ai-processing";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
+// Bounded so a stalled request can never freeze the flow: without a timeout an
+// unresolved fetch leaves `progress` pinned, the Analyze button disabled, and the page
+// sitting there forever with no error.
+const AI_TIMEOUT_MS = 60_000;
+
 async function ai(prompt: string, url?: string): Promise<string> {
-  const r = await fetch("/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, url: url || null }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  let r: Response;
+  try {
+    r = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, url: url || null }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("timed out — the request took too long, please try again");
+    }
+    throw new Error("network error — check your connection and try again");
+  } finally {
+    clearTimeout(timer);
+  }
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.error) {
     const detail = [d.error, d.kind, d.provider, d.model, d.status, d.detail]

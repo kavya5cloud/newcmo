@@ -91,6 +91,72 @@ function dropTrailingCommas(s: string): string {
 }
 
 /**
+ * Repair stray comma-separated strings in an OBJECT value position.
+ *
+ * Models asked for `"voice": "3 adjectives"` frequently emit
+ *   "voice":"modern", "innovative", "collaborative","description":…
+ * i.e. three bare strings where one was expected. The parser then meets `, "innovative"`
+ * where a key belongs and fails with `Expecting ':' delimiter`.
+ *
+ * Fix: inside an object, when a comma is followed by a string that is NOT followed by a
+ * colon, that string is a continuation of the previous value — fold it in. Array elements
+ * are untouched because the merge only runs when the innermost container is `{`.
+ */
+function mergeStrayObjectStrings(src: string): string {
+  const skipWs = (idx: number) => { let j = idx; while (j < src.length && /\s/.test(src[j])) j++; return j; };
+  const readString = (idx: number) => {
+    let j = idx + 1, esc = false;
+    while (j < src.length) {
+      const c = src[j];
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') { j++; break; }
+      j++;
+    }
+    return { raw: src.slice(idx, j), end: j };
+  };
+
+  let out = "";
+  const stack: string[] = [];
+  let i = 0;
+
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (ch === '"') {
+      const { raw, end } = readString(i);
+      out += raw;
+      i = end;
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") { stack.push(ch); out += ch; i++; continue; }
+    if (ch === "}" || ch === "]") { stack.pop(); out += ch; i++; continue; }
+
+    if (ch === "," && stack[stack.length - 1] === "{") {
+      const afterComma = skipWs(i + 1);
+      if (src[afterComma] === '"') {
+        const { raw, end } = readString(afterComma);
+        const afterStr = skipWs(end);
+        if (src[afterStr] !== ":") {
+          // Continuation of the previous value: fold it into the preceding string.
+          if (/"\s*$/.test(out)) {
+            out = out.replace(/"(\s*)$/, "");                 // reopen the previous string
+            out += ", " + raw.slice(1, -1) + '"';             // append ", content" and close
+            i = end;
+            continue;
+          }
+        }
+      }
+    }
+
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
  * Extract and parse the first complete JSON value from model output.
  * Repairs truncation and tolerates fences/prose. Throws LlmJsonError with a useful
  * message (and a sample of what came back) when there is genuinely no JSON.
@@ -115,9 +181,14 @@ export function extractJson<T = Record<string, unknown>>(text: string): T {
   const sc = scan(clean, start);
   const fragment = clean.slice(start, sc.end);
 
-  const attempts = sc.complete
-    ? [fragment, dropTrailingCommas(fragment)]
-    : [repairTruncated(fragment, sc), dropTrailingCommas(repairTruncated(fragment, sc))];
+  const base = sc.complete ? fragment : repairTruncated(fragment, sc);
+  // Escalating repairs: as-is → drop trailing commas → fold stray value strings → both.
+  const attempts = [
+    base,
+    dropTrailingCommas(base),
+    mergeStrayObjectStrings(base),
+    dropTrailingCommas(mergeStrayObjectStrings(base)),
+  ];
 
   for (const attempt of attempts) {
     try {

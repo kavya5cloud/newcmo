@@ -76,6 +76,36 @@ describe("extractJson — truncation repair (the production failure)", () => {
   });
 });
 
+describe("extractJson — stray value strings (the live trypopulr.in failure)", () => {
+  // Verbatim shape of the real linear.app response that broke analyse in production:
+  // the model emitted three bare strings for the single-string `voice` field.
+  const real = '{"name":"Linear","oneLiner":"issue tracking","audience":"product teams",' +
+    '"positioning":"Fast by default.","competitors":["Asana", "Jira", "Trello", "Notion"],' +
+    '"voice":"modern", "innovative", "collaborative","description":"Linear is a system."}';
+
+  it("legacy parser choked on it (this is what users hit)", () => {
+    // V8: "Expected ':' after property name" — the stray string lands in key position.
+    expect(() => legacyParse(real)).toThrow(/Expected ':'/);
+  });
+
+  it("folds the stray strings back into the value", () => {
+    const p = extractJson<{ voice: string; name: string; description: string }>(real);
+    expect(p.name).toBe("Linear");
+    expect(p.voice).toBe("modern, innovative, collaborative");
+    expect(p.description).toBe("Linear is a system.");
+  });
+
+  it("does NOT damage real arrays while doing so", () => {
+    const p = extractJson<{ competitors: string[] }>(real);
+    expect(p.competitors).toEqual(["Asana", "Jira", "Trello", "Notion"]);
+  });
+
+  it("leaves well-formed objects untouched", () => {
+    const good = '{"a":"one","b":["x","y"],"c":{"d":"z"}}';
+    expect(extractJson(good)).toEqual({ a: "one", b: ["x", "y"], c: { d: "z" } });
+  });
+});
+
 describe("extractJson — clear errors instead of 'Unexpected end of JSON input'", () => {
   it("reports prose-only replies as no_json", () => {
     try {
