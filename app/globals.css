@@ -1200,3 +1200,18 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .mkt-input:focus{outline:none;border-color:var(--acc)}
 .lw-subnav a.mkt-tab-on{border-color:var(--acc);color:var(--fg);background:rgba(213,255,114,.10)}
 .mkt-evidence{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint);margin-top:8px;line-height:1.5}
+
+/* ---- Launch Workspace entry point (landing) ---- */
+.landing .lwx{border-bottom:0;position:relative;overflow:hidden}
+.landing .lwx::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 20% 0%,rgba(213,255,114,.10),transparent 42%),radial-gradient(circle at 88% 20%,rgba(64,212,197,.08),transparent 38%)}
+.landing .lwx .wrap{position:relative}
+.landing .lwx-lede{margin-top:16px;max-width:660px;color:#abb5ad;font-size:17px;line-height:1.6}
+.landing .lwx-cta{margin-top:26px}
+.landing .lwx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:44px;
+  background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.landing .lwx-cell{background:var(--bg);padding:22px 22px 24px}
+.landing .lwx-cell h3{font-size:15px;font-weight:600;margin-bottom:7px;color:var(--fg)}
+.landing .lwx-cell p{font-size:13.5px;color:var(--dim);line-height:1.55}
+@media(max-width:860px){.landing .lwx-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.landing .lwx-grid{grid-template-columns:1fr}.landing .lwx-lede{font-size:15.5px}}

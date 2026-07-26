@@ -229,7 +229,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="pricing" style={{ borderBottom: 0 }}>
+      <section id="pricing">
         <div className="wrap">
           <p className="label">Pricing</p>
           <h2 style={{ marginTop: 14 }}>One plan. First month free.</h2>
@@ -239,6 +239,41 @@ export default function Landing() {
               <p className="inc">all channels · unlimited drafts · cancel anytime</p>
             </div>
             <a href="/app" className="btn btn-lg">Try free for a month</a>
+          </div>
+        </div>
+      </section>
+
+      {/* Entry point into the existing Launch Workspace (/studio/launch). This is the
+          bridge from "I write posts" to "Populr runs my marketing" — it links to the
+          workspace that already exists rather than introducing another one. */}
+      <section id="launch-workspace" className="lwx">
+        <div className="wrap">
+          <p className="label">Launch Workspace</p>
+          <h2 style={{ marginTop: 14 }}>Go beyond creating individual posts.</h2>
+          <p className="lwx-lede">
+            Plan campaigns, generate assets, publish across every platform, monitor
+            performance, and let Populr execute your marketing from one workspace.
+          </p>
+
+          <div className="cta-row lwx-cta">
+            <a href="/studio/launch" className="btn btn-lg">Open Launch Workspace</a>
+            <a href="#launch-detail" className="btn btn-lg btn-ghost">Learn more</a>
+          </div>
+
+          <div id="launch-detail" className="lwx-grid">
+            {[
+              ["Campaigns", "One mission becomes sequenced campaigns with briefs and owners."],
+              ["Assets", "Every asset the launch needs — planned, generated and versioned."],
+              ["Publishing", "Schedule and publish across platforms with approvals and retries."],
+              ["Performance", "Reach, engagement and conversions tracked back to each asset."],
+              ["Market intel", "Trends, competitor moves and opportunities before they're obvious."],
+              ["Automation", "Auto-scheduling, best-time posting and recurring campaigns."],
+            ].map(([title, copy]) => (
+              <div key={title} className="lwx-cell">
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
