@@ -64,3 +64,17 @@ CREATE TABLE IF NOT EXISTS social_history (
   error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_social_history_tenant ON social_history (tenant, published_at DESC);
+
+-- Asset Service (media attached to posts). Added with the Webhook + Asset services.
+CREATE TABLE IF NOT EXISTS social_assets (
+  id TEXT PRIMARY KEY,
+  tenant TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  uri TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  alt_text TEXT,
+  width INT,
+  height INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_social_assets_tenant ON social_assets (tenant, created_at DESC);

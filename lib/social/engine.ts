@@ -224,6 +224,56 @@ export class SocialPublishingEngine {
     return true;
   }
 
+  /**
+   * Apply a normalized platform webhook (see webhooks.ts). Platform callbacks are the
+   * source of truth AFTER dispatch: a provider can confirm, fail or delete a post
+   * asynchronously, and a revoked token must mark the account disconnected.
+   * Returns what changed so the API can report it.
+   */
+  async applyWebhook(e: {
+    platform: SocialPlatform; type: string; externalId: string | null;
+    accountExternalId: string | null; permalink: string | null; error: string | null;
+  }): Promise<{ applied: boolean; jobId?: string; accountId?: string; change?: string }> {
+    // Token revocation → mark the account disconnected so nothing publishes with it.
+    if (e.type === "token.revoked") {
+      const all = [...this.jobMem.values()];
+      const accId = e.accountExternalId ? `acc_${e.platform}_${e.accountExternalId}` : all.find((j) => j.platform === e.platform)?.accountId;
+      if (!accId) return { applied: false };
+      const account = await this.accounts.get(accId);
+      if (!account) return { applied: false };
+      await this.accounts.save({ ...account, status: "disconnected" });
+      await this.credentials.remove(accId);
+      console.info(JSON.stringify({ event: "social_webhook", type: e.type, platform: e.platform, account: accId }));
+      return { applied: true, accountId: accId, change: "account_disconnected" };
+    }
+
+    if (!e.externalId) return { applied: false };
+    const job = [...this.jobMem.values()].find((j) => j.result?.externalId === e.externalId);
+    if (!job) return { applied: false };
+
+    if (e.type === "publish.confirmed") {
+      job.state = "published";
+      job.error = null;
+      if (job.result) job.result = { ...job.result, ok: true, permalink: e.permalink ?? job.result.permalink };
+      this.log(job, "info", "Platform confirmed publish");
+    } else if (e.type === "publish.failed") {
+      job.error = e.error ?? "platform_reported_failure";
+      this.log(job, "error", `Platform reported failure: ${job.error}`);
+      await this.finalizeFailure(job);
+    } else if (e.type === "post.deleted") {
+      job.state = "cancelled";
+      this.log(job, "warn", "Post deleted on the platform");
+    } else {
+      return { applied: false, jobId: job.id };
+    }
+
+    job.updatedAt = this.now();
+    await this.persist(job);
+    await this.appendHistory(job);
+    console.info(JSON.stringify({ event: "social_webhook", type: e.type, platform: e.platform, jobId: job.id }));
+    return { applied: true, jobId: job.id, change: job.state };
+  }
+
   getJob(id: string) { return this.jobMem.get(id) ?? this.jobs.get(id); }
   listJobs(tenant?: string) { return this.jobs.list(tenant); }
   listHistory(tenant: string) { return this.history.list(tenant); }

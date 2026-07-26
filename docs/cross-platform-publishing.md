@@ -64,3 +64,36 @@ Migration `db/migrations/20260727_social_publishing.sql`: `social_accounts`,
 timezone conversion (UTC + DST), backoff, connect, publish-now, idempotency, schedule +
 due dispatch, cancel, retry→dead-letter, drafts CRUD + multiple assets. 12 deterministic
 tests.
+
+## Webhook Service
+
+`lib/social/webhooks.ts` + `POST /api/social/webhooks/[platform]`.
+
+Platform callbacks (publish confirmed/failed, post deleted, token revoked) arrive here,
+are **HMAC-SHA256 verified in constant time** against `SOCIAL_WEBHOOK_SECRET`, then
+normalized into one `WebhookEvent` shape — each provider's vocabulary
+(`post_published`, `media_published`, `deauthorize`, …) maps in a single alias table, so
+platform detail never reaches the engine.
+
+`SocialPublishingEngine.applyWebhook()` applies them: a confirmation finalizes the post, a
+failure re-enters the retry/backoff path (never silently lost), a deletion cancels the job,
+and **token revocation disconnects the account and drops its credential** so nothing can
+publish with a dead token. Requests are rejected with 401 on a bad signature, and the
+route fails closed (503) in production when no secret is configured.
+
+## Asset Service
+
+`lib/social/assets.ts` + `/api/social/assets` (GET/POST/DELETE), table `social_assets`.
+
+Media kind is **derived from the MIME type**, never trusted from the client, and unknown
+types are rejected with 415. `validateForPlatform()` checks assets against the target
+platform's constraints — which come from that platform's **adapter**, so adding a platform
+never means editing the asset service. It catches the mistakes that would otherwise only
+fail at publish time: Instagram/Pinterest requiring media, X's 4-asset cap, Pinterest
+rejecting video, and images missing alt text.
+
+## Dashboard additions
+
+`/studio/social` now also has a **Draft Manager** (list / load / delete, plus “Save draft”
+from the composer) and an **Integration Settings** panel (per-account status with
+disconnect / reconnect).

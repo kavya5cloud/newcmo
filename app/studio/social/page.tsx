@@ -11,9 +11,10 @@ type Metrics = { queued: number; scheduled: number; publishing: number; publishe
 type Job = { id: string; platform: string; state: string; attempts: number; text: string; error: string | null };
 type CalItem = { id: string; platform: string; localTime: string | null; text: string };
 type Hist = { id: string; platform: string; state: string; permalink: string | null; attempts: number };
+type Draft = { id: string; title: string; platforms: string[]; content: { text: string }; updatedAt: number };
 
 const LABEL: Record<string, string> = { linkedin: "LinkedIn", instagram_business: "Instagram", facebook_pages: "Facebook", x: "X", threads: "Threads", pinterest: "Pinterest" };
-const STATE_CLASS: Record<string, string> = { published: "job-ok", failed: "job-bad", dead_letter: "job-bad", cancelled: "job-muted", scheduled: "job-warn", queued: "job-warn", publishing: "job-warn" };
+const STATE_CLASS: Record<string, string> = { published: "job-ok", failed: "job-bad", dead_letter: "job-bad", cancelled: "job-muted", scheduled: "job-warn", queued: "job-warn", publishing: "job-warn", connected: "job-ok", disconnected: "job-muted", expired: "job-warn", error: "job-bad" };
 
 export default function SocialDashboard() {
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -22,6 +23,7 @@ export default function SocialDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [calendar, setCalendar] = useState<CalItem[]>([]);
   const [history, setHistory] = useState<Hist[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [text, setText] = useState("Big news for founders — Populr is live.");
   const [account, setAccount] = useState("");
   const [when, setWhen] = useState("");
@@ -29,9 +31,10 @@ export default function SocialDashboard() {
   const seeded = useRef(false);
 
   async function refresh() {
-    const [a, d] = await Promise.all([
+    const [a, d, dr] = await Promise.all([
       fetch("/api/social/accounts", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
       fetch("/api/social/dashboard", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+      fetch("/api/social/drafts", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
     ]);
     if (a.platforms) setPlatforms(a.platforms);
     if (a.accounts) { setAccounts(a.accounts); if (a.accounts[0] && !account) setAccount(a.accounts[0].id); }
@@ -39,6 +42,22 @@ export default function SocialDashboard() {
     if (d.jobs) setJobs(d.jobs);
     if (d.calendar) setCalendar(d.calendar);
     if (d.history) setHistory(d.history);
+    if (dr.drafts) setDrafts(dr.drafts);
+  }
+
+  // ---- Draft Manager ----
+  async function saveDraft() {
+    const acc = accounts.find((a) => a.id === account);
+    await fetch("/api/social/drafts", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: text.slice(0, 40) || "Untitled", platforms: acc ? [acc.platform] : [], content: { text, assetIds: [] } }),
+    }).catch(() => {});
+    await refresh();
+  }
+  async function loadDraft(d: Draft) { setText(d.content.text); }
+  async function deleteDraft(id: string) {
+    await fetch(`/api/social/drafts/${id}`, { method: "DELETE" }).catch(() => {});
+    await refresh();
   }
 
   useEffect(() => {
@@ -120,7 +139,45 @@ export default function SocialDashboard() {
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--fg)", padding: "8px 10px" }} />
             <button className="st-card-cta st-card-gen" disabled={busy || !account} onClick={() => publish(false)}>Publish now</button>
             <button className="st-card-cta st-card-gen" disabled={busy || !account || !when} onClick={() => publish(true)}>Schedule</button>
+            <button className="st-card-cta st-card-gen" disabled={busy || !text.trim()} onClick={saveDraft}>Save draft</button>
           </div>
+        </div>
+      </section>
+
+      {/* Draft Manager */}
+      <section className="lw-block">
+        <h2 className="lw-h2">Draft Manager</h2>
+        <div className="job-list">
+          {drafts.length ? drafts.map((d) => (
+            <div key={d.id} className="job-row">
+              <span className="job-type">{d.title}</span>
+              <span className="job-state job-muted">{d.platforms.map((p) => LABEL[p] ?? p).join(", ") || "no platform"}</span>
+              <span className="lw-muted">{d.content.text.slice(0, 70)}</span>
+              <span className="job-meta">
+                <button className="lw-chip" onClick={() => loadDraft(d)}>load</button>
+                <button className="lw-chip" onClick={() => deleteDraft(d.id)}>delete</button>
+              </span>
+            </div>
+          )) : <div className="lw-muted">No drafts yet — write something above and hit “Save draft”.</div>}
+        </div>
+      </section>
+
+      {/* Integration Settings */}
+      <section className="lw-block">
+        <h2 className="lw-h2">Integration Settings</h2>
+        <div className="job-list">
+          {accounts.length ? accounts.map((a) => (
+            <div key={a.id} className="job-row">
+              <span className="job-type">{LABEL[a.platform] ?? a.platform}</span>
+              <span className={"job-state " + (STATE_CLASS[a.status] ?? "")}>{a.status}</span>
+              <span className="lw-muted">{a.handle}</span>
+              <span className="job-meta">
+                <button className="lw-chip" onClick={() => (a.status === "connected" ? disconnect(a.id) : connect(a.platform))}>
+                  {a.status === "connected" ? "disconnect" : "reconnect"}
+                </button>
+              </span>
+            </div>
+          )) : <div className="lw-muted">No accounts connected yet.</div>}
         </div>
       </section>
 
