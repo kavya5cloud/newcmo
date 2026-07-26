@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { loadState, workspaceId, type Profile } from "@/lib/store";
 import { CAMPAIGN_GOALS, type CampaignTask } from "@/lib/services/contracts";
 import type { AssetRow } from "@/lib/services/assets";
+import { extractJson } from "@/lib/llm-json";
 
 // Marketing Missions — the AI CMO assigns work, not tips.
 // Flow (decision-first, enforced): pick a mission → decision engine ranks channels
@@ -36,11 +37,8 @@ async function ai(prompt: string, url?: string): Promise<string> {
   return d.text as string;
 }
 
-function parseJSON(txt: string) {
-  const clean = txt.replace(/```json|```/g, "").trim();
-  const s = clean.indexOf("{"), e = clean.lastIndexOf("}");
-  return JSON.parse(clean.slice(s, e + 1));
-}
+// Shared, truncation-tolerant JSON extraction (lib/llm-json.ts).
+const parseJSON = extractJson;
 
 const GOAL_LABEL = Object.fromEntries(CAMPAIGN_GOALS.map((g) => [g.id, g.label]));
 

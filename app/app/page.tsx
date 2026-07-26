@@ -5,6 +5,7 @@ import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel
 import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
 import { AIProcessing } from "@/app/components/ai-processing";
+import { extractJson, LlmJsonError } from "@/lib/llm-json";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
 async function ai(prompt: string, url?: string): Promise<string> {
@@ -22,11 +23,8 @@ async function ai(prompt: string, url?: string): Promise<string> {
   }
   return d.text as string;
 }
-function parseJSON(txt: string) {
-  const clean = txt.replace(/```json|```/g, "").trim();
-  const s = clean.indexOf("{"), e = clean.lastIndexOf("}");
-  return JSON.parse(clean.slice(s, e + 1));
-}
+// JSON extraction lives in lib/llm-json.ts — it repairs truncated model output and gives
+// a readable error when the model replies without JSON.
 function hostOf(u: string) {
   try { return new URL(u).hostname.replace("www.", ""); } catch { return u; }
 }
@@ -436,7 +434,16 @@ export default function AppPage() {
   const hydrated = useRef(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2600); };
-  const aiErrorText = (err: unknown) => err instanceof Error ? err.message : String(err);
+  // Surface WHY it failed. A model that replies without JSON (or gets cut off) used to
+  // surface as the useless "Unexpected end of JSON input" — now it says so plainly.
+  const aiErrorText = (err: unknown) => {
+    if (err instanceof LlmJsonError) {
+      return err.reason === "no_json"
+        ? "the site couldn't be read cleanly — try again, or use a different URL"
+        : "the response was cut short — try again";
+    }
+    return err instanceof Error ? err.message : String(err);
+  };
   const liveTrial = useMemo(() => trialSnapshot(trial, nowTick), [trial, nowTick]);
 
   useEffect(() => {
@@ -652,7 +659,7 @@ export default function AppPage() {
             `Analyze ${subject} using the page content above.${srcNote}${descLine}\nRespond ONLY with JSON, no markdown fences, no preamble:\n{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`,
             source === "gbp" ? undefined : u
           );
-          p = parseJSON(txt) as Profile;
+          p = extractJson<Profile>(txt);
         } catch (e) { lastErr = e; }
       }
       if (!p) throw lastErr || new Error("profile_failed");
@@ -670,9 +677,9 @@ Output ONLY compact valid JSON (no markdown, no prose). Each item's first string
 Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
         try {
-          const ins = parseJSON(t);
-          if (ins.feed) genFeed = ins.feed as Record<string, FeedEntry>;
-          if (Array.isArray(ins.rankings)) setRankings(ins.rankings as Ranking[]);
+          const ins = extractJson<{ feed?: Record<string, FeedEntry>; rankings?: Ranking[] }>(t);
+          if (ins.feed) genFeed = ins.feed;
+          if (Array.isArray(ins.rankings)) setRankings(ins.rankings);
         }
         catch { setRankings([]); }
       }).catch(() => { setRankings([]); });
@@ -681,7 +688,7 @@ Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep
         `Estimate realistic MONTHLY Google Search numbers for the website ${u} (${p.name} — ${p.oneLiner}). Consider how well-known and large the site is.
 Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>,"visits":<integer>}`
       ).then((t) => {
-        try { const tt = parseJSON(t); if (typeof tt.impressions === "number" && tt.impressions > 0) setEstTraffic({ impressions: tt.impressions, clicks: tt.clicks || 0, visits: tt.visits || 0 }); else setEstTraffic(null); }
+        try { const tt = extractJson<{ impressions?: number; clicks?: number; visits?: number }>(t); if (typeof tt.impressions === "number" && tt.impressions > 0) setEstTraffic({ impressions: tt.impressions, clicks: tt.clicks || 0, visits: tt.visits || 0 }); else setEstTraffic(null); }
         catch { setEstTraffic(null); }
       }).catch(() => setEstTraffic(null));
 
