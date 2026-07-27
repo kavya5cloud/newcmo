@@ -165,6 +165,40 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* Create Content — the second entry point into the existing studio, next to the
+          hero so it isn't buried under the launch story. Links to routes that exist. */}
+      <section id="create-content" className="ccx">
+        <div className="wrap">
+          <p className="label">Create content</p>
+          <h2 style={{ marginTop: 14 }}>Create AI-powered content for every platform from one place.</h2>
+          <p className="lwx-lede">
+            One prompt becomes a post, a thread, a blog, an email or a landing page — sized to each
+            platform&apos;s real limits, with hashtags, CTAs and a posting schedule. Publish everywhere in one click.
+          </p>
+
+          <div className="cta-row lwx-cta">
+            <a href="/studio/documents" className="btn btn-lg">Create Content</a>
+            <a href="/studio" className="btn btn-lg btn-ghost">Browse templates</a>
+          </div>
+
+          <div className="ccx-grid">
+            {[
+              ["Posts & threads", "/studio/documents"],
+              ["Blogs & landing pages", "/studio/documents"],
+              ["Images & carousels", "/studio/images"],
+              ["UGC video scripts", "/studio/ugc"],
+              ["Ads", "/studio/ads"],
+              ["Drafts & scheduling", "/studio/social"],
+            ].map(([label, href]) => (
+              <a key={href + label} href={href} className="ccx-cell">
+                <span>{label}</span>
+                <span className="ccx-arrow">→</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="how">
         <div className="wrap">
           <p className="label">How it works</p>

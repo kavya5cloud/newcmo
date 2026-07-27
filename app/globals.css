@@ -1312,3 +1312,48 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .agt-current{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
 .agt-task{background:var(--bg);margin-top:8px}
 @media(max-width:620px){.agt-graph{gap:4px}.agt-node{padding:5px 10px;font-size:11.5px}}
+
+/* ---- Content composer + UGC workflow ---- */
+.cmp{display:flex;flex-direction:column;gap:16px;margin-bottom:24px}
+.cmp-form{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px}
+.cmp-prompt{width:100%;resize:vertical;line-height:1.5}
+.cmp-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cmp-audience{flex:1;min-width:180px}
+.cmp-hint{font-size:12.5px;margin:0}
+.cmp-out{display:flex;flex-direction:column;gap:14px}
+.cmp-h3{margin-top:8px}
+.cmp-grid{margin:0}
+.cmp-body{white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.6;color:var(--dim);margin:8px 0 0;
+  background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 13px;overflow-x:auto}
+.cmp-body-sm{font-size:12.5px}
+.cmp-actions{margin-top:4px}
+.lw-chip.lwa-chip-btn.on{border-color:var(--acc);color:var(--fg);background:rgba(213,255,114,.1)}
+.ugc-scenes{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.ugc-scene{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:start}
+.ugc-at{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--acc);padding-top:2px}
+.ugc-line{font-size:13.5px;color:var(--fg);line-height:1.5}
+.ugc-visual{font-size:12px;margin-top:3px}
+@media(max-width:620px){.cmp-controls>*{flex:1 1 100%}.cmp-audience{min-width:0}}
+
+/* ---- Create Content (landing) ---- */
+.landing .ccx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:34px}
+.landing .ccx-cell{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--bg);padding:20px 22px;font-size:14.5px;color:var(--fg);text-decoration:none;
+  transition:background .15s ease}
+.landing .ccx-cell:hover{background:var(--panel)}
+.landing .ccx-arrow{color:var(--faint);font-size:13px}
+.landing .ccx-cell:hover .ccx-arrow{color:var(--acc)}
+@media(max-width:860px){.landing .ccx-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.landing .ccx-grid{grid-template-columns:1fr}}
+
+/* ---- Dashboard quick actions ---- */
+.appui .quickbar{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 14px 0}
+.appui .qa{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:11px 13px;text-decoration:none;transition:border-color .15s ease,background .15s ease}
+.appui .qa:hover{border-color:var(--acc)}
+.appui .qa-primary{background:linear-gradient(180deg,rgba(213,255,114,.09),transparent)}
+.appui .qa-t{font-size:13px;font-weight:600;color:var(--fg)}
+.appui .qa-s{font-size:11.5px;color:var(--faint)}
+@media(max-width:1100px){.appui .quickbar{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.appui .quickbar{grid-template-columns:repeat(2,1fr);padding:10px 12px 0}.appui .qa-s{display:none}}

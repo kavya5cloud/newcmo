@@ -1,5 +1,5 @@
-import StudioSection from "../StudioSection";
+import UgcWorkspace from "./Ugc";
 
 export default function Page() {
-  return <StudioSection category="ugc" />;
+  return <UgcWorkspace />;
 }
