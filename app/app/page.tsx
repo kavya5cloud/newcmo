@@ -1074,7 +1074,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         <div className="dash">
           {/* COMPANY */}
           <div className={"col" + (mtab === "company" ? " mactive" : "")}>
-            <div className="col-head"><span className="ct"><span className="ic">▤</span>Company</span><span className="ca"><button title="Reset" onClick={reset}>⚙</button></span></div>
+            <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" onClick={reset}>⚙</button></span></div>
             <div className="col-body">
               <p className="company-desc">{profile?.description || profile?.positioning || "—"}</p>
               <div className="sect">
@@ -1105,7 +1105,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
           {/* ANALYTICS */}
           <div className={"col" + (mtab === "analytics" ? " mactive" : "")}>
-            <div className="col-head"><span className="ct"><span className="ic">∿</span>Analytics</span></div>
+            <div className="col-head"><span className="ct">Analytics</span></div>
             <div className="tabs">
               {(["overview", "seo"] as const).map((t) => (
                 <button key={t} className={"tab" + (tab === t ? " on" : "")} onClick={() => setTab(t)}>{t === "overview" ? "Overview" : "SEO"}</button>
@@ -1262,7 +1262,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           {/* AGENTS FEED */}
           <div className={"col" + (mtab === "agents" ? " mactive" : "")}>
             <div className="col-head">
-              <span className="ct"><span className="ic">≋</span>Agents Feed</span>
+              <span className="ct">Agents Feed</span>
               {pendingDrafts.length > 0 && <span className="draftbadge">{pendingDrafts.length}</span>}
             </div>
             <div className="col-body">
@@ -1323,7 +1323,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
           {/* CHAT */}
           <div className={"col" + (mtab === "chat" ? " mactive" : "")}>
-            <div className="col-head"><span className="ct"><span className="ic">◍</span>Talk to AI CMO</span></div>
+            <div className="col-head"><span className="ct">Talk to AI CMO</span></div>
             <div className="col-body chat-body" ref={chatBodyRef}>
               <div className="chat-tools">
                 <div className="chat-mode" role="tablist" aria-label="Chat mode">

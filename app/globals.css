@@ -197,8 +197,11 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 .appui .dash{flex:1;display:grid;grid-template-columns:250px minmax(340px,1fr) 300px 330px;min-height:0}
 .appui .col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
 .appui .col:last-child{border-right:0}
-.appui .col-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
-.appui .col-head .ct{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.appui .col-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+/* Column titles are labels, not headlines. Mono uppercase at low contrast reads as
+   structure; 600-weight body text competed with the content underneath it. */
+.appui .col-head .ct{display:flex;align-items:center;gap:8px;font-family:'Geist Mono',monospace;
+  font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .appui .col-head .ct .ic{color:var(--faint);font-family:'Geist Mono',monospace;font-size:12.5px}
 .appui .col-head .ca{display:flex;gap:10px;color:var(--faint);font-size:12.5px}
 .appui .col-head .ca button{background:none;border:0;color:var(--faint);font-size:12.5px}
