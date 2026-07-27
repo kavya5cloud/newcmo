@@ -33,6 +33,21 @@ const SEED_PROMPTS = [
   "Explain what we do to someone who has never heard of us",
 ];
 
+/** API error codes are for logs. People get a sentence, and a way forward. */
+function humanError(d: { error?: string; hint?: string }, status: number): string {
+  if (d.hint) return d.hint;
+  switch (d.error) {
+    case "rate_limited": return "You're generating faster than we can keep up. Give it a minute and try again.";
+    case "missing_prompt": return "Write what you want to say first.";
+    case "prompt_too_long": return "That prompt is too long — trim it to a sentence or two.";
+    case "no_platforms": return "Connect a platform in Cross-Post before publishing.";
+    case "compose_failed": return "Generation failed. Your prompt is still here — try again.";
+    default: return status === 429
+      ? "You're generating faster than we can keep up. Give it a minute and try again."
+      : "Something went wrong generating that. Your prompt is still here — try again.";
+  }
+}
+
 const when = (t: number) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export default function Composer({ initialFormat = "post" as ContentFormat, heading }: { initialFormat?: ContentFormat; heading?: string }) {
@@ -61,7 +76,7 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
         body: JSON.stringify({ prompt, format, audience, ...body }),
       });
       const d = await r.json();
-      if (!r.ok || d.error) { setErr(String(d.hint || d.error || `request failed (${r.status})`)); return null; }
+      if (!r.ok || d.error) { setErr(humanError(d, r.status)); return null; }
       return d;
     } catch { setErr("network error — check your connection"); return null; }
     finally { setBusy(null); }
@@ -110,7 +125,7 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
           : <p className="lw-muted cmp-hint">No platforms connected — connect one in Cross-Post to get sized variants and one-click publishing.</p>}
       </div>
 
-      {err && <div className="lw-card lwa-note lwa-sev-critical">{err}</div>}
+      {err && <div className="cmp-err" role="alert">{err}</div>}
       {note && <div className="lw-card lwa-note">{note}</div>}
 
       {/* Empty state that teaches: real prompts, one click to try one. */}

@@ -172,21 +172,27 @@ export default function Landing() {
         <div className="wrap">
           <p className="label">Start here</p>
           <h2 style={{ marginTop: 14 }}>Three ways in.</h2>
+          <p className="start-lede">
+            All three start the same way — paste your site, and Populr reads it before it writes
+            anything. The full Creative Studio (images, video and UGC production) is in private
+            beta and opens to early-access accounts first.
+          </p>
 
           <div className="start-grid">
-            <a href="/studio/documents" className="start-row start-primary">
+            <a href="/app" className="start-row start-primary">
               <span className="start-n">01</span>
               <span className="start-b">
                 <span className="start-t">Create content</span>
                 <span className="start-d">
                   One prompt becomes a post, thread, blog, email or landing page — sized to each
-                  platform&apos;s limits, with hashtags, CTAs and a schedule. Publish everywhere in one click.
+                  platform&apos;s limits, with hashtags, CTAs and a schedule. Paste your site first so it
+                  writes about your product, not a generic one.
                 </span>
               </span>
               <span className="start-a">→</span>
             </a>
 
-            <a href="/studio/launch" className="start-row">
+            <a href="/app" className="start-row">
               <span className="start-n">02</span>
               <span className="start-b">
                 <span className="start-t">Launch workspace</span>
@@ -198,7 +204,7 @@ export default function Landing() {
               <span className="start-a">→</span>
             </a>
 
-            <a href="/app/campaigns" className="start-row">
+            <a href="/app" className="start-row">
               <span className="start-n">03</span>
               <span className="start-b">
                 <span className="start-t">Campaigns</span>
