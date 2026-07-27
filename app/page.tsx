@@ -174,12 +174,11 @@ export default function Landing() {
           <h2 style={{ marginTop: 14 }}>Three ways in.</h2>
           <p className="start-lede">
             All three start the same way — paste your site, and Populr reads it before it writes
-            anything. The full Creative Studio (images, video and UGC production) is in private
-            beta and opens to early-access accounts first.
+            anything. You land exactly where you were heading.
           </p>
 
           <div className="start-grid">
-            <a href="/app" className="start-row start-primary">
+            <a href="/app?next=/studio/documents" className="start-row start-primary">
               <span className="start-n">01</span>
               <span className="start-b">
                 <span className="start-t">Create content</span>

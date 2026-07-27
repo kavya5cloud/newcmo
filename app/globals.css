@@ -1525,3 +1525,11 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .landing .start-a{display:none}
   .landing .start-t{font-size:18px}
 }
+
+/* Resume hand-off: the moment analysis finishes and we continue to what was clicked. */
+.appui .resume{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:60;
+  display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+  border-radius:100px;padding:10px 18px;font-size:13.5px;color:var(--fg);
+  box-shadow:0 10px 40px -12px rgba(0,0,0,.7)}
+.appui .resume-dot{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse 1.2s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.appui .resume-dot{animation:none}}

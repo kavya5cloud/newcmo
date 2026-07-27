@@ -393,6 +393,19 @@ const DOC_DEMO: Record<string, string> = {
 };
 
 /* ---------- component ---------- */
+/** Where the user was heading before we asked them to sign in / paste their site. */
+const NEXT_KEY = "populr:next";
+
+/**
+ * Only internal product paths. A `next` value arrives from the URL, so it is untrusted:
+ * reject protocol-relative URLs (which leave the origin), traversal segments (which
+ * resolve somewhere other than where they read), and anything outside /studio and /app.
+ */
+function isSafeNext(v: string): boolean {
+  if (v.startsWith("//") || v.includes("..") || v.includes("\\")) return false;
+  return /^\/(studio|app)(\/|$|\?)/.test(v);
+}
+
 export default function AppPage() {
   const [entered, setEntered] = useState(false);
   const [cloud, setCloud] = useState(false);
@@ -437,6 +450,7 @@ export default function AppPage() {
   const verifyShownRef = useRef(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [resuming, setResuming] = useState<string | null>(null);
   const [gscData, setGscData] = useState<null | {
     site: string; impressions: string; clicks: string; ctr: string; position: string;
     deltas: { impressions: string; clicks: string; ctr: string; position: string };
@@ -520,6 +534,21 @@ export default function AppPage() {
   // Sign-in is required to use the app once accounts are enabled.
   const mustSignIn = authReady && accountsEnabled && !authUser && entered;
 
+  // Once the workspace is genuinely usable — signed in where required, and a profile
+  // exists — resume whatever the user originally clicked. Nothing is lost to the detour.
+  useEffect(() => {
+    if (!entered || !profile) return;
+    if (accountsEnabled && !authUser) return;
+    let target: string | null = null;
+    try { target = sessionStorage.getItem(NEXT_KEY); } catch { target = null; }
+    if (!target || !isSafeNext(target)) return;
+    try { sessionStorage.removeItem(NEXT_KEY); } catch { /* ignore */ }
+    setResuming(target);
+    // A beat so the "brand understood" state is seen rather than flashing past.
+    const timer = setTimeout(() => { window.location.assign(target!); }, 900);
+    return () => clearTimeout(timer);
+  }, [entered, profile, authUser, accountsEnabled]);
+
   /* collapse the decorative terminal by default on small screens */
   useEffect(() => {
     if (entered && typeof window !== "undefined" && window.innerWidth <= 720) setTermCollapsed(true);
@@ -548,6 +577,12 @@ export default function AppPage() {
       window.history.replaceState({}, "", "/app");
     }
     const qs = new URLSearchParams(window.location.search);
+    const nxt = qs.get("next");
+    if (nxt && isSafeNext(nxt)) {
+      // Keep the user's intent across sign-in and website analysis. Only internal
+      // product paths are accepted — a `next` from a URL is untrusted input.
+      try { sessionStorage.setItem(NEXT_KEY, nxt); } catch { /* private mode */ }
+    }
     const t = qs.get("tab");
     if (t === "agents" || t === "analytics" || t === "company" || t === "chat") setMtab(t);
     const ch = qs.get("channel");
@@ -1463,6 +1498,12 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           </div>
         );
       })()}
+      {resuming && (
+        <div className="resume" role="status" aria-live="polite">
+          <span className="resume-dot" />
+          <span>Brand understood — opening {resuming.includes("launch") ? "Launch Workspace" : resuming.includes("ugc") ? "UGC" : resuming.includes("social") ? "Publishing" : "Content"}…</span>
+        </div>
+      )}
       {authOpen && <AuthModal onClose={() => { if (!mustSignIn) setAuthOpen(false); }} forced={mustSignIn} />}
       {authUser && liveTrial && !liveTrial.active && (
         <div className="trial-lock">
