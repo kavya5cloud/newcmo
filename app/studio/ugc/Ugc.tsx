@@ -31,6 +31,7 @@ export default function UgcWorkspace() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ source: string; provider: string | null; model: string | null; confidence: number; reasoning: string; degradedReason?: string } | null>(null);
 
   const loadRecent = useCallback(async () => {
     const d = await fetch("/api/ugc").then((r) => r.json()).catch(() => null);
@@ -63,7 +64,10 @@ export default function UgcWorkspace() {
   const generate = useCallback(async () => {
     if (!product.trim() || !outcome.trim()) { setErr("Name the product and the change it creates — the script is built from both."); return; }
     const d = await post({ op: "generate", product, audience, outcome, objection, format, creatorStyle, voiceStyle, versions }, "gen");
-    if (d?.ok) { setPkg(d.package); setOpenVersion(d.package.versions[0]?.id ?? null); loadRecent(); }
+    if (d?.ok) {
+      setPkg(d.package); setOpenVersion(d.package.versions[0]?.id ?? null); loadRecent();
+      setMeta({ source: d.source, provider: d.provider, model: d.model, confidence: d.confidence, reasoning: d.reasoning, degradedReason: d.degradedReason });
+    }
   }, [post, product, audience, outcome, objection, format, creatorStyle, voiceStyle, versions, loadRecent]);
 
   const decide = useCallback(async (versionId: string, op: "approve" | "reject") => {
@@ -194,6 +198,15 @@ export default function UgcWorkspace() {
 
       {err && <div className="lw-card lwa-note lwa-sev-critical">{err}</div>}
       {note && <div className="lw-card lwa-note">{note}</div>}
+
+      {pkg && meta && (
+        <div className="cmp-meta">
+          <span className="cmp-src">{meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in engine"}</span>
+          <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
+          <span className="cmp-reason">{meta.reasoning}</span>
+          {meta.degradedReason && <span className="cmp-degraded">{meta.degradedReason}</span>}
+        </div>
+      )}
 
       {pkg && (
         <>

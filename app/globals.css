@@ -1357,3 +1357,86 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .appui .qa-s{font-size:11.5px;color:var(--faint)}
 @media(max-width:1100px){.appui .quickbar{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.appui .quickbar{grid-template-columns:repeat(2,1fr);padding:10px 12px 0}.appui .qa-s{display:none}}
+
+/* =========================================================
+   REFINEMENT PASS
+   One shared interaction language across the studio surfaces.
+   Additive and low-specificity: this tightens rhythm, focus and
+   motion without moving anything or restyling a single component.
+   ========================================================= */
+
+:root{
+  /* A type scale, so headings stop being one-off pixel values. */
+  --t-xs:11px; --t-sm:12.5px; --t-base:13.5px; --t-lg:15px; --t-xl:19px; --t-2xl:26px;
+  /* A 4px spacing rhythm. */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  /* One easing curve everywhere. Motion should feel like one hand made it. */
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --dur:.16s;
+}
+
+/* Focus is a first-class state, not a browser default. Keyboard only — a mouse
+   user clicking a button shouldn't get a ring. */
+.studio a:focus-visible,.studio button:focus-visible,.studio input:focus-visible,
+.studio select:focus-visible,.studio textarea:focus-visible{
+  outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+
+/* Hover should acknowledge, not perform. No lift, no shadow — a border and a
+   text colour are enough to say "this is live". */
+.st-section .lw-card,.st-section .st-card{transition:border-color var(--dur) var(--ease)}
+.st-section .st-card:hover{border-color:#33403a}
+
+/* Typography rhythm across studio surfaces. Reading width is capped so long-form
+   output doesn't run to 1400px and become unreadable. */
+.st-shead h1{font-size:var(--t-2xl);letter-spacing:-.02em;line-height:1.15}
+.st-shead p{max-width:68ch;line-height:1.6}
+.lw-hyp,.lw-list{max-width:78ch}
+.cmp-body{max-width:80ch}
+
+/* Section spacing on one rhythm instead of five different margins. */
+.lw-block{margin-top:var(--s-7)}
+.lw-h2{font-size:var(--t-xl);letter-spacing:-.015em}
+.cmp-h3{font-size:var(--t-lg);letter-spacing:-.01em;margin-top:var(--s-5);margin-bottom:calc(var(--s-2) * -1)}
+
+/* Generation provenance. Quiet by default — it matters, but it is not the content. */
+.cmp-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s-2) var(--s-3);
+  font-size:var(--t-sm);color:var(--faint);padding:var(--s-2) 0 var(--s-1)}
+.cmp-src{font-family:'Geist Mono',monospace;font-size:var(--t-xs);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--acc)}
+.cmp-conf{font-family:'Geist Mono',monospace;font-size:var(--t-xs);color:var(--dim)}
+.cmp-reason{flex:1 1 340px;color:var(--dim);line-height:1.5}
+.cmp-degraded{flex:1 1 100%;color:var(--amberr);font-size:var(--t-sm);line-height:1.5}
+
+/* Results arrive, they don't pop. One entrance, used everywhere, disabled for
+   anyone who asked for less motion. */
+@keyframes settle{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.cmp-out>*,.lwa-cmdout,.lwa-notif{animation:settle .22s var(--ease) both}
+@media(prefers-reduced-motion:reduce){
+  .cmp-out>*,.lwa-cmdout,.lwa-notif{animation:none}
+  *{scroll-behavior:auto}
+}
+
+/* Buttons: one height, one radius, consistent disabled treatment. */
+.st-card-cta,.lwa-btn{transition:border-color var(--dur) var(--ease),color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.st-card-gen{color:#0e1206;background:var(--acc);border-color:var(--acc);font-weight:600}
+.st-card-gen:hover:not(:disabled){background:#e2ff96;border-color:#e2ff96}
+.st-card-gen:disabled{opacity:.55}
+
+/* Empty states teach. Left-aligned and readable rather than a centred shrug. */
+.st-empty{text-align:left;padding:var(--s-5);border-style:solid;border-color:var(--line);
+  background:var(--panel);color:var(--dim);line-height:1.6}
+.st-empty p{max-width:60ch}
+
+/* Inputs share one resting and focus treatment. */
+.mkt-input,.lwa-select{transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.mkt-input::placeholder{color:var(--faint)}
+.mkt-input:hover:not(:focus),.lwa-select:hover{border-color:#33403a}
+
+/* Composer empty state — examples, not "no data". */
+.cmp-empty{display:flex;flex-direction:column;gap:var(--s-3);padding:var(--s-2) 0}
+.cmp-seeds{display:flex;flex-direction:column;gap:var(--s-1)}
+.cmp-seed{text-align:left;font-family:inherit;font-size:var(--t-base);color:var(--dim);
+  background:none;border:0;border-left:2px solid var(--line);padding:var(--s-2) 0 var(--s-2) var(--s-3);
+  cursor:pointer;transition:border-color var(--dur) var(--ease),color var(--dur) var(--ease)}
+.cmp-seed:hover{border-left-color:var(--acc);color:var(--fg)}

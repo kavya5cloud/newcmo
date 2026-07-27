@@ -4,6 +4,47 @@ Content creation is reachable in two clicks from anywhere: a **Create content** 
 the home page and a **Create Content** quick action on the dashboard, both pointing at the
 existing Creative Studio. No new routes, no new navigation layer.
 
+## Generation runs on the existing LLM orchestration
+
+`lib/content/ai.ts` and `lib/ugc/ai.ts` generate through `lib/services/llm` — the layer that
+already owns provider routing (Groq → Gemini → OpenAI), model fallback, retry with backoff,
+quota handling, response caching, in-flight de-duplication and structured logging. No second
+AI layer was introduced and none of that was re-implemented.
+
+**Every generation consumes one assembled context** (`lib/content/generation-context.ts`):
+brand voice from the Learning Engine's Brand DNA, audience, market intelligence, competitors,
+opportunities and keywords from M13, recall from Market Memory, top patterns from the Pattern
+Library, and each connected platform's hard limits from the M12 adapters. Sources degrade
+independently, and the prompt **names what is missing** rather than omitting the heading — a
+model told "market intelligence unavailable" writes differently from one that never saw the
+section, and the difference is whether it invents competitors.
+
+**The deterministic engines were not deleted — they were demoted to the floor.** With no API
+key, a failing provider, or output that doesn't parse, the product still returns a usable
+draft and says plainly that a model didn't write it. Silently degrading to worse text with no
+marker is the one failure mode a founder cannot detect.
+
+**Model output is not trusted on limits.** The model is asked to count characters and is
+usually close, but the adapters are the contract: any variant that overruns is cut at a
+sentence boundary and the note says it was cut.
+
+Every response carries `source`, `provider`, `model`, `confidence`, `reasoning` and
+`degradedReason`, and the UI shows them above the output. Confidence is the model's own
+number, reduced when context was missing.
+
+**Generation metadata** goes to Market Memory (`lib/content/generation-log.ts`) where the
+Learning Engine and the Research agent already read — provider, model, confidence, format and
+whether a model wrote it at all — so that when those posts report performance, the
+correlation between how something was made and how it did is available rather than lost.
+
+### Not implemented, deliberately
+
+Token-level streaming. `generateText` returns a complete response; adding an SSE token stream
+means changing the orchestration layer itself, which is a larger change than this brief
+allows and would risk the M10–M15 paths that depend on it. **Cancellation is real** — the
+request aborts on client disconnect and returns the deterministic draft rather than finishing
+work nobody is waiting for.
+
 ## One prompt → a publishable set
 
 `lib/content/compose.ts` turns one sentence into the piece, a variant per connected

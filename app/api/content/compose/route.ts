@@ -3,7 +3,9 @@ import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { socialEngine } from "@/lib/social/shared";
-import { compose, isContentFormat, isSocialPlatform, type ContentFormat } from "@/lib/content/compose";
+import { isContentFormat, isSocialPlatform, type ContentFormat } from "@/lib/content/compose";
+import { composeWithAi } from "@/lib/content/ai";
+import { recordGeneration } from "@/lib/content/generation-log";
 import type { SocialPlatform } from "@/lib/social/types";
 
 export const runtime = "nodejs";
@@ -40,17 +42,34 @@ export async function POST(req: NextRequest) {
     const connected = [...new Set(accounts.filter((a) => a.status === "connected").map((a) => a.platform))];
     const platforms: SocialPlatform[] = requested?.length ? requested : connected;
 
-    const composed = compose({
+    // Generation runs through the existing multi-provider LLM orchestration. The request
+    // is cancellable: if the client disconnects, we stop rather than finish work nobody
+    // is waiting for.
+    const generation = await composeWithAi({
       tenant, prompt, format: format as ContentFormat,
       audience: String(body.audience || "founders").slice(0, 120),
       platforms,
       now: Date.now(),
+    }, { signal: req.signal });
+    const composed = generation.composed;
+
+    // Metadata the Learning Engine can correlate with what these posts go on to do.
+    await recordGeneration({
+      tenant, kind: "content", format, source: generation.source,
+      provider: generation.provider, model: generation.model,
+      confidence: generation.confidence, platforms: platforms.length, cached: generation.cached,
     });
 
     const action = String(body.publish || "");
     if (!action) {
       return NextResponse.json({
         ok: true, composed,
+        source: generation.source,
+        provider: generation.provider,
+        model: generation.model,
+        confidence: generation.confidence,
+        reasoning: generation.reasoning,
+        degradedReason: generation.degradedReason,
         connectedPlatforms: connected,
         note: platforms.length === 0
           ? "No platforms connected yet, so no platform variants were built. Connect an account in Cross-Post and re-run to get sized variants."
@@ -94,6 +113,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true, composed, results,
+      source: generation.source,
+      provider: generation.provider,
+      model: generation.model,
+      confidence: generation.confidence,
+      reasoning: generation.reasoning,
+      degradedReason: generation.degradedReason,
       message: `${action === "draft" ? "Saved" : action === "schedule" ? "Scheduled" : "Published"} across ${results.length} platform${results.length === 1 ? "" : "s"}.`,
     });
   } catch (e) {

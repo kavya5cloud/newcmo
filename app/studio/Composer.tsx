@@ -19,6 +19,19 @@ type Composed = {
   campaignSuggestion: { title: string; goal: string; rationale: string };
 };
 type Result = { platform: SocialPlatform; jobId: string; state: string; at: number | null };
+/** Where the words came from. Shown because a founder should never have to guess. */
+type Provenance = {
+  source: "llm" | "deterministic"; provider: string | null; model: string | null;
+  confidence: number; reasoning: string; degradedReason?: string;
+};
+
+/** Real prompts, not placeholders — a first-time user should be able to click one. */
+const SEED_PROMPTS = [
+  "We shipped a feature that removes the manual step our users hate most",
+  "Why we rebuilt our onboarding, and what changed",
+  "A short launch announcement for our newest release",
+  "Explain what we do to someone who has never heard of us",
+];
 
 const when = (t: number) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -32,6 +45,7 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [meta, setMeta] = useState<Provenance | null>(null);
 
   useEffect(() => {
     fetch("/api/social/dashboard").then((r) => r.json())
@@ -56,12 +70,18 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   const generate = useCallback(async () => {
     if (!prompt.trim()) { setErr("Describe what you want to say first."); return; }
     const d = await call({}, "gen");
-    if (d?.ok) { setComposed(d.composed); setResults(null); if (d.note) setNote(d.note); }
+    if (d?.ok) {
+      setComposed(d.composed); setResults(null); if (d.note) setNote(d.note);
+      setMeta({ source: d.source, provider: d.provider, model: d.model, confidence: d.confidence, reasoning: d.reasoning, degradedReason: d.degradedReason });
+    }
   }, [call, prompt]);
 
   const publish = useCallback(async (action: "draft" | "schedule" | "now") => {
     const d = await call({ publish: action }, action);
-    if (d?.ok) { setComposed(d.composed); setResults(d.results); setNote(d.message); }
+    if (d?.ok) {
+      setComposed(d.composed); setResults(d.results); setNote(d.message);
+      setMeta({ source: d.source, provider: d.provider, model: d.model, confidence: d.confidence, reasoning: d.reasoning, degradedReason: d.degradedReason });
+    }
   }, [call]);
 
   return (
@@ -93,8 +113,30 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
       {err && <div className="lw-card lwa-note lwa-sev-critical">{err}</div>}
       {note && <div className="lw-card lwa-note">{note}</div>}
 
+      {/* Empty state that teaches: real prompts, one click to try one. */}
+      {!composed && !busy && (
+        <div className="cmp-empty">
+          <p className="lw-muted">Start from one of these, or write your own.</p>
+          <div className="cmp-seeds">
+            {SEED_PROMPTS.map((p) => (
+              <button key={p} type="button" className="cmp-seed" onClick={() => setPrompt(p)}>{p}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {composed && (
         <div className="cmp-out">
+          {meta && (
+            <div className="cmp-meta">
+              <span className="cmp-src">
+                {meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}
+              </span>
+              <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
+              <span className="cmp-reason">{meta.reasoning}</span>
+              {meta.degradedReason && <span className="cmp-degraded">{meta.degradedReason}</span>}
+            </div>
+          )}
           <div className="lw-card">
             <div className="lw-k">{FORMAT_META[composed.format].label}</div>
             <div className="lw-card-h">{composed.title}</div>

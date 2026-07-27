@@ -4,7 +4,9 @@ import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { socialEngine } from "@/lib/social/shared";
 import { SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social/types";
-import { decideVersion, editVersion, generateUgc } from "@/lib/ugc/engine";
+import { decideVersion, editVersion } from "@/lib/ugc/engine";
+import { generateUgcWithAi } from "@/lib/ugc/ai";
+import { recordGeneration } from "@/lib/content/generation-log";
 import { ugcRepo } from "@/lib/ugc/shared";
 import {
   CREATOR_STYLES, UGC_FORMATS, VOICE_STYLES,
@@ -73,9 +75,24 @@ export async function POST(req: NextRequest) {
     if (op === "generate") {
       const brief = readBrief(body);
       if ("error" in brief) return NextResponse.json(brief, { status: 422 });
-      const pkg = generateUgc(tenant, brief, { versions: Number(body.versions) || 3 });
-      await repo.save(pkg);
-      return NextResponse.json({ ok: true, package: pkg });
+      // Scripts come from the existing multi-provider LLM orchestration; the built-in
+      // engine is the floor when no provider is configured or a response can't be used.
+      const generation = await generateUgcWithAi(tenant, brief, {
+        versions: Number(body.versions) || 3,
+        signal: req.signal,
+      });
+      await repo.save(generation.package);
+      await recordGeneration({
+        tenant, kind: "ugc", format: brief.format, source: generation.source,
+        provider: generation.provider, model: generation.model,
+        confidence: generation.confidence, platforms: 0,
+      });
+      return NextResponse.json({
+        ok: true, package: generation.package,
+        source: generation.source, provider: generation.provider, model: generation.model,
+        confidence: generation.confidence, reasoning: generation.reasoning,
+        degradedReason: generation.degradedReason,
+      });
     }
 
     const id = String(body.id || "");
