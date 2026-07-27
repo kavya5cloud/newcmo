@@ -165,36 +165,49 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Create Content — the second entry point into the existing studio, next to the
-          hero so it isn't buried under the launch story. Links to routes that exist. */}
-      <section id="create-content" className="ccx">
+      {/* The three ways into the product, stated once. Replaces two near-identical
+          sections that between them offered six CTAs and twelve equal-weight links —
+          when everything is primary, nothing is. */}
+      <section id="start" className="start">
         <div className="wrap">
-          <p className="label">Create content</p>
-          <h2 style={{ marginTop: 14 }}>Create AI-powered content for every platform from one place.</h2>
-          <p className="lwx-lede">
-            One prompt becomes a post, a thread, a blog, an email or a landing page — sized to each
-            platform&apos;s real limits, with hashtags, CTAs and a posting schedule. Publish everywhere in one click.
-          </p>
+          <p className="label">Start here</p>
+          <h2 style={{ marginTop: 14 }}>Three ways in.</h2>
 
-          <div className="cta-row lwx-cta">
-            <a href="/studio/documents" className="btn btn-lg">Create Content</a>
-            <a href="/studio" className="btn btn-lg btn-ghost">Browse templates</a>
-          </div>
+          <div className="start-grid">
+            <a href="/studio/documents" className="start-row start-primary">
+              <span className="start-n">01</span>
+              <span className="start-b">
+                <span className="start-t">Create content</span>
+                <span className="start-d">
+                  One prompt becomes a post, thread, blog, email or landing page — sized to each
+                  platform&apos;s limits, with hashtags, CTAs and a schedule. Publish everywhere in one click.
+                </span>
+              </span>
+              <span className="start-a">→</span>
+            </a>
 
-          <div className="ccx-grid">
-            {[
-              ["Posts & threads", "/studio/documents"],
-              ["Blogs & landing pages", "/studio/documents"],
-              ["Images & carousels", "/studio/images"],
-              ["UGC video scripts", "/studio/ugc"],
-              ["Ads", "/studio/ads"],
-              ["Drafts & scheduling", "/studio/social"],
-            ].map(([label, href]) => (
-              <a key={href + label} href={href} className="ccx-cell">
-                <span>{label}</span>
-                <span className="ccx-arrow">→</span>
-              </a>
-            ))}
+            <a href="/studio/launch" className="start-row">
+              <span className="start-n">02</span>
+              <span className="start-b">
+                <span className="start-t">Launch workspace</span>
+                <span className="start-d">
+                  A whole launch, planned and executed — campaigns, assets, approvals and publishing,
+                  run by seven AI specialists you can watch and interrupt.
+                </span>
+              </span>
+              <span className="start-a">→</span>
+            </a>
+
+            <a href="/app/campaigns" className="start-row">
+              <span className="start-n">03</span>
+              <span className="start-b">
+                <span className="start-t">Campaigns</span>
+                <span className="start-d">
+                  Everything already in flight, and what each one is doing next.
+                </span>
+              </span>
+              <span className="start-a">→</span>
+            </a>
           </div>
         </div>
       </section>
@@ -280,7 +293,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="pricing">
+      <section id="pricing" style={{ borderBottom: 0 }}>
         <div className="wrap">
           <p className="label">Pricing</p>
           <h2 style={{ marginTop: 14 }}>One plan. First month free.</h2>
@@ -297,38 +310,6 @@ export default function Landing() {
       {/* Entry point into the existing Launch Workspace (/studio/launch). This is the
           bridge from "I write posts" to "Populr runs my marketing" — it links to the
           workspace that already exists rather than introducing another one. */}
-      <section id="launch-workspace" className="lwx">
-        <div className="wrap">
-          <p className="label">Launch Workspace</p>
-          <h2 style={{ marginTop: 14 }}>Go beyond creating individual posts.</h2>
-          <p className="lwx-lede">
-            Plan campaigns, generate assets, publish across every platform, monitor
-            performance, and let Populr execute your marketing from one workspace.
-          </p>
-
-          <div className="cta-row lwx-cta">
-            <a href="/studio/launch" className="btn btn-lg">Open Launch Workspace</a>
-            <a href="#launch-detail" className="btn btn-lg btn-ghost">Learn more</a>
-          </div>
-
-          <div id="launch-detail" className="lwx-grid">
-            {[
-              ["Campaigns", "One mission becomes sequenced campaigns with briefs and owners."],
-              ["Assets", "Every asset the launch needs — planned, generated and versioned."],
-              ["Publishing", "Schedule and publish across platforms with approvals and retries."],
-              ["Performance", "Reach, engagement and conversions tracked back to each asset."],
-              ["Market intel", "Trends, competitor moves and opportunities before they're obvious."],
-              ["Automation", "Auto-scheduling, best-time posting and recurring campaigns."],
-            ].map(([title, copy]) => (
-              <div key={title} className="lwx-cell">
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <footer>
         <div className="wrap" style={{ display: "flex", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: 10 }}>
           <a href="/" className="footer-logo" aria-label="Populr home">Populr.</a>

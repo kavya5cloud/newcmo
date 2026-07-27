@@ -1200,20 +1200,6 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .lw-subnav a.mkt-tab-on{border-color:var(--acc);color:var(--fg);background:rgba(213,255,114,.10)}
 .mkt-evidence{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint);margin-top:8px;line-height:1.5}
 
-/* ---- Launch Workspace entry point (landing) ---- */
-.landing .lwx{border-bottom:0;position:relative;overflow:hidden}
-.landing .lwx::before{content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(circle at 20% 0%,rgba(213,255,114,.08),transparent 46%)}
-.landing .lwx .wrap{position:relative}
-.landing .lwx-lede{margin-top:16px;max-width:660px;color:#abb5ad;font-size:18px;line-height:1.6}
-.landing .lwx-cta{margin-top:26px}
-.landing .lwx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:44px;
-  background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.landing .lwx-cell{background:var(--bg);padding:22px 22px 24px}
-.landing .lwx-cell h3{font-size:15px;font-weight:600;margin-bottom:7px;color:var(--fg)}
-.landing .lwx-cell p{font-size:13.5px;color:var(--dim);line-height:1.55}
-@media(max-width:860px){.landing .lwx-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.landing .lwx-grid{grid-template-columns:1fr}.landing .lwx-lede{font-size:15px}}
 
 /* ---- Launch Workspace actions (command bar, item controls, automation) ---- */
 .lwa-cmd{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
@@ -1334,17 +1320,6 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .ugc-visual{font-size:12.5px;margin-top:3px}
 @media(max-width:620px){.cmp-controls>*{flex:1 1 100%}.cmp-audience{min-width:0}}
 
-/* ---- Create Content (landing) ---- */
-.landing .ccx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-  border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:34px}
-.landing .ccx-cell{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  background:var(--bg);padding:20px 22px;font-size:15px;color:var(--fg);text-decoration:none;
-  transition:background .15s ease}
-.landing .ccx-cell:hover{background:var(--panel)}
-.landing .ccx-arrow{color:var(--faint);font-size:13.5px}
-.landing .ccx-cell:hover .ccx-arrow{color:var(--acc)}
-@media(max-width:860px){.landing .ccx-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.landing .ccx-grid{grid-template-columns:1fr}}
 
 /* ---- Dashboard quick actions ---- */
 .appui .quickbar{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 14px 0}
@@ -1439,3 +1414,31 @@ html{scroll-padding-top:var(--eab-h,0px)}
   background:none;border:0;border-left:2px solid var(--line);padding:var(--s-2) 0 var(--s-2) var(--s-3);
   cursor:pointer;transition:border-color var(--dur) var(--ease),color var(--dur) var(--ease)}
 .cmp-seed:hover{border-left-color:var(--acc);color:var(--fg)}
+
+/* ---- Home: the three ways in ----
+   A numbered list, not cards. Cards imply peers competing for a click; a numbered
+   list implies an order, which is what a first-time user actually needs. One
+   hairline between rows instead of four borders per card. */
+.landing .start{border-bottom:1px solid var(--line)}
+.landing .start-grid{margin-top:36px;border-top:1px solid rgba(213,255,114,.12)}
+.landing .start-row{display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;gap:20px;
+  padding:28px 4px;border-bottom:1px solid rgba(213,255,114,.12);text-decoration:none;
+  transition:background .16s var(--ease),padding-left .16s var(--ease)}
+.landing .start-row:hover{background:rgba(213,255,114,.03);padding-left:12px}
+.landing .start-n{font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint);letter-spacing:.08em}
+.landing .start-b{display:flex;flex-direction:column;gap:8px}
+.landing .start-t{font-size:22px;font-weight:500;letter-spacing:-.02em;color:var(--fg);line-height:1.2}
+.landing .start-primary .start-t{color:var(--acc)}
+.landing .start-d{font-size:15px;color:var(--dim);line-height:1.6;max-width:64ch}
+.landing .start-a{color:var(--faint);font-size:15px;transition:color .16s var(--ease),transform .16s var(--ease)}
+.landing .start-row:hover .start-a{color:var(--acc);transform:translateX(3px)}
+@media(prefers-reduced-motion:reduce){
+  .landing .start-row,.landing .start-a{transition:none}
+  .landing .start-row:hover{padding-left:4px}
+  .landing .start-row:hover .start-a{transform:none}
+}
+@media(max-width:560px){
+  .landing .start-row{grid-template-columns:auto 1fr;gap:14px;padding:22px 2px}
+  .landing .start-a{display:none}
+  .landing .start-t{font-size:18px}
+}
