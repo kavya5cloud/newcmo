@@ -1299,7 +1299,7 @@ html{scroll-padding-top:var(--eab-h,0px)}
 @media(max-width:620px){.agt-graph{gap:4px}.agt-node{padding:5px 10px;font-size:11.5px}}
 
 /* ---- Content composer + UGC workflow ---- */
-.cmp{display:flex;flex-direction:column;gap:16px;margin-bottom:24px}
+.cmp{display:flex;flex-direction:column;gap:24px;margin-bottom:32px}
 .cmp-form{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px}
 .cmp-prompt{width:100%;resize:vertical;line-height:1.5}
 .cmp-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -1442,3 +1442,49 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .landing .start-a{display:none}
   .landing .start-t{font-size:18px}
 }
+
+/* ---- Content workspace: writing is the hero ----
+   The generated piece used to sit in a card, inside a grid, beside four more cards.
+   That is a dashboard. Writing wants a page: one measure, generous leading, and
+   nothing drawing a box around it. Everything the piece implies still exists — it
+   moved below the writing and lost its containers. */
+.cmp-piece{max-width:68ch}
+.cmp-title{font-size:28px;font-weight:500;letter-spacing:-.022em;line-height:1.2;color:var(--fg);margin-bottom:12px}
+.cmp-piece .cmp-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:20px}
+.cmp-body{white-space:pre-wrap;font-size:15px;line-height:1.75;color:#d7ded4;background:none;border:0;padding:0;
+  max-width:68ch;font-family:inherit}
+.cmp-body-sm{font-size:13.5px;line-height:1.65;color:var(--dim)}
+.cmp-tags{margin-top:20px;font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint);letter-spacing:.02em}
+.cmp-degraded{color:var(--amberr);font-size:12.5px;line-height:1.5;margin-bottom:16px;max-width:68ch}
+
+/* Publishing sits with the writing. One primary; the rest are text. */
+.cmp-publish{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:20px;
+  border-top:1px solid var(--line);max-width:68ch}
+.cmp-go{font-family:inherit;font-size:13.5px;font-weight:600;color:#0e1206;background:var(--acc);
+  border:0;border-radius:10px;padding:10px 18px;cursor:pointer;transition:background .16s var(--ease)}
+.cmp-go:hover:not(:disabled){background:#e2ff96}
+.cmp-go:disabled{opacity:.55;cursor:default}
+.cmp-alt{font-family:inherit;font-size:13.5px;color:var(--dim);background:none;border:0;
+  padding:10px 12px;cursor:pointer;text-decoration:none;border-radius:10px;transition:color .16s var(--ease)}
+.cmp-alt:hover:not(:disabled){color:var(--fg)}
+.cmp-alt:disabled{opacity:.5;cursor:default}
+.cmp-result{max-width:68ch;font-size:13.5px;color:var(--dim);line-height:1.7}
+.cmp-result b{color:var(--fg);font-weight:500}
+
+/* Secondary detail: hairlines, no cards, no nesting. */
+.cmp-sub{max-width:68ch;padding-top:28px;border-top:1px solid var(--line)}
+.cmp-sub-h{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;margin-bottom:18px}
+.cmp-variant+.cmp-variant{margin-top:22px;padding-top:22px;border-top:1px solid var(--line)}
+.cmp-variant-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px}
+.cmp-variant-p{font-size:13.5px;color:var(--fg)}
+.cmp-count{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint)}
+.cmp-count.over{color:var(--amberr)}
+.cmp-note{font-size:12.5px;color:var(--amberr);margin-top:6px;line-height:1.5}
+.cmp-dl{display:grid;grid-template-columns:120px 1fr;gap:12px 20px;font-size:13.5px;line-height:1.6}
+.cmp-dl dt{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding-top:3px}
+.cmp-dl dd{color:var(--dim)}
+.cmp-dl a{color:var(--acc);text-decoration:none}
+.cmp-slot{display:block}
+@media(max-width:620px){.cmp-dl{grid-template-columns:1fr;gap:4px 0}.cmp-dl dd{margin-bottom:12px}}

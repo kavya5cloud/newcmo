@@ -127,89 +127,85 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
 
       {composed && (
         <div className="cmp-out">
-          {meta && (
-            <div className="cmp-meta">
-              <span className="cmp-src">
-                {meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}
-              </span>
-              <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
-              <span className="cmp-reason">{meta.reasoning}</span>
-              {meta.degradedReason && <span className="cmp-degraded">{meta.degradedReason}</span>}
-            </div>
-          )}
-          <div className="lw-card">
-            <div className="lw-k">{FORMAT_META[composed.format].label}</div>
-            <div className="lw-card-h">{composed.title}</div>
-            <pre className="cmp-body">{composed.body}</pre>
-            <div className="lw-chips">{composed.hashtags.map((h) => <span key={h} className="lw-chip">{h}</span>)}</div>
-          </div>
+          {/* The piece is the page, not a card. Chrome around writing competes with it. */}
+          <article className="cmp-piece">
+            <h2 className="cmp-title">{composed.title}</h2>
+            {meta && (
+              <p className="cmp-meta">
+                <span className="cmp-src">
+                  {meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}
+                </span>
+                <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
+                <span className="cmp-reason">{meta.reasoning}</span>
+              </p>
+            )}
+            {meta?.degradedReason && <p className="cmp-degraded">{meta.degradedReason}</p>}
+            <div className="cmp-body">{composed.body}</div>
+            <p className="cmp-tags">{composed.hashtags.join("  ")}</p>
+          </article>
 
-          {composed.variants.length > 0 && (
-            <>
-              <h3 className="lw-h2 cmp-h3">Platform variants</h3>
-              <div className="lw-cards">
-                {composed.variants.map((v) => (
-                  <div key={v.platform} className="lw-card">
-                    <div className="lw-rec-top lwa-cardtop">
-                      <span className="lw-card-h">{v.platform}</span>
-                      <span className={"job-state " + (v.fits ? "job-ok" : "job-warn")}>{v.length}/{v.limit}</span>
-                    </div>
-                    <pre className="cmp-body cmp-body-sm">{v.text}</pre>
-                    <div className="lw-meta">{v.note}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="lw-grid2 cmp-grid">
-            <div className="lw-card">
-              <div className="lw-k">Call to action</div>
-              <ul className="lw-list">{composed.ctas.map((c) => <li key={c}>{c}</li>)}</ul>
-            </div>
-            <div className="lw-card">
-              <div className="lw-k">Schedule</div>
-              {composed.schedule.length
-                ? <ul className="lw-list">{composed.schedule.map((s) => <li key={s.platform}><b>{s.platform}</b> — {when(s.at)}<br /><span className="lw-muted">{s.rationale}</span></li>)}</ul>
-                : <div className="lw-muted">Connect a platform to get a schedule.</div>}
-            </div>
-          </div>
-
-          <div className="lw-card">
-            <div className="lw-k">Campaign suggestion</div>
-            <div className="lw-card-h">{composed.campaignSuggestion.title}</div>
-            <p className="lw-hyp">{composed.campaignSuggestion.rationale}</p>
-            <div className="lwa-actions">
-              <a className="lwa-btn" href="/studio/launch#campaigns">Open Launch Workspace</a>
-            </div>
-          </div>
-
-          <div className="lwa-actions cmp-actions">
-            <button className="st-card-cta st-card-gen" disabled={busy === "now"} onClick={() => publish("now")}>
+          {/* Publishing is the last step of writing, so it sits with the writing —
+              one primary action, the rest as quiet text. */}
+          <div className="cmp-publish">
+            <button className="cmp-go" disabled={busy === "now"} onClick={() => publish("now")}>
               {busy === "now" ? "Publishing…" : "Publish everywhere"}
             </button>
-            <button className="lwa-btn" disabled={busy === "schedule"} onClick={() => publish("schedule")}>
+            <button className="cmp-alt" disabled={busy === "schedule"} onClick={() => publish("schedule")}>
               {busy === "schedule" ? "Scheduling…" : "Schedule"}
             </button>
-            <button className="lwa-btn" disabled={busy === "draft"} onClick={() => publish("draft")}>
+            <button className="cmp-alt" disabled={busy === "draft"} onClick={() => publish("draft")}>
               {busy === "draft" ? "Saving…" : "Save as draft"}
             </button>
-            <a className="lwa-btn" href="/studio/social">Open drafts</a>
+            <a className="cmp-alt" href="/studio/social">Drafts</a>
           </div>
 
           {results && (
-            <div className="lw-card">
-              <div className="lw-k">Result</div>
-              <ul className="lw-list">
-                {results.map((r) => (
-                  <li key={r.jobId}>
-                    <b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""} <span className="lw-muted">{r.jobId}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="lw-meta">Retries, failures and approvals for these live in <a href="/studio/social">Cross-Post</a>.</div>
+            <div className="cmp-result">
+              {results.map((r) => (
+                <p key={r.jobId}>
+                  <b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""}
+                </p>
+              ))}
+              <p className="lw-muted">Retries, failures and approvals live in <a href="/studio/social">Cross-Post</a>.</p>
             </div>
           )}
+
+          {/* Everything the piece implies, below the fold of the writing: hairlines,
+              no cards, no nesting. */}
+          {composed.variants.length > 0 && (
+            <section className="cmp-sub">
+              <h3 className="cmp-sub-h">Per platform</h3>
+              {composed.variants.map((v) => (
+                <div key={v.platform} className="cmp-variant">
+                  <div className="cmp-variant-top">
+                    <span className="cmp-variant-p">{v.platform}</span>
+                    <span className={"cmp-count" + (v.fits ? "" : " over")}>{v.length}/{v.limit}</span>
+                  </div>
+                  <div className="cmp-body cmp-body-sm">{v.text}</div>
+                  {!v.fits && <p className="cmp-note">{v.note}</p>}
+                </div>
+              ))}
+            </section>
+          )}
+
+          <section className="cmp-sub">
+            <h3 className="cmp-sub-h">Then</h3>
+            <dl className="cmp-dl">
+              <dt>Call to action</dt>
+              <dd>{composed.ctas.join(" · ")}</dd>
+              <dt>Schedule</dt>
+              <dd>
+                {composed.schedule.length
+                  ? composed.schedule.map((sl) => <span key={sl.platform} className="cmp-slot"><b>{sl.platform}</b> {when(sl.at)} <span className="lw-muted">{sl.rationale}</span></span>)
+                  : <span className="lw-muted">Connect a platform to get a schedule.</span>}
+              </dd>
+              <dt>Campaign</dt>
+              <dd>
+                {composed.campaignSuggestion.title} <span className="lw-muted">{composed.campaignSuggestion.rationale}</span>{" "}
+                <a href="/studio/launch#campaigns">Open Launch Workspace →</a>
+              </dd>
+            </dl>
+          </section>
         </div>
       )}
     </div>
