@@ -7,6 +7,7 @@ import type {
   AdaptationProposal, CampaignExecutionStatus, CampaignHealth, ExecutionMode,
   HealthStatus, Notification, StepAction, StepState, WorkflowStep,
 } from "@/lib/execution/types";
+import type { AgentId, AgentProfile, AgentStatus, AgentSummary, AgentTask } from "@/lib/agents/types";
 import type { LaunchPlan, LaunchRecommendation } from "@/lib/launch/types";
 
 // Launch Workspace — the same dashboard, now actionable. Layout, sections and classes are
@@ -18,7 +19,13 @@ import type { LaunchPlan, LaunchRecommendation } from "@/lib/launch/types";
 
 const STAGE_LABEL: Record<string, string> = { foundation: "Foundation", distribution: "Distribution", amplification: "Amplification", conversion: "Conversion" };
 const SEV_CLASS: Record<string, string> = { high: "lw-sev-high", medium: "lw-sev-med", low: "lw-sev-low" };
-const NAV = ["Mission", "Campaigns", "Execution", "Activity", "Timeline", "Assets", "Dependencies", "Publishing", "Market", "Experiments", "Performance", "Automation"];
+const NAV = ["Mission", "Team", "Campaigns", "Execution", "Activity", "Timeline", "Assets", "Dependencies", "Publishing", "Market", "Experiments", "Performance", "Automation"];
+
+const AGENT_CLASS: Record<AgentStatus, string> = {
+  idle: "job-muted", running: "job-warn", waiting_approval: "job-warn",
+  paused: "job-bad", completed: "job-ok", failed: "job-bad",
+};
+const ms = (n: number | null) => (n == null ? "—" : n < 1000 ? `${n}ms` : `${(n / 1000).toFixed(1)}s`);
 
 // How often the live panels re-read execution state. Slow enough to be cheap, fast enough
 // that a run visibly moves; paused entirely while the tab is hidden.
@@ -103,6 +110,17 @@ type ExecPayload = {
   activity: { id: string; campaignId: string | null; kind: string; message: string; at: number }[];
 };
 
+type TeamPayload = {
+  roster: AgentProfile[];
+  agents: AgentSummary[];
+  totals: { agents: number; running: number; paused: number; completedTasks: number; failedTasks: number; awaitingApproval: number };
+  completed: AgentTask[];
+  waitingApproval: AgentTask[];
+  queue: { agent: AgentId; name: string; blocked: boolean }[];
+  recommendations: { agent: AgentId; text: string; confidence: number; taskId: string }[];
+  graph: { agent: AgentId; name: string; status: AgentStatus; dependsOn: AgentId[]; taskCount: number }[];
+};
+
 type PerfPayload = { snapshot: Record<string, unknown> | null; insights: { id?: string; title?: string; message?: string; detail?: string }[]; accuracy: number | null };
 
 export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
@@ -120,6 +138,8 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
   const [live, setLive] = useState<ExecPayload | null>(null);
   const [proposals, setProposals] = useState<AdaptationProposal[] | null>(null);
   const [openExec, setOpenExec] = useState<string | null>(null);
+  const [team, setTeam] = useState<TeamPayload | null>(null);
+  const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
 
   const g = plan.dependencies;
   const maxDepth = g.nodes.reduce((m, n) => Math.max(m, n.depth), 0);
@@ -149,6 +169,15 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, [loadLive]);
+
+  const loadTeam = useCallback(async () => {
+    const r = await fetch(`/api/agents/state?launchId=${plan.launchId}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setTeam(r);
+  }, [plan.launchId]);
+
+  // The team panel refreshes on the same beat as execution — one agent finishing a step is
+  // exactly when both change.
+  useEffect(() => { loadTeam(); }, [loadTeam, live?.activity.length]);
 
   useEffect(() => {
     fetch(`/api/execution/adaptive?launchId=${plan.launchId}`).then((r) => r.json())
@@ -195,6 +224,11 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
     if (d?.ok) { setNote(d.message || null); await loadLive(); }
     return d;
   }, [post, plan.launchId, loadLive]);
+
+  const agentControl = useCallback(async (body: Record<string, unknown>, tag: string) => {
+    const d = await post("/api/agents/control", { ...body, launchId: plan.launchId }, tag);
+    if (d?.ok) { setNote(d.message || null); await loadTeam(); }
+  }, [post, plan.launchId, loadTeam]);
 
   const dismissNotification = useCallback(async (id: string) => {
     await post("/api/execution/notifications", { id, launchId: plan.launchId }, `ntf:${id}`);
@@ -400,6 +434,144 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
                 <div className="lw-k" style={{ marginTop: 14 }}>Risks</div>
                 <ul className="lw-list">{plan.risks.map((r) => <li key={r.id}><span className={"lw-dot " + SEV_CLASS[r.level]} />{r.description}</li>)}</ul>
               </>}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* AI Team — the workers behind every execution step */}
+      <section id="team" className="lw-block">
+        <h2 className="lw-h2">
+          AI team
+          {team && (
+            <span className="lw-muted lwa-h2-note">
+              {team.totals.running} running · {team.totals.completedTasks} tasks done ·
+              {" "}{team.totals.awaitingApproval} awaiting approval{team.totals.paused > 0 ? ` · ${team.totals.paused} paused` : ""}
+            </span>
+          )}
+        </h2>
+        <p className="lw-muted lw-sub">
+          Seven specialists working through the Execution Engine. They never call each other —
+          what one learns reaches the next through the Business Graph, Market Memory and the Learning Engine.
+        </p>
+
+        {/* Execution graph: who works on whose output */}
+        {team && (
+          <div className="agt-graph">
+            {team.graph.map((n, i) => (
+              <span key={n.agent} className="agt-graph-item">
+                <button
+                  className={"agt-node " + AGENT_CLASS[n.status] + (openAgent === n.agent ? " on" : "")}
+                  onClick={() => setOpenAgent(openAgent === n.agent ? null : n.agent)}
+                  title={n.dependsOn.length ? `builds on ${n.dependsOn.join(", ")}` : "starts the chain"}
+                >
+                  {n.name}
+                  {n.taskCount > 0 && <b className="agt-count">{n.taskCount}</b>}
+                </button>
+                {i < team.graph.length - 1 && <span className="lw-rel-arrow">→</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="lw-cards">
+          {(team?.agents ?? []).map((a) => {
+            const profile = team!.roster.find((r) => r.id === a.agent)!;
+            const open = openAgent === a.agent;
+            const tasks = team!.completed.filter((t) => t.agent === a.agent).slice(0, 4);
+            const pending = team!.waitingApproval.filter((t) => t.agent === a.agent);
+            return (
+              <div key={a.agent} className={"lw-card" + (open ? " lwa-open" : "")}>
+                <div className="lw-rec-top lwa-cardtop">
+                  <span className="lw-card-h">{a.name}</span>
+                  <span className={"job-state " + AGENT_CLASS[a.status]}>{a.status.replace(/_/g, " ")}</span>
+                </div>
+                <div className="lw-meta">{profile.role}</div>
+
+                {a.currentTask ? (
+                  <div className="agt-current">
+                    <div className="lw-k" style={{ margin: 0 }}>Current</div>
+                    <div className="lw-meta">{a.currentTask.task}</div>
+                    <p className="lw-hyp">{a.currentTask.reasoning}</p>
+                  </div>
+                ) : <div className="lw-meta lw-muted">No task in flight.</div>}
+
+                <div className="lw-meta">
+                  {a.completed} done{a.failed ? ` · ${a.failed} failed` : ""}
+                  {a.avgConfidence != null ? ` · confidence ${pct(a.avgConfidence)}` : ""}
+                  {a.avgDurationMs != null ? ` · ~${ms(a.avgDurationMs)} per task` : ""}
+                </div>
+                <div className="lw-meta lw-muted">Uses {profile.uses.join(" · ")}</div>
+
+                <div className="lwa-actions">
+                  <button className="lwa-btn" onClick={() => setOpenAgent(open ? null : a.agent)}>{open ? "Hide" : "View work"}</button>
+                  {a.paused
+                    ? <button className="lwa-btn" disabled={busy === `ag:${a.agent}`} onClick={() => agentControl({ op: "resume", agent: a.agent }, `ag:${a.agent}`)}>Resume</button>
+                    : <button className="lwa-btn" disabled={busy === `ag:${a.agent}`} onClick={() => agentControl({ op: "pause", agent: a.agent }, `ag:${a.agent}`)}>Pause</button>}
+                  {a.failed > 0 && <button className="lwa-btn" disabled={busy === `ag:${a.agent}`} onClick={() => agentControl({ op: "retry", agent: a.agent }, `ag:${a.agent}`)}>Clear for retry</button>}
+                </div>
+
+                {open && (
+                  <div className="lwa-detail">
+                    <div className="lw-k">Responsibilities</div>
+                    <div className="lw-chips">{profile.responsibilities.map((r) => <span key={r} className="lw-chip">{r}</span>)}</div>
+
+                    {pending.length > 0 && (
+                      <>
+                        <div className="lw-k" style={{ marginTop: 12 }}>Waiting on you</div>
+                        {pending.map((t) => (
+                          <div key={t.id} className="lw-card agt-task">
+                            <div className="lw-card-h">{t.task}</div>
+                            <p className="lw-hyp">{t.reasoning}</p>
+                            <ul className="lw-list">{t.outputs.map((o) => <li key={o}>{o}</li>)}</ul>
+                            <div className="lwa-actions">
+                              <button className="lwa-btn" disabled={busy === `tk:${t.id}`} onClick={() => agentControl({ op: "approve", taskId: t.id }, `tk:${t.id}`)}>Approve</button>
+                              <button className="lwa-btn" disabled={busy === `tk:${t.id}`} onClick={() => agentControl({ op: "dismiss", taskId: t.id }, `tk:${t.id}`)}>Dismiss</button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    <div className="lw-k" style={{ marginTop: 12 }}>Completed work</div>
+                    {tasks.length ? tasks.map((t) => (
+                      <div key={t.id} className="lw-card agt-task">
+                        <div className="lw-rec-top lwa-cardtop">
+                          <span className="lw-card-h">{t.task}</span>
+                          <span className="lw-muted lwa-time">{ms(t.durationMs)} · {pct(t.confidence)} confident</span>
+                        </div>
+                        <p className="lw-hyp">{t.reasoning}</p>
+                        <ul className="lw-list">{t.outputs.slice(0, 6).map((o) => <li key={o}>{o}</li>)}</ul>
+                        {t.dependsOn.length > 0 && <div className="lw-meta lw-muted">Builds on {t.dependsOn.join(", ")}</div>}
+                      </div>
+                    )) : <div className="lw-muted">Nothing yet. Run a campaign and this fills in.</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!team && <div className="lw-muted">Loading the team…</div>}
+        </div>
+
+        {team && team.recommendations.length > 0 && (
+          <div className="lw-grid2" style={{ marginTop: 16 }}>
+            <div className="lw-card">
+              <div className="lw-k">Team recommendations</div>
+              <ul className="lw-list">
+                {team.recommendations.map((r, i) => (
+                  <li key={`${r.taskId}:${i}`}>
+                    <b>{r.text}</b> <span className="lw-muted">— {r.agent}, {pct(r.confidence)} confident</span>
+                    <button className="lwa-btn" style={{ marginLeft: 8 }} disabled={busy === `tk:${r.taskId}`}
+                      onClick={() => agentControl({ op: "dismiss", taskId: r.taskId }, `tk:${r.taskId}`)}>Dismiss</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="lw-card">
+              <div className="lw-k">Queue</div>
+              {team.queue.length
+                ? <ul className="lw-list">{team.queue.map((q) => <li key={q.agent}>{q.name} <span className="lw-muted">{q.blocked ? "— paused by you" : "— waiting for its step"}</span></li>)}</ul>
+                : <div className="lw-muted">Every agent has run.</div>}
             </div>
           </div>
         )}

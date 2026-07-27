@@ -4,7 +4,7 @@ import { CampaignExecutionEngine } from "./engine";
 import { CampaignHealthService } from "./health";
 import { InMemoryExecutionHistory, NeonExecutionHistory, type ExecutionHistoryStore } from "./history";
 import { NotificationService } from "./notifications";
-import { liveServices } from "./services";
+import { agentServices } from "./agent-services";
 import {
   InMemoryAdaptationRepo, InMemoryExecutionStateRepo, InMemoryNotificationRepo,
   NeonAdaptationRepo, NeonExecutionStateRepo, NeonNotificationRepo,
@@ -32,7 +32,9 @@ export function executionPlatform(): ExecutionPlatform {
     const sql = db();
     const historyStore = sql ? new NeonExecutionHistory(sql) : new InMemoryExecutionHistory();
     platform = {
-      engine: new CampaignExecutionEngine({ services: liveServices(), history: historyStore, now: Date.now }),
+      // Milestone 15: the workflow is performed by the AI team. The engine is still the
+      // only orchestrator — agents are the workers behind its steps.
+      engine: new CampaignExecutionEngine({ services: agentServices(), history: historyStore, now: Date.now }),
       health: new CampaignHealthService(),
       notifications: new NotificationService(),
       adaptive: new AdaptiveTimeline(),

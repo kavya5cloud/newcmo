@@ -35,6 +35,12 @@ export type ExecutionServices = {
   research(ctx: ExecutionContext): Promise<StepOutcome>;
   /** Market Intelligence (M13) — trends, competitors, opportunities. */
   marketIntelligence(ctx: ExecutionContext): Promise<StepOutcome>;
+  /**
+   * Campaign planning. Optional: when absent the step simply records the plan the Launch
+   * Engine already produced, which is what M14 did. Milestone 15 supplies it so the
+   * Strategy agent owns the step.
+   */
+  plan?(ctx: ExecutionContext): Promise<StepOutcome>;
   /** Job Engine (M11) — background generation work. */
   generate(ctx: ExecutionContext, kind: "asset" | "copy"): Promise<StepOutcome>;
   /** Cross-Platform Publishing (M12) — per-platform constraints. */
@@ -60,10 +66,12 @@ export class WorkflowCoordinator {
       mission: async (c) => ({ ok: true, note: `Mission: ${c.plan.mission}` }),
       research: (c) => this.services.research(c),
       market_intelligence: (c) => this.services.marketIntelligence(c),
-      campaign_planning: async (c) => ({
-        ok: true,
-        note: `${c.campaign.assetPlan.summary.total} assets planned across ${c.campaign.channels.join(", ")}`,
-      }),
+      campaign_planning: (c) => this.services.plan
+        ? this.services.plan(c)
+        : Promise.resolve({
+          ok: true,
+          note: `${c.campaign.assetPlan.summary.total} assets planned across ${c.campaign.channels.join(", ")}`,
+        }),
       asset_generation: (c) => this.services.generate(c, "asset"),
       copy_generation: (c) => this.services.generate(c, "copy"),
       platform_optimization: (c) => this.services.optimizeForPlatforms(c),

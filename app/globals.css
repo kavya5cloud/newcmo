@@ -1296,3 +1296,19 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .landing .ph-badge:hover{transform:translateY(-1px);opacity:.9}
 .landing .ph-badge img{width:250px;height:54px;max-width:100%}
 .landing .ph-badge:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
+
+/* ---- AI Team panel (Milestone 15) ---- */
+.lwa-h2-note{font-size:12px;font-weight:400;margin-left:12px;letter-spacing:0}
+.agt-graph{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 4px}
+.agt-graph-item{display:inline-flex;align-items:center;gap:6px}
+.agt-node{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:12px;cursor:pointer;
+  color:var(--dim);background:var(--panel);border:1px solid var(--line);border-radius:100px;padding:6px 13px;
+  transition:border-color .15s ease,color .15s ease}
+.agt-node:hover,.agt-node.on{border-color:var(--acc);color:var(--fg)}
+.agt-node.job-ok{color:var(--acc)}
+.agt-node.job-bad{color:var(--redd);border-color:rgba(242,141,120,.35)}
+.agt-node.job-warn{color:var(--amberr);border-color:rgba(242,191,112,.35)}
+.agt-count{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint);font-weight:500}
+.agt-current{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+.agt-task{background:var(--bg);margin-top:8px}
+@media(max-width:620px){.agt-graph{gap:4px}.agt-node{padding:5px 10px;font-size:11.5px}}

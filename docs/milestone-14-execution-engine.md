@@ -17,7 +17,7 @@ Mission → Research → Market Intelligence → Campaign Planning → Asset Gen
 | `types.ts` | Workflow steps, 8 step statuses, execution modes, health, activity, notifications, adaptations |
 | `state-machine.ts` | **ExecutionStateMachine** — the only place a step's status changes; illegal transitions are rejected |
 | `workflow.ts` | **WorkflowCoordinator** — what each step means and which service does it (+ deterministic reference services) |
-| `services.ts` | The live wiring into Market Intelligence, Job Engine, Publishing and Learning |
+| `agent-services.ts` | The live wiring — each step is performed by the agent that owns it (M15). The engine still decides what runs. |
 | `approval.ts` | **ApprovalCoordinator** — when a run must stop for a human |
 | `engine.ts` | **CampaignExecutionEngine** — run / pause / resume / retry / cancel / emergency stop, modes, queue, recurrence |
 | `health.ts` | **CampaignHealthService** — continuous health, each status explained with a fix |
