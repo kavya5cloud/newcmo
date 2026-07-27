@@ -1261,3 +1261,31 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .lwa-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dim);transition:transform .18s ease,background .18s ease}
 .lwa-toggle.on .lwa-knob{transform:translateX(18px);background:#0b0b0b}
 @media(max-width:620px){.lwa-detail-row{align-items:flex-start}.lwa-cmd-in{min-width:0}}
+
+/* ---- Live execution (Milestone 14) ---- */
+.lwa-notifs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:14px}
+.lwa-notif{border-left:3px solid var(--line)}
+.lwa-sev-critical{border-left-color:var(--redd)}
+.lwa-sev-warn{border-left-color:var(--amberr)}
+.lwa-sev-info{border-left-color:var(--acc)}
+.lwa-stop{border-left-color:var(--redd);color:var(--fg)}
+.lwa-time{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--faint)}
+.lwa-live{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.lwa-recent{margin-top:8px;font-size:12px}
+.lwa-select{font-size:11.5px;color:var(--dim);background:var(--bg);border:1px solid var(--line);
+  border-radius:7px;padding:5px 8px;font-family:inherit}
+.lwa-select:focus{outline:none;border-color:var(--acc)}
+.lwa-danger{color:var(--redd);border-color:rgba(224,110,110,.4)}
+.lwa-danger:hover:not(:disabled){border-color:var(--redd);color:var(--redd)}
+.lwa-stepnote{grid-column:1/-1;font-size:11.5px}
+.lwa-feed{gap:2px}
+.lwa-feed-row{grid-template-columns:auto auto 1fr;align-items:center;gap:10px}
+/* Feed messages are sentences, not labels — keep their original casing. */
+.lwa-feed-msg{font-weight:400;color:var(--dim);text-transform:none}
+.lwa-adapt{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+/* Subtle: a step that is actually running breathes. Scoped to the execution panels so the
+   Jobs and Market dashboards keep their static chips. */
+@keyframes lwa-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.lwa-live .job-state.job-warn,.lwa-detail .job-state.job-warn{animation:lwa-pulse 2.4s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.lwa-live .job-state.job-warn,.lwa-detail .job-state.job-warn{animation:none}}
+@media(max-width:720px){.lwa-feed-row{grid-template-columns:auto 1fr}.lwa-feed-row .job-state{grid-row:1}}

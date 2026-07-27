@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { flagDependents } from "@/lib/launch/dependencies";
 import { AUTOMATION_KEYS, AUTOMATION_META, type Automation, type ItemAction, type ItemStatus } from "@/lib/launch/workspace";
 import { COMMAND_EXAMPLES } from "@/lib/launch/command";
+import type {
+  AdaptationProposal, CampaignExecutionStatus, CampaignHealth, ExecutionMode,
+  HealthStatus, Notification, StepAction, StepState, WorkflowStep,
+} from "@/lib/execution/types";
 import type { LaunchPlan, LaunchRecommendation } from "@/lib/launch/types";
 
 // Launch Workspace — the same dashboard, now actionable. Layout, sections and classes are
@@ -14,7 +18,40 @@ import type { LaunchPlan, LaunchRecommendation } from "@/lib/launch/types";
 
 const STAGE_LABEL: Record<string, string> = { foundation: "Foundation", distribution: "Distribution", amplification: "Amplification", conversion: "Conversion" };
 const SEV_CLASS: Record<string, string> = { high: "lw-sev-high", medium: "lw-sev-med", low: "lw-sev-low" };
-const NAV = ["Mission", "Campaigns", "Timeline", "Assets", "Dependencies", "Publishing", "Market", "Experiments", "Performance", "Automation"];
+const NAV = ["Mission", "Campaigns", "Execution", "Activity", "Timeline", "Assets", "Dependencies", "Publishing", "Market", "Experiments", "Performance", "Automation"];
+
+// How often the live panels re-read execution state. Slow enough to be cheap, fast enough
+// that a run visibly moves; paused entirely while the tab is hidden.
+const LIVE_POLL_MS = 6_000;
+
+const HEALTH_CLASS: Record<HealthStatus, string> = {
+  healthy: "job-ok", completed: "job-ok", needs_attention: "job-warn", at_risk: "job-warn", blocked: "job-bad",
+};
+const HEALTH_LABEL: Record<HealthStatus, string> = {
+  healthy: "Healthy", needs_attention: "Needs attention", at_risk: "At risk", blocked: "Blocked", completed: "Completed",
+};
+const EXEC_CLASS: Record<CampaignExecutionStatus, string> = {
+  idle: "job-muted", running: "job-warn", paused: "job-bad", waiting_approval: "job-warn",
+  completed: "job-ok", failed: "job-bad", cancelled: "job-muted",
+};
+const STEP_CLASS: Record<string, string> = {
+  pending: "job-muted", running: "job-warn", completed: "job-ok", failed: "job-bad",
+  paused: "job-bad", cancelled: "job-muted", waiting_approval: "job-warn", skipped: "job-muted",
+};
+/** Which step actions to offer for a status — the state machine rejects the rest anyway. */
+const STEP_BUTTONS: Record<string, StepAction[]> = {
+  pending: ["execute", "skip"],
+  running: ["complete", "pause", "skip"],
+  waiting_approval: ["approve", "reject", "skip"],
+  paused: ["resume", "cancel"],
+  failed: ["retry", "skip", "cancel"],
+  skipped: ["retry"],
+  completed: [],
+  cancelled: [],
+};
+const MODES: ExecutionMode[] = ["approval", "automatic", "scheduled"];
+
+const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 const STATUS_LABEL: Record<ItemStatus, string> = { todo: "To do", in_progress: "In progress", done: "Done", paused: "Paused" };
 const STATUS_CLASS: Record<ItemStatus, string> = { todo: "job-muted", in_progress: "job-warn", done: "job-ok", paused: "job-bad" };
@@ -50,6 +87,22 @@ type PubPayload = {
 };
 type Opportunity = { id: string; title: string; kind: string; confidence: number; recommendedAction: string; suggestedCampaign: string; urgency: string };
 type MarketPayload = { headline: string; opportunities: Opportunity[]; trends: { id: string; topic: string; confidence: number }[]; keywords: { keyword: string; opportunity: number }[]; competitors: { name: string; summary: string }[] };
+type ExecView = {
+  campaignId: string; status: CampaignExecutionStatus; mode: ExecutionMode; progress: number;
+  currentStep: StepState | null; nextStep: StepState | null; steps: StepState[];
+  awaitingApproval: number; runCount: number; startAfter: number | null;
+  recurEveryDays: number | null; estimatedCompletion: number | null;
+};
+type ExecPayload = {
+  launchId: string; now: number; emergencyStopped: boolean; queue: string[];
+  steps: { step: WorkflowStep; label: string }[];
+  campaigns: { campaignId: string; title: string; execution: ExecView | null; health: CampaignHealth | null }[];
+  overallHealth: HealthStatus;
+  publishing: { accounts: { id: string; platform: string; handle: string; status: string }[]; failed: number; queued: number; scheduled: number };
+  notifications: Notification[];
+  activity: { id: string; campaignId: string | null; kind: string; message: string; at: number }[];
+};
+
 type PerfPayload = { snapshot: Record<string, unknown> | null; insights: { id?: string; title?: string; message?: string; detail?: string }[]; accuracy: number | null };
 
 export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
@@ -64,6 +117,9 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
   const [draft, setDraft] = useState<Mission | null>(null);
   const [cmd, setCmd] = useState("");
   const [cmdOut, setCmdOut] = useState<{ summary: string; done?: string; details?: string[] } | null>(null);
+  const [live, setLive] = useState<ExecPayload | null>(null);
+  const [proposals, setProposals] = useState<AdaptationProposal[] | null>(null);
+  const [openExec, setOpenExec] = useState<string | null>(null);
 
   const g = plan.dependencies;
   const maxDepth = g.nodes.reduce((m, n) => Math.max(m, n.depth), 0);
@@ -75,6 +131,29 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
   }, [plan.launchId]);
 
   useEffect(() => { loadWorkspace(); }, [loadWorkspace]);
+
+  // Live execution state. Polling (not SSE) because the panel reads from several engines on
+  // each pass; it stops entirely when the tab is hidden so a backgrounded workspace is free.
+  const loadLive = useCallback(async () => {
+    const r = await fetch(`/api/execution/state?launchId=${plan.launchId}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setLive(r);
+  }, [plan.launchId]);
+
+  useEffect(() => {
+    loadLive();
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => { if (!timer) timer = setInterval(loadLive, LIVE_POLL_MS); };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    const onVisibility = () => (document.hidden ? stop() : (loadLive(), start()));
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [loadLive]);
+
+  useEffect(() => {
+    fetch(`/api/execution/adaptive?launchId=${plan.launchId}`).then((r) => r.json())
+      .then((d) => { if (d?.ok) setProposals(d.proposals); }).catch(() => {});
+  }, [plan.launchId]);
 
   useEffect(() => {
     fetch("/api/social/dashboard").then((r) => r.json()).then((d) => { if (d?.ok) setPub(d); }).catch(() => {});
@@ -109,6 +188,25 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
   const toggle = useCallback(async (key: string, on: boolean) => {
     const d = await post("/api/launch/workspace", { op: "automation", key, on, launchId: plan.launchId }, `auto:${key}`);
     if (d?.ok) setWs((w) => (w ? { ...w, automation: d.automation, summary: d.summary } : w));
+  }, [post, plan.launchId]);
+
+  const control = useCallback(async (body: Record<string, unknown>, tag: string) => {
+    const d = await post("/api/execution/control", { ...body, launchId: plan.launchId }, tag);
+    if (d?.ok) { setNote(d.message || null); await loadLive(); }
+    return d;
+  }, [post, plan.launchId, loadLive]);
+
+  const dismissNotification = useCallback(async (id: string) => {
+    await post("/api/execution/notifications", { id, launchId: plan.launchId }, `ntf:${id}`);
+    setLive((l) => (l ? { ...l, notifications: l.notifications.filter((n) => n.id !== id) } : l));
+  }, [post, plan.launchId]);
+
+  const decideProposal = useCallback(async (proposal: AdaptationProposal, decision: "approved" | "rejected") => {
+    const d = await post("/api/execution/adaptive", { proposal, decision, launchId: plan.launchId }, `adp:${proposal.id}`);
+    if (d?.ok) {
+      setProposals((ps) => ps?.map((x) => (x.id === proposal.id ? d.proposal : x)) ?? ps);
+      setNote(d.message);
+    }
   }, [post, plan.launchId]);
 
   const saveMission = useCallback(async () => {
@@ -197,6 +295,31 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
           </div>
         )}
         {note && <div className="lw-card lwa-note">{note}</div>}
+        {live && live.notifications.length > 0 && (
+          <div className="lwa-notifs">
+            {live.notifications.slice(0, 4).map((n) => (
+              <div key={n.id} className={"lw-card lwa-notif lwa-sev-" + n.severity}>
+                <div className="lw-rec-top lwa-cardtop">
+                  <span className="lw-card-h">{n.title}</span>
+                  <span className="lw-muted lwa-time">{clock(n.at)}</span>
+                </div>
+                <p className="lw-hyp">{n.body}</p>
+                {n.detail.length > 0 && <div className="lw-meta">{n.detail.join(" · ")}</div>}
+                <div className="lwa-actions">
+                  {n.action && <button className="lwa-btn" disabled={busy === "cmd"} onClick={() => { setCmd(n.action!); runCommand(n.action!); }}>Act</button>}
+                  <button className="lwa-btn" onClick={() => setOpenExec(n.campaignId)}>View details</button>
+                  <button className="lwa-btn" disabled={busy === `ntf:${n.id}`} onClick={() => dismissNotification(n.id)}>Dismiss</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {live?.emergencyStopped && (
+          <div className="lw-card lwa-note lwa-stop">
+            Emergency stop is active — nothing will run until it is cleared.
+            <button className="lwa-btn" style={{ marginLeft: 10 }} onClick={() => control({ op: "clear_emergency_stop" }, "estop")}>Clear</button>
+          </div>
+        )}
         {ws?.degraded && <div className="lw-card lwa-note">Execution state is temporarily unavailable — the plan below is live, but progress and actions won't save until storage recovers.</div>}
 
         {ws && (
@@ -310,6 +433,63 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
                   </div>
                 </>}
                 <div className="lw-meta">{c.assetPlan.summary.total} assets · {Math.round(c.budgetShare * 100)}% of budget</div>
+
+                {(() => {
+                  const l = live?.campaigns.find((x) => x.campaignId === c.id);
+                  if (!l) return null;
+                  const e = l.execution;
+                  const recent = live?.activity.filter((a) => a.campaignId === c.id).slice(0, 3) ?? [];
+                  return (
+                    <div className="lwa-live">
+                      <div className="lw-rec-top lwa-cardtop">
+                        <span className="lw-k" style={{ margin: 0 }}>Execution</span>
+                        {l.health && <span className={"job-state " + HEALTH_CLASS[l.health.status]}>{HEALTH_LABEL[l.health.status]}</span>}
+                      </div>
+                      {l.health && <div className="lw-meta">{l.health.reasons[0].message} <span className="lw-muted">Fix: {l.health.reasons[0].fix}</span></div>}
+                      {e ? (
+                        <>
+                          <div className="lw-meta">
+                            <span className={"job-state " + EXEC_CLASS[e.status]}>{e.status.replace(/_/g, " ")}</span>
+                            <span className="lw-muted"> {Math.round(e.progress * 100)}% of the workflow · {e.mode} mode</span>
+                          </div>
+                          <div className="lw-meta">
+                            Now: {e.currentStep ? live!.steps.find((s) => s.step === e.currentStep!.step)?.label : "—"}
+                            {" · "}Next: {e.nextStep ? live!.steps.find((s) => s.step === e.nextStep!.step)?.label : "—"}
+                          </div>
+                          {e.estimatedCompletion && <div className="lw-meta lw-muted">Estimated completion {clock(e.estimatedCompletion)}</div>}
+                          {e.awaitingApproval > 0 && <div className="lw-meta">{e.awaitingApproval} step(s) waiting on you</div>}
+                        </>
+                      ) : <div className="lw-meta lw-muted">Not started. Run it to begin execution.</div>}
+
+                      {recent.length > 0 && (
+                        <ul className="lw-list lwa-recent">
+                          {recent.map((a) => <li key={a.id}><span className="lwa-time">{clock(a.at)}</span> {a.message}</li>)}
+                        </ul>
+                      )}
+
+                      <div className="lwa-actions">
+                        <button className="lwa-btn" disabled={busy === `run:${c.id}`} onClick={() => control({ op: "run", campaignId: c.id }, `run:${c.id}`)}>Run campaign</button>
+                        {e?.status === "paused"
+                          ? <button className="lwa-btn" disabled={busy === `res:${c.id}`} onClick={() => control({ op: "resume", campaignId: c.id }, `res:${c.id}`)}>Resume</button>
+                          : <button className="lwa-btn" disabled={busy === `pau:${c.id}`} onClick={() => control({ op: "pause", campaignId: c.id }, `pau:${c.id}`)}>Pause</button>}
+                        {e?.status === "failed" && <button className="lwa-btn" disabled={busy === `ret:${c.id}`} onClick={() => control({ op: "retry", campaignId: c.id }, `ret:${c.id}`)}>Retry failed</button>}
+                        <button className="lwa-btn" disabled={busy === `can:${c.id}`} onClick={() => control({ op: "cancel", campaignId: c.id }, `can:${c.id}`)}>Cancel</button>
+                        <select className="lwa-select" aria-label="Execution mode" value={e?.mode ?? "approval"}
+                          onChange={(ev) => control({ op: "mode", campaignId: c.id, mode: ev.target.value }, `mode:${c.id}`)}>
+                          {MODES.map((m) => <option key={m} value={m}>{m} mode</option>)}
+                        </select>
+                        <select className="lwa-select" aria-label="Recurrence" value={e?.recurEveryDays ?? ""}
+                          onChange={(ev) => control({ op: "recurrence", campaignId: c.id, everyDays: ev.target.value ? Number(ev.target.value) : null }, `rec:${c.id}`)}>
+                          <option value="">one-off</option>
+                          <option value="7">every 7 days</option>
+                          <option value="14">every 14 days</option>
+                          <option value="30">every 30 days</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {rec && <div className="lw-meta lwa-rec">Recommendation: {rec.message} → {rec.suggestedAction}</div>}
 
                 <div className="lwa-actions">
@@ -335,6 +515,86 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Execution — the workflow each campaign is running, step by step */}
+      <section id="execution" className="lw-block">
+        <h2 className="lw-h2">
+          Execution
+          {live && <span className={"job-state " + HEALTH_CLASS[live.overallHealth]} style={{ marginLeft: 12 }}>{HEALTH_LABEL[live.overallHealth]}</span>}
+          <button className="lwa-btn lwa-h2-btn lwa-danger" disabled={busy === "estop"}
+            onClick={() => control({ op: live?.emergencyStopped ? "clear_emergency_stop" : "emergency_stop" }, "estop")}>
+            {live?.emergencyStopped ? "Clear emergency stop" : "Emergency stop"}
+          </button>
+        </h2>
+        <p className="lw-muted lw-sub">
+          Mission → Research → Market intelligence → Planning → Assets → Copy → Platform optimisation → Approval →
+          Publishing → Analytics → Learning → Optimise. Each step runs through the engine that owns it.
+        </p>
+
+        {live?.queue.length ? <div className="lw-meta">Queued: {live.queue.length} campaign(s) waiting for a slot. <button className="lwa-btn" onClick={() => control({ op: "drain" }, "drain")}>Start next</button></div> : null}
+
+        <div className="lw-cards">
+          {(live?.campaigns ?? []).map((l) => {
+            const e = l.execution;
+            const openStep = openExec === l.campaignId;
+            return (
+              <div key={l.campaignId} className={"lw-card" + (openStep ? " lwa-open" : "")}>
+                <div className="lw-rec-top lwa-cardtop">
+                  <span className="lw-card-h">{l.title}</span>
+                  <span className={"job-state " + (e ? EXEC_CLASS[e.status] : "job-muted")}>{e ? e.status.replace(/_/g, " ") : "not started"}</span>
+                </div>
+                {e && <span className="job-bar lwa-bar"><span className="job-bar-fill" style={{ width: pct(e.progress) }} /></span>}
+                <div className="lwa-actions">
+                  <button className="lwa-btn" onClick={() => setOpenExec(openStep ? null : l.campaignId)}>{openStep ? "Hide steps" : "View steps"}</button>
+                  {l.health && l.health.reasons.length > 1 && <span className="lw-muted">{l.health.reasons.length} findings</span>}
+                </div>
+
+                {openStep && (
+                  <div className="lwa-detail">
+                    {(e?.steps ?? live!.steps.map((x) => ({ step: x.step, status: "pending", attempts: 0, startedAt: null, completedAt: null, note: null, error: null } as StepState))).map((st) => (
+                      <div key={st.step} className="lwa-detail-row">
+                        <span className="job-type">{live!.steps.find((x) => x.step === st.step)?.label ?? st.step}</span>
+                        <span className={"job-state " + (STEP_CLASS[st.status] ?? "job-muted")}>{st.status.replace(/_/g, " ")}</span>
+                        <span className="lwa-actions">
+                          {(STEP_BUTTONS[st.status] ?? []).map((a) => (
+                            <button key={a} className="lwa-btn" disabled={busy === `st:${l.campaignId}:${st.step}`}
+                              onClick={() => control({ op: "step", campaignId: l.campaignId, step: st.step, action: a }, `st:${l.campaignId}:${st.step}`)}>
+                              {a.replace(/_/g, " ")}
+                            </button>
+                          ))}
+                        </span>
+                        {(st.note || st.error) && <span className="lw-muted lwa-stepnote">{st.error ?? st.note}</span>}
+                      </div>
+                    ))}
+                    {l.health && (
+                      <ul className="lw-list" style={{ marginTop: 10 }}>
+                        {l.health.reasons.map((r) => <li key={r.code}><b>{r.message}</b> <span className="lw-muted">{r.fix}</span></li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!live && <div className="lw-muted">Loading execution state…</div>}
+        </div>
+      </section>
+
+      {/* Activity — the append-only stream of what actually happened */}
+      <section id="activity" className="lw-block">
+        <h2 className="lw-h2">Activity</h2>
+        <p className="lw-muted lw-sub">Every execution event, timestamped and append-only.</p>
+        <div className="job-list lwa-feed">
+          {(live?.activity ?? []).map((a) => (
+            <div key={a.id} className="job-row lwa-feed-row">
+              <span className="lwa-time">{clock(a.at)}</span>
+              <span className="job-state job-muted">{a.kind.replace(/_/g, " ")}</span>
+              <span className="job-type lwa-feed-msg">{a.message}</span>
+            </div>
+          ))}
+          {live && live.activity.length === 0 && <div className="lw-muted">Nothing has run yet. Run a campaign to start the feed.</div>}
         </div>
       </section>
 
@@ -421,6 +681,11 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
               ? <div className="lw-chips">{pub.accounts.map((a) => <span key={a.id} className="lw-chip">{a.platform} · {a.handle} <b className="pub-count">{a.status}</b></span>)}</div>
               : <div className="lw-muted">No platforms connected yet — connect them in Cross-Post, then scheduling runs from here.</div>}
             {pub && <div className="lw-meta">{Object.entries(pub.metrics).map(([k, v]) => `${k.replace(/_/g, " ")} ${v}`).join(" · ")}</div>}
+            {live && (
+              <div className="lw-meta">
+                Live: {live.publishing.queued} queued · {live.publishing.scheduled} scheduled · {live.publishing.failed} failed
+              </div>
+            )}
           </div>
           <div className="lw-card">
             <div className="lw-k">Scheduled</div>
@@ -475,6 +740,28 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
                 </div>
               ))}
             </div>
+            {proposals && proposals.length > 0 && (
+              <div className="lwa-adapt">
+                <div className="lw-k">Adaptive timeline — proposals, never applied automatically</div>
+                {proposals.map((pr) => (
+                  <div key={pr.id} className="lw-card">
+                    <div className="lw-rec-top lwa-cardtop">
+                      <span className="lw-card-h">{pr.title}</span>
+                      <span className={"job-state " + (pr.status === "approved" ? "job-ok" : pr.status === "rejected" ? "job-muted" : "job-warn")}>{pr.status}</span>
+                    </div>
+                    <p className="lw-hyp">{pr.rationale}</p>
+                    <div className="lw-meta mkt-evidence">evidence: {pr.evidence.join(" · ")}</div>
+                    {pr.status === "proposed" && (
+                      <div className="lwa-actions">
+                        <button className="lwa-btn" disabled={busy === `adp:${pr.id}`} onClick={() => decideProposal(pr, "approved")}>Approve</button>
+                        <button className="lwa-btn" disabled={busy === `adp:${pr.id}`} onClick={() => decideProposal(pr, "rejected")}>Reject</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="lw-grid2" style={{ marginTop: 14 }}>
               <div className="lw-card">
                 <div className="lw-k">Trends</div>
