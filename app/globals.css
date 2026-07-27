@@ -1289,3 +1289,10 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .lwa-live .job-state.job-warn,.lwa-detail .job-state.job-warn{animation:lwa-pulse 2.4s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){.lwa-live .job-state.job-warn,.lwa-detail .job-state.job-warn{animation:none}}
 @media(max-width:720px){.lwa-feed-row{grid-template-columns:auto 1fr}.lwa-feed-row .job-state{grid-row:1}}
+
+/* ---- Product Hunt badge ---- */
+.landing .ph-badge{display:inline-block;margin-top:20px;line-height:0;border-radius:10px;
+  transition:transform .15s ease,opacity .15s ease}
+.landing .ph-badge:hover{transform:translateY(-1px);opacity:.9}
+.landing .ph-badge img{width:250px;height:54px;max-width:100%}
+.landing .ph-badge:focus-visible{outline:2px solid var(--acc);outline-offset:4px}

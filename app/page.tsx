@@ -141,6 +141,23 @@ export default function Landing() {
             <a href="#how" className="btn btn-lg btn-ghost">See how it works</a>
           </div>
           <p className="under">no card · no setup · one URL</p>
+
+          {/* Product Hunt featured badge. Their asset, their domain — allow-listed in the
+              CSP's img-src. theme=dark to match this page; light glares on #0b0b0b. */}
+          <a
+            className="ph-badge"
+            href="https://www.producthunt.com/products/populr-your-cmo?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-populr-your-cmo"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1207267&theme=dark&t=1785136310387"
+              alt="Populr — your CMO - Streamline your marketing, amplify your impact | Product Hunt"
+              width={250}
+              height={54}
+            />
+          </a>
           <div className="term" role="img" aria-label="Terminal showing Populr skipping low-value tasks">
             <div className="term-bar"><b /><b /><b /><span>populr · daily run</span></div>
             <div className="term-body" ref={termRef} />
