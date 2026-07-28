@@ -62,8 +62,22 @@ export async function GET(req: NextRequest) {
       // provenance alongside the outcome rather than just "something published".
       const provenance = new Map<string, ResolvedContent>();
 
+      // Text already queued, so the pipeline can catch a duplicate before it posts twice.
+      const scheduledTexts: string[] = [];
+
       const run = await runDue(queue, tenant, {
         now, engine,
+        scheduledTexts,
+        onOptimized: (slotId, result) => {
+          scheduledTexts.push(result.optimization.optimized.text);
+          console.info(JSON.stringify({
+            event: "prepublish", tenant, slot: slotId,
+            source: result.optimization.source, provider: result.optimization.provider,
+            applied: result.optimization.applied,
+            errors: result.validation.errors.map((e) => e.code),
+            warnings: result.validation.warnings.map((w) => w.code),
+          }));
+        },
         content: async (slot) => {
           const automation = automations.find((a) => a.id === slot.automationId);
           const resolved = await resolveContent(slot, {

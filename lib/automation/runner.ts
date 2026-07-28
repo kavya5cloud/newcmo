@@ -1,6 +1,7 @@
 import { createAdapterRegistry } from "@/lib/social/registry";
 import type { ConnectedAccount, SocialPlatform } from "@/lib/social/types";
 import { materialize, setState } from "./engine";
+import { prePublish, type PrePublishResult } from "./prepublish";
 import type { Automation, QueueItem } from "./types";
 
 // Executing a due slot.
@@ -112,6 +113,12 @@ export type RunOptions = {
   content: ContentPort;
   /** Cap per run so one tenant with a huge backlog can't monopolise a cron minute. */
   max?: number;
+  /** Brand/market context handed to the optimiser. Assembled by the caller. */
+  contextPrompt?: string;
+  /** Already-scheduled text, so the pipeline can catch a duplicate before it posts. */
+  scheduledTexts?: string[];
+  /** Called with the pipeline result for each slot, for logging and Learning. */
+  onOptimized?: (slotId: string, result: PrePublishResult) => void;
 };
 
 /**
@@ -162,10 +169,31 @@ export async function runDue(
       continue;
     }
 
+    // Every slot goes through the one pre-publish pipeline, whatever wrote it. A draft
+    // and a generated post are held to the same limits, links and accessibility rules.
+    const pipeline = await prePublish(
+      { text: body.text, assetIds: body.assetIds },
+      { platform: slot.platform as SocialPlatform, contextPrompt: opts.contextPrompt, scheduledTexts: opts.scheduledTexts },
+    ).catch(() => null);
+
+    if (pipeline) opts.onOptimized?.(slot.id, pipeline);
+
+    // Validation is the only thing allowed to block. Optimisation failing just means the
+    // original ships — shipping the original beats shipping nothing.
+    if (pipeline && !pipeline.validation.ok) {
+      const why = pipeline.validation.errors.map((e) => e.message).join(" ");
+      const r = setState(working, slot.id, "failed", why);
+      working = r.queue;
+      outcomes.push({ slotId: slot.id, ok: false, jobId: null, state: "failed", message: why });
+      continue;
+    }
+
+    const finalContent = pipeline?.publishable ?? { text: body.text, assetIds: body.assetIds };
+
     try {
       const job = await opts.engine.publishNow({
         tenant, accountId: check.account.id, platform: slot.platform,
-        content: { text: body.text, assetIds: body.assetIds },
+        content: { text: finalContent.text, assetIds: finalContent.assetIds },
         assets: [],
         // The slot id is the idempotency key: the Publishing Engine will not run the
         // same key twice, whatever happens to this process in between.
