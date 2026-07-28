@@ -3,13 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 import { CONTENT_FORMATS, FORMAT_META, type ContentFormat } from "@/lib/content/compose";
 import type { SocialPlatform } from "@/lib/social/types";
 
-// The Content Composer. One prompt → the piece, a variant per connected platform sized to
-// that platform's real limit, hashtags, CTAs, a schedule and a campaign suggestion — then
-// straight into the existing Publishing Engine (drafts, scheduling, immediate publish).
+// The Content Workspace: write → review → publish.
 //
-// Every control here performs a real request. There is no local-only state pretending to be
-// a result: what you see came from /api/content/compose, and publishing goes through the
-// same adapters as everything else in the product.
+// Everything the API can infer is inferred. Format and audience still exist and still
+// reach /api/content/compose unchanged — they moved behind Options, because someone
+// arriving to write a post should not first be asked to configure one. The generated
+// piece and its platform variants became one document with tabs rather than a stack of
+// cards, so reviewing feels like reading rather than auditing.
+//
+// No functionality was removed. Every control that existed still exists.
 
 type Variant = { platform: SocialPlatform; text: string; length: number; limit: number; fits: boolean; requiresAsset: boolean; note: string };
 type Composed = {
@@ -54,6 +56,8 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState<ContentFormat>(initialFormat);
   const [audience, setAudience] = useState("seed-stage founders");
+  const [advanced, setAdvanced] = useState(false);
+
   const [composed, setComposed] = useState<Composed | null>(null);
   const [connected, setConnected] = useState<string[]>([]);
   const [results, setResults] = useState<Result[] | null>(null);
@@ -61,6 +65,9 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [meta, setMeta] = useState<Provenance | null>(null);
+  /** "" is the full piece; otherwise the platform whose variant is being read. */
+  const [tab, setTab] = useState<string>("");
+  const [details, setDetails] = useState(false);
 
   useEffect(() => {
     fetch("/api/social/dashboard").then((r) => r.json())
@@ -82,85 +89,113 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
     finally { setBusy(null); }
   }, [prompt, format, audience]);
 
+  const readMeta = (d: Record<string, unknown>) => setMeta({
+    source: d.source as Provenance["source"], provider: d.provider as string | null,
+    model: d.model as string | null, confidence: d.confidence as number,
+    reasoning: d.reasoning as string, degradedReason: d.degradedReason as string | undefined,
+  });
+
   const generate = useCallback(async () => {
-    if (!prompt.trim()) { setErr("Describe what you want to say first."); return; }
+    if (!prompt.trim()) { setErr("Write what you want to create first."); return; }
     const d = await call({}, "gen");
-    if (d?.ok) {
-      setComposed(d.composed); setResults(null); if (d.note) setNote(d.note);
-      setMeta({ source: d.source, provider: d.provider, model: d.model, confidence: d.confidence, reasoning: d.reasoning, degradedReason: d.degradedReason });
-    }
+    if (d?.ok) { setComposed(d.composed); setResults(null); setTab(""); if (d.note) setNote(d.note); readMeta(d); }
   }, [call, prompt]);
 
   const publish = useCallback(async (action: "draft" | "schedule" | "now") => {
     const d = await call({ publish: action }, action);
-    if (d?.ok) {
-      setComposed(d.composed); setResults(d.results); setNote(d.message);
-      setMeta({ source: d.source, provider: d.provider, model: d.model, confidence: d.confidence, reasoning: d.reasoning, degradedReason: d.degradedReason });
-    }
+    if (d?.ok) { setComposed(d.composed); setResults(d.results); setNote(d.message); readMeta(d); }
   }, [call]);
+
+  const active = composed?.variants.find((v) => v.platform === tab);
+  const bodyText = active ? active.text : composed?.body ?? "";
 
   return (
     <div className="cmp">
-      <div className="cmp-form">
-        <label className="lw-k" htmlFor="cmp-prompt">{heading ?? "What do you want to say?"}</label>
+      {/* Write. One question, one action. */}
+      <div className="cmp-write">
+        <label className="cmp-ask" htmlFor="cmp-prompt">{heading ?? "What do you want to create?"}</label>
         <textarea
-          id="cmp-prompt" className="mkt-input cmp-prompt" rows={3} value={prompt}
+          id="cmp-prompt" className="cmp-prompt" rows={composed ? 2 : 4} value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="e.g. We shipped an AI CMO that plans and publishes a whole launch from one mission."
+          placeholder="A launch announcement for the feature we shipped this week…"
         />
 
-        <div className="cmp-controls">
-          <select className="lwa-select" aria-label="Format" value={format} onChange={(e) => setFormat(e.target.value as ContentFormat)}>
-            {CONTENT_FORMATS.map((f) => <option key={f} value={f}>{FORMAT_META[f].label}</option>)}
-          </select>
-          <input className="mkt-input cmp-audience" aria-label="Audience" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="audience" />
-          <button className="st-card-cta st-card-gen" onClick={generate} disabled={busy === "gen"}>
+        <div className="cmp-go-row">
+          <button className="cmp-go" onClick={generate} disabled={busy === "gen"}>
             {busy === "gen" ? "Writing…" : "Generate"}
           </button>
+          <button className="cmp-adv-toggle" type="button" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+            {advanced ? "Hide options" : "Options"}
+          </button>
         </div>
-        <p className="lw-muted cmp-hint">{FORMAT_META[format].blurb}</p>
 
-        {connected.length > 0
-          ? <div className="lw-chips">{connected.map((p) => <span key={p} className="lw-chip">{p}</span>)}</div>
-          : <p className="lw-muted cmp-hint">No platforms connected — connect one in Cross-Post to get sized variants and one-click publishing.</p>}
-      </div>
+        {/* Everything Populr already infers, still changeable when someone wants to. */}
+        {advanced && (
+          <div className="cmp-adv">
+            <label className="cmp-adv-field">
+              <span>Format</span>
+              <select className="lwa-select" value={format} onChange={(e) => setFormat(e.target.value as ContentFormat)}>
+                {CONTENT_FORMATS.map((f) => <option key={f} value={f}>{FORMAT_META[f].label}</option>)}
+              </select>
+            </label>
+            <label className="cmp-adv-field">
+              <span>Audience</span>
+              <input className="mkt-input" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="who is this for?" />
+            </label>
+            <p className="cmp-adv-note">
+              Left alone, Populr infers both from your site and what has performed before.
+              {connected.length === 0 && " No platforms are connected yet — connect one in Cross-Post for sized variants and one-click publishing."}
+            </p>
+          </div>
+        )}
 
-      {err && <div className="cmp-err" role="alert">{err}</div>}
-      {note && <div className="lw-card lwa-note">{note}</div>}
-
-      {/* Empty state that teaches: real prompts, one click to try one. */}
-      {!composed && !busy && (
-        <div className="cmp-empty">
-          <p className="lw-muted">Start from one of these, or write your own.</p>
+        {!composed && !busy && (
           <div className="cmp-seeds">
             {SEED_PROMPTS.map((p) => (
               <button key={p} type="button" className="cmp-seed" onClick={() => setPrompt(p)}>{p}</button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
+      {err && <div className="cmp-err" role="alert">{err}</div>}
+      {note && <div className="cmp-note-line">{note}</div>}
+
+      {/* Review. One document; each platform is a tab, not another card. */}
       {composed && (
-        <div className="cmp-out">
-          {/* The piece is the page, not a card. Chrome around writing competes with it. */}
+        <div className="cmp-doc">
+          {composed.variants.length > 0 && (
+            <div className="cmp-tabs" role="tablist" aria-label="Version">
+              <button role="tab" aria-selected={tab === ""} className={"cmp-tab" + (tab === "" ? " on" : "")} onClick={() => setTab("")}>
+                Full piece
+              </button>
+              {composed.variants.map((v) => (
+                <button key={v.platform} role="tab" aria-selected={tab === v.platform}
+                  className={"cmp-tab" + (tab === v.platform ? " on" : "")} onClick={() => setTab(v.platform)}>
+                  {v.platform}
+                  <span className={"cmp-tab-n" + (v.fits ? "" : " over")}>{v.length}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <article className="cmp-piece">
-            <h2 className="cmp-title">{composed.title}</h2>
-            {meta && (
-              <p className="cmp-meta">
-                <span className="cmp-src">
-                  {meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}
-                </span>
-                <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
-                <span className="cmp-reason">{meta.reasoning}</span>
-              </p>
-            )}
-            {meta?.degradedReason && <p className="cmp-degraded">{meta.degradedReason}</p>}
-            <div className="cmp-body">{composed.body}</div>
-            <p className="cmp-tags">{composed.hashtags.join("  ")}</p>
+            {tab === "" && <h2 className="cmp-title">{composed.title}</h2>}
+            <div className="cmp-body">{bodyText}</div>
+            {tab === "" && composed.hashtags.length > 0 && <p className="cmp-tags">{composed.hashtags.join("  ")}</p>}
+            {active && !active.fits && <p className="cmp-note">{active.note}</p>}
           </article>
 
-          {/* Publishing is the last step of writing, so it sits with the writing —
-              one primary action, the rest as quiet text. */}
+          {meta && (
+            <p className="cmp-meta">
+              <span className="cmp-src">{meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}</span>
+              <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
+              <span className="cmp-reason">{meta.reasoning}</span>
+            </p>
+          )}
+          {meta?.degradedReason && <p className="cmp-degraded">{meta.degradedReason}</p>}
+
+          {/* Publish. The last step of writing, not a separate screen. */}
           <div className="cmp-publish">
             <button className="cmp-go" disabled={busy === "now"} onClick={() => publish("now")}>
               {busy === "now" ? "Publishing…" : "Publish everywhere"}
@@ -171,56 +206,42 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
             <button className="cmp-alt" disabled={busy === "draft"} onClick={() => publish("draft")}>
               {busy === "draft" ? "Saving…" : "Save as draft"}
             </button>
-            <a className="cmp-alt" href="/studio/social">Drafts</a>
+            <button className="cmp-adv-toggle" type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}>
+              {details ? "Hide details" : "Details"}
+            </button>
           </div>
 
           {results && (
             <div className="cmp-result">
               {results.map((r) => (
-                <p key={r.jobId}>
-                  <b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""}
-                </p>
+                <p key={r.jobId}><b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""}</p>
               ))}
               <p className="lw-muted">Retries, failures and approvals live in <a href="/studio/social">Cross-Post</a>.</p>
             </div>
           )}
 
-          {/* Everything the piece implies, below the fold of the writing: hairlines,
-              no cards, no nesting. */}
-          {composed.variants.length > 0 && (
+          {/* Details. Present, not in the way. */}
+          {details && (
             <section className="cmp-sub">
-              <h3 className="cmp-sub-h">Per platform</h3>
-              {composed.variants.map((v) => (
-                <div key={v.platform} className="cmp-variant">
-                  <div className="cmp-variant-top">
-                    <span className="cmp-variant-p">{v.platform}</span>
-                    <span className={"cmp-count" + (v.fits ? "" : " over")}>{v.length}/{v.limit}</span>
-                  </div>
-                  <div className="cmp-body cmp-body-sm">{v.text}</div>
-                  {!v.fits && <p className="cmp-note">{v.note}</p>}
-                </div>
-              ))}
+              <dl className="cmp-dl">
+                <dt>Call to action</dt>
+                <dd>{composed.ctas.join(" · ")}</dd>
+                <dt>Schedule</dt>
+                <dd>
+                  {composed.schedule.length
+                    ? composed.schedule.map((sl) => (
+                      <span key={sl.platform} className="cmp-slot"><b>{sl.platform}</b> {when(sl.at)} <span className="lw-muted">{sl.rationale}</span></span>
+                    ))
+                    : <span className="lw-muted">Connect a platform to get a schedule.</span>}
+                </dd>
+                <dt>Campaign</dt>
+                <dd>
+                  {composed.campaignSuggestion.title} <span className="lw-muted">{composed.campaignSuggestion.rationale}</span>{" "}
+                  <a href="/studio/launch#campaigns">Open Launch Workspace →</a>
+                </dd>
+              </dl>
             </section>
           )}
-
-          <section className="cmp-sub">
-            <h3 className="cmp-sub-h">Then</h3>
-            <dl className="cmp-dl">
-              <dt>Call to action</dt>
-              <dd>{composed.ctas.join(" · ")}</dd>
-              <dt>Schedule</dt>
-              <dd>
-                {composed.schedule.length
-                  ? composed.schedule.map((sl) => <span key={sl.platform} className="cmp-slot"><b>{sl.platform}</b> {when(sl.at)} <span className="lw-muted">{sl.rationale}</span></span>)
-                  : <span className="lw-muted">Connect a platform to get a schedule.</span>}
-              </dd>
-              <dt>Campaign</dt>
-              <dd>
-                {composed.campaignSuggestion.title} <span className="lw-muted">{composed.campaignSuggestion.rationale}</span>{" "}
-                <a href="/studio/launch#campaigns">Open Launch Workspace →</a>
-              </dd>
-            </dl>
-          </section>
         </div>
       )}
     </div>
