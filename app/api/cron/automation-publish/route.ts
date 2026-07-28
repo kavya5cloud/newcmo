@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { socialEngine } from "@/lib/social/shared";
 import { automationRepo } from "@/lib/automation/shared";
 import { extend, retryFailed, runDue, type PublishPort } from "@/lib/automation/runner";
-import type { QueueItem } from "@/lib/automation/types";
+import { resolveContent, type ResolvedContent } from "@/lib/automation/sources";
+import { recordGeneration } from "@/lib/content/generation-log";
+import type { Automation, QueueItem } from "@/lib/automation/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,22 +28,16 @@ function authCron(req: NextRequest): boolean {
 }
 
 /**
- * Where a slot's text comes from.
+ * The topic an automation writes about.
  *
- * Today: the automation's own statement is not the post — a slot sourced from drafts
- * takes the oldest unscheduled draft. Sources that have no content yet return null, and
- * the runner marks the slot failed with a reason rather than posting a placeholder.
+ * The statement the founder typed is a cadence, not a subject ("3 LinkedIn posts every
+ * week"). The subject is the business itself, so the composer's own context assembly —
+ * brand, website, market, memory, learning — supplies it. The statement is passed through
+ * as a hint so a rule that *does* name a subject is honoured.
  */
-async function contentFor(slot: QueueItem): Promise<{ text: string; assetIds: string[] } | null> {
-  const engine = socialEngine();
-  if (slot.source === "drafts") {
-    const drafts = await engine.listDrafts(slot.tenant).catch(() => []);
-    const match = drafts.find((d) => d.platforms.includes(slot.platform)) ?? drafts[0];
-    return match ? { text: match.content.text, assetIds: match.content.assetIds } : null;
-  }
-  // Other sources are not wired yet. Returning null is deliberate: the slot fails with
-  // "no content available", which is true, instead of publishing filler.
-  return null;
+function topicFor(a: Automation | undefined, slot: QueueItem): string {
+  const stated = a?.statement?.replace(/\b\d+\b|\bposts?\b|\bevery\b|\bdaily\b|\bweekly\b|\bmonthly\b/gi, "").trim();
+  return stated && stated.length > 12 ? stated : `an update for ${slot.platform} about what we shipped recently`;
 }
 
 export async function GET(req: NextRequest) {
@@ -62,8 +58,37 @@ export async function GET(req: NextRequest) {
       const retry = retryFailed(queue, { now });
       queue = retry.queue;
 
-      const run = await runDue(queue, tenant, { now, engine, content: contentFor });
+      // Remember how each slot's content was produced, so Learning receives the
+      // provenance alongside the outcome rather than just "something published".
+      const provenance = new Map<string, ResolvedContent>();
+
+      const run = await runDue(queue, tenant, {
+        now, engine,
+        content: async (slot) => {
+          const automation = automations.find((a) => a.id === slot.automationId);
+          const resolved = await resolveContent(slot, {
+            topic: topicFor(automation, slot),
+            audience: "founders",
+            now,
+          });
+          if (resolved) provenance.set(slot.id, resolved);
+          return resolved ? { text: resolved.text, assetIds: resolved.assetIds } : null;
+        },
+      });
       queue = run.queue;
+
+      // Feed the Learning Engine what was published and how it was made. Correlating
+      // provider, confidence and source with performance is the whole point of storing it.
+      for (const o of run.outcomes) {
+        const p = provenance.get(o.slotId);
+        if (!p) continue;
+        await recordGeneration({
+          tenant, kind: "content", format: `automation:${p.origin}`,
+          source: p.origin === "ai_queue" ? "llm" : "deterministic",
+          provider: p.provider, model: p.model,
+          confidence: p.confidence ?? 0.3, platforms: 1,
+        }).catch(() => { /* metadata must never fail a publish */ });
+      }
 
       const before = queue.length;
       queue = extend(automations, queue, now);
