@@ -7,6 +7,7 @@ import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
 import { AIProcessing } from "@/app/components/ai-processing";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
+import { SHOW_CONTENT_ENGINE, isContentEnginePath } from "@/lib/flags";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
 // Bounded so a stalled request can never freeze the flow: without a timeout an
@@ -404,7 +405,11 @@ const NEXT_KEY = "populr:next";
  */
 function isSafeNext(v: string): boolean {
   if (v.startsWith("//") || v.includes("..") || v.includes("\\")) return false;
-  return /^\/(studio|app)(\/|$|\?)/.test(v);
+  if (!/^\/(studio|app)(\/|$|\?)/.test(v)) return false;
+  // A saved link or an old bookmark can still carry a content-engine destination. Sending
+  // someone through sign-in only to bounce them off the far end is worse than ignoring the
+  // hint and landing them on the dashboard.
+  return !isContentEnginePath(v.split("?")[0]);
 }
 
 export default function AppPage() {
@@ -1092,20 +1097,24 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
         <Brief company={profile?.name} />
 
-        {/* Primary actions. Every link goes to a route that exists and does real work —
-            the studio composer, the launch workspace, generation, UGC, and drafts. */}
+        {/* Primary actions. Every link goes to a route that exists and does real work.
+            The generation entries are the content engine and are dropped while it is off —
+            a quick action that redirects to the page you are already on is worse than one
+            that isn't there. */}
         <div className="quickbar" aria-label="Quick actions">
-          <a className="qa qa-primary" href="/studio/documents">
-            <span className="qa-t">Create Content</span>
-            <span className="qa-s">One prompt → every platform</span>
-          </a>
+          {SHOW_CONTENT_ENGINE && (
+            <a className="qa qa-primary" href="/studio/documents">
+              <span className="qa-t">Create Content</span>
+              <span className="qa-s">One prompt → every platform</span>
+            </a>
+          )}
           <a className="qa qa-primary" href="/studio/launch">
             <span className="qa-t">Launch Workspace</span>
             <span className="qa-s">Plan and run a whole launch</span>
           </a>
           <a className="qa" href="/app/campaigns"><span className="qa-t">Create Campaign</span></a>
-          <a className="qa" href="/studio/images"><span className="qa-t">Generate Images</span></a>
-          <a className="qa" href="/studio/ugc"><span className="qa-t">Create UGC</span></a>
+          {SHOW_CONTENT_ENGINE && <a className="qa" href="/studio/images"><span className="qa-t">Generate Images</span></a>}
+          {SHOW_CONTENT_ENGINE && <a className="qa" href="/studio/ugc"><span className="qa-t">Create UGC</span></a>}
           <a className="qa" href="/studio/social"><span className="qa-t">Open Drafts</span></a>
         </div>
 

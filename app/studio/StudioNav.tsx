@@ -2,6 +2,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SHOW_CONTENT_ENGINE } from "@/lib/flags";
 
 // Creative Studio navigation.
 //
@@ -21,18 +22,21 @@ const svg = (children: ReactNode) => (
 
 type Item = { href: string; label: string; icon: ReactNode; match?: (p: string) => boolean };
 
-/** Where work happens. */
+/** Where work happens. Create and Library are the content engine; when it is switched off
+ *  they are dropped rather than left pointing at a route that redirects away. */
 const PRIMARY: Item[] = [
-  {
-    href: "/studio", label: "Create",
-    icon: svg(<><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></>),
-    // Create owns the asset categories now, so their routes keep it highlighted.
-    match: (p) => p === "/studio" || /^\/studio\/(documents|ads|videos|images|motion|ugc|blitz)$/.test(p),
-  },
-  {
-    href: "/studio/library", label: "Library",
-    icon: svg(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /></>),
-  },
+  ...(SHOW_CONTENT_ENGINE ? [
+    {
+      href: "/studio", label: "Create",
+      icon: svg(<><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></>),
+      // Create owns the asset categories now, so their routes keep it highlighted.
+      match: (p: string) => p === "/studio" || /^\/studio\/(documents|ads|videos|images|motion|ugc|blitz)$/.test(p),
+    },
+    {
+      href: "/studio/library", label: "Library",
+      icon: svg(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /></>),
+    },
+  ] : []),
   {
     href: "/studio/social", label: "Publishing",
     icon: svg(<><path d="M4 4h16v12H5.2L4 18z" /><path d="M8 9h8M8 12h5" /></>),
@@ -66,7 +70,9 @@ export default function StudioNav() {
   const path = usePathname();
   return (
     <nav className="st-nav" aria-label="Creative Studio">
-      <Link href="/studio" className="st-brand">
+      {/* "/studio" is the composer, which redirects away when the engine is off — the
+          wordmark would have been a dead click. Point it at the first place that answers. */}
+      <Link href={PRIMARY[0].href} className="st-brand">
         <span className="st-brand-word">Populr<span className="st-brand-acc">.</span></span>
         <span className="st-brand-name">Studio</span>
       </Link>

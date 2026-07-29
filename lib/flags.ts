@@ -15,10 +15,60 @@ function publicFlag(raw: string | undefined, fallback: boolean): boolean {
 }
 
 /**
- * Whether the landing page advertises the content engine as a way into the product.
+ * Whether the content engine exists for users at all.
  *
- * Off by default: the engine is still being finished, and "Create content" was the primary
- * call to action on the home page — the first thing a visitor was promised. Set
- * NEXT_PUBLIC_SHOW_CONTENT_ENGINE=1 to put it back.
+ * Off by default: the engine is still being finished. When off, the landing page stops
+ * advertising it, the dashboard and Studio nav stop linking to it, and its routes redirect
+ * away — so a bookmark or a guessed URL does not reach a half-finished surface. No code is
+ * deleted and no data is touched. Set NEXT_PUBLIC_SHOW_CONTENT_ENGINE=1 to put it back.
  */
 export const SHOW_CONTENT_ENGINE = publicFlag(process.env.NEXT_PUBLIC_SHOW_CONTENT_ENGINE, false);
+
+/**
+ * The authoring surface — where content is written and generated. This is the content
+ * engine proper, and it is what gets sealed off.
+ *
+ * Deliberately a list rather than the whole /studio subtree. The Launch Workspace lives at
+ * /studio/launch and is now the only primary call to action on the landing page; the
+ * reporting pages (market, learning, jobs, integrations) and the publishing views
+ * (social, publishing) describe work the Publishing Engine still does on a schedule.
+ * Blocking /studio wholesale would take all of that down with it.
+ */
+export const CONTENT_ENGINE_PATHS = [
+  "/studio",            // the composer home — exact match only, see isContentEnginePath
+  "/studio/documents",
+  "/studio/ads",
+  "/studio/videos",
+  "/studio/images",
+  "/studio/motion",
+  "/studio/ugc",
+  "/studio/blitz",
+  "/studio/library",
+] as const;
+
+/** Generation endpoints. Nothing server-side calls these over HTTP — the cron and the
+ *  automation runner import the libraries directly — so sealing them affects only callers
+ *  coming in from a browser. */
+export const CONTENT_ENGINE_API_PATHS = [
+  "/api/content/compose",
+  "/api/content/refine",
+  "/api/content/generate",
+  "/api/content/edit",
+  "/api/ugc",
+] as const;
+
+/** True when `pathname` belongs to the content engine and the flag is off. */
+export function isContentEnginePath(pathname: string): boolean {
+  if (SHOW_CONTENT_ENGINE) return false;
+  // "/studio" is an exact match: "/studio/launch" must stay reachable.
+  const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  return (CONTENT_ENGINE_PATHS as readonly string[]).includes(path);
+}
+
+/** True when `pathname` is a generation endpoint and the flag is off. */
+export function isContentEngineApi(pathname: string): boolean {
+  if (SHOW_CONTENT_ENGINE) return false;
+  return (CONTENT_ENGINE_API_PATHS as readonly string[]).some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
+}
