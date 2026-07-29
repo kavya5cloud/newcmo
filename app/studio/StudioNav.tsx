@@ -2,113 +2,87 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CREATIVE_CATEGORIES, CATEGORY_META, type CreativeCategory } from "@/lib/creative/taxonomy";
 
-// Creative Studio navigation. Reads the category taxonomy so nav and content never
-// drift. Polished product-shell sidebar (icon + label rows, filled active state) on
-// desktop; a horizontal scroller on mobile.
+// Creative Studio navigation.
+//
+// This was seventeen links drawn with Unicode glyphs — seventeen choices to answer "I want
+// to write a post", which is the one thing people come here to do. Several pointed at
+// pages that could not act on them.
+//
+// It is now four places where work happens, and four you look at. Nothing was removed:
+// every route still exists and is still reachable. The asset categories moved inside
+// Create, where they belong, because "Videos" is a kind of thing you make, not a place you
+// go.
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 const svg = (children: ReactNode) => (
   <svg viewBox="0 0 24 24" width="18" height="18" {...stroke} aria-hidden="true">{children}</svg>
 );
 
-const ICONS: Record<CreativeCategory, ReactNode> = {
-  launch: svg(<><path d="M13.5 3.5C17 4.5 19.5 7 20.5 10.5c.3 1-.2 1.7-1 2L14 15l-5-5 2.5-5.5c.3-.8 1-1.3 2-1Z" /><path d="M9 15l-3 3M5 13l-1.5 4.5L8 16" /><circle cx="15" cy="9" r="1.4" /></>),
-  videos: svg(<><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3" /></>),
-  ugc: svg(<><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></>),
-  motion: svg(<><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" /></>),
-  images: svg(<><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M21 16l-5-5-8 8" /></>),
-  documents: svg(<><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></>),
-  ads: svg(<><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1Z" /><path d="M17 9a4 4 0 0 1 0 6" /></>),
-  library: svg(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /><path d="M6.5 8h0M17.5 8h0" /></>),
-};
+type Item = { href: string; label: string; icon: ReactNode; match?: (p: string) => boolean };
+
+/** Where work happens. */
+const PRIMARY: Item[] = [
+  {
+    href: "/studio", label: "Create",
+    icon: svg(<><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></>),
+    // Create owns the asset categories now, so their routes keep it highlighted.
+    match: (p) => p === "/studio" || /^\/studio\/(documents|ads|videos|images|motion|ugc|blitz)$/.test(p),
+  },
+  {
+    href: "/studio/library", label: "Library",
+    icon: svg(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /></>),
+  },
+  {
+    href: "/studio/social", label: "Publishing",
+    icon: svg(<><path d="M4 4h16v12H5.2L4 18z" /><path d="M8 9h8M8 12h5" /></>),
+    match: (p) => p === "/studio/social" || p === "/studio/publishing",
+  },
+  {
+    href: "/studio/launch", label: "Launch",
+    icon: svg(<><path d="M13.5 3.5C17 4.5 19.5 7 20.5 10.5c.3 1-.2 1.7-1 2L14 15l-5-5 2.5-5.5c.3-.8 1-1.3 2-1Z" /><path d="M9 15l-3 3M5 13l-1.5 4.5L8 16" /><circle cx="15" cy="9" r="1.4" /></>),
+  },
+];
+
+/** What you look at rather than work in. */
+const SECONDARY: Item[] = [
+  { href: "/studio/market", label: "Market", icon: svg(<><path d="M4 19V5M4 19h16" /><path d="M8 16l4-6 3 3 5-7" /></>) },
+  { href: "/studio/learning", label: "Performance", icon: svg(<><path d="M12 3l8 4-8 4-8-4 8-4Z" /><path d="M6 10v4c0 1.5 2.7 3 6 3s6-1.5 6-3v-4" /></>) },
+  { href: "/studio/jobs", label: "Activity", icon: svg(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" /></>) },
+  { href: "/studio/integrations", label: "Connections", icon: svg(<><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>) },
+];
+
+function NavLink({ item, path }: { item: Item; path: string }) {
+  const active = item.match ? item.match(path) : path === item.href;
+  return (
+    <Link href={item.href} className={"st-link" + (active ? " on" : "")} aria-current={active ? "page" : undefined}>
+      <span className="st-link-ic">{item.icon}</span>
+      <span className="st-link-label">{item.label}</span>
+    </Link>
+  );
+}
 
 export default function StudioNav() {
   const path = usePathname();
-  if (path === "/studio" || path === "/studio/blitz") return <BlitzNav />;
   return (
-    <nav className="st-nav" aria-label="Creative Studio sections">
+    <nav className="st-nav" aria-label="Creative Studio">
       <Link href="/studio" className="st-brand">
         <span className="st-brand-word">Populr<span className="st-brand-acc">.</span></span>
-        <span className="st-brand-name">Creative Studio</span>
+        <span className="st-brand-name">Studio</span>
       </Link>
 
-      <div className="st-navlabel">Sections</div>
       <div className="st-links">
-        {CREATIVE_CATEGORIES.map((c) => {
-          const href = `/studio/${c}`;
-          const active = path === href;
-          const m = CATEGORY_META[c];
-          return (
-            <Link key={c} href={href} className={"st-link" + (active ? " on" : "")} aria-current={active ? "page" : undefined}>
-              <span className="st-link-ic">{ICONS[c]}</span>
-              <span className="st-link-label">{m.label}</span>
-            </Link>
-          );
-        })}
+        {PRIMARY.map((i) => <NavLink key={i.href} item={i} path={path} />)}
       </div>
 
-      <div className="st-navlabel">Execution</div>
-      <div className="st-links">
-        <Link href="/studio/publishing" className={"st-link" + (path === "/studio/publishing" ? " on" : "")} aria-current={path === "/studio/publishing" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<><path d="M4 4h16v12H5.2L4 18z" /><path d="M8 9h8M8 12h5" /></>)}</span>
-          <span className="st-link-label">Publishing</span>
-        </Link>
-        <Link href="/studio/learning" className={"st-link" + (path === "/studio/learning" ? " on" : "")} aria-current={path === "/studio/learning" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<><path d="M12 3l8 4-8 4-8-4 8-4Z" /><path d="M6 10v4c0 1.5 2.7 3 6 3s6-1.5 6-3v-4" /></>)}</span>
-          <span className="st-link-label">Learning</span>
-        </Link>
-        <Link href="/studio/jobs" className={"st-link" + (path === "/studio/jobs" ? " on" : "")} aria-current={path === "/studio/jobs" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" /></>)}</span>
-          <span className="st-link-label">Jobs</span>
-        </Link>
-        <Link href="/studio/integrations" className={"st-link" + (path === "/studio/integrations" ? " on" : "")} aria-current={path === "/studio/integrations" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>)}</span>
-          <span className="st-link-label">Integrations</span>
-        </Link>
-        <Link href="/studio/social" className={"st-link" + (path === "/studio/social" ? " on" : "")} aria-current={path === "/studio/social" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<path d="M4 12l16-8-7 16-2-6-7-2Z" />)}</span>
-          <span className="st-link-label">Cross-Post</span>
-        </Link>
-        <Link href="/studio/market" className={"st-link" + (path === "/studio/market" ? " on" : "")} aria-current={path === "/studio/market" ? "page" : undefined}>
-          <span className="st-link-ic">{svg(<><path d="M4 19V5M4 19h16" /><path d="M8 16l4-6 3 3 5-7" /></>)}</span>
-          <span className="st-link-label">Market Intel</span>
-        </Link>
+      <div className="st-links st-links-2">
+        {SECONDARY.map((i) => <NavLink key={i.href} item={i} path={path} />)}
       </div>
 
       <Link href="/app" className="st-back">
         <span className="st-link-ic">{svg(<path d="M15 5l-7 7 7 7" />)}</span>
         <span className="st-link-label">Back to app</span>
       </Link>
-    </nav>
-  );
-}
-
-function BlitzNav() {
-  const items = [
-    ["⌂", "Home", "/app"], ["♢", "Blitz", "/studio/blitz"], ["ϟ", "Automations", "/studio/launch"],
-    ["✣", "AI Studio", "/studio"], ["♙", "Influencers", "/studio/ugc"], ["▣", "Content", "/studio/documents"],
-    ["▧", "Library", "/studio/library"], ["□", "Calendar", "/studio/publishing"], ["▥", "Analytics", "/studio/learning"],
-    ["♧", "Warmed Accounts", "/studio/integrations"],
-  ] as const;
-  const path = usePathname();
-  return (
-    <nav className="st-nav blitz-nav" aria-label="Populr workspace">
-      <Link href="/studio/blitz" className="blitz-brand"><span className="blitz-brand-mark">P</span><span>populr</span><i /></Link>
-      <div className="blitz-nav-divider" />
-      <div className="blitz-nav-links">
-        {items.map(([icon, label, href]) => <Link key={label} href={href} className={"blitz-nav-link" + (path === href ? " on" : "")}><span>{icon}</span>{label}{label === "Content" && <b />}</Link>)}
-      </div>
-      <div className="blitz-nav-bottom">
-        <Link href="/early-access" className="blitz-upgrade"><span>◉</span>Upgrade</Link>
-        <Link href="/early-access" className="blitz-nav-link"><span>♧</span>Refer &amp; Earn</Link>
-        <Link href="/app" className="blitz-nav-link"><span>▣</span>Brand<b /></Link>
-        <Link href="/studio" className="blitz-nav-link"><span>⌑</span>Guide</Link>
-        <Link href="/app" className="blitz-nav-link"><span>□</span>Feedback</Link>
-        <Link href="/app" className="blitz-nav-link"><span>◌</span>Discord</Link>
-        <Link href="/account" className="blitz-nav-link"><span>⚙</span>Settings</Link>
-      </div>
     </nav>
   );
 }
