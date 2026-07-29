@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { humanError, humanThrow } from "@/lib/ui/errors";
 
 // Market Intelligence Dashboard — Opportunity Feed, Trend Explorer, Competitor Dashboard,
 // Keyword Explorer, Business Graph Viewer and Research Center in one cockpit. Everything
@@ -39,12 +40,12 @@ export default function MarketDashboard() {
         }),
       });
       const d = await r.json();
-      if (d.brief) setBrief(d.brief); else setErr(d.error || "research failed");
+      if (d.brief) setBrief(d.brief); else setErr(humanError(d, r.status));
 
       const q = new URLSearchParams({ terms, competitors, industry: "saas" });
       const g = await fetch(`/api/market/graph?${q}`).then((x) => x.json()).catch(() => null);
       if (g?.graph) setGraph(g.graph);
-    } catch { setErr("network error"); }
+    } catch (e) { setErr(humanThrow(e)); }
     setBusy(false);
   }, [terms, competitors]);
 

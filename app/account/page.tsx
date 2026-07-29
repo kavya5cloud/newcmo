@@ -99,7 +99,16 @@ export default function Account() {
                   <>
                     <div className="acct-plan">Free trial <span className="acct-badge end">ended</span></div>
                     <p className="acct-dim">Your free month ended {fmtDate(liveTrial.endsAt)}. Upgrade to keep using Populr.</p>
-                    <button className="acct-btn pri" style={{ marginTop: 12 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
+                    <a
+                      className="acct-btn pri"
+                      style={{ marginTop: 12, display: "inline-block", textDecoration: "none" }}
+                      href="mailto:team@trypopulr.in?subject=Upgrade%20my%20Populr%20workspace&body=I%27d%20like%20to%20keep%20using%20Populr%20past%20the%20trial."
+                    >
+                      Upgrade — $15/mo
+                    </a>
+                    <p className="acct-dim" style={{ marginTop: 8, fontSize: 12 }}>
+                      Card payments aren&apos;t self-serve yet — we&apos;ll set you up by email.
+                    </p>
                   </>
                 )
               ) : (

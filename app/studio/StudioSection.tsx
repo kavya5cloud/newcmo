@@ -8,6 +8,18 @@ import Composer from "./Composer";
 // because the work behind them is done — a disabled-looking card next to a working button
 // was the worst of both.
 
+/**
+ * The first step for sections that produce assets rather than writing. Without it these
+ * pages open on a grid of nouns and never say what to do — the answer to "what should I
+ * do next?" has to be on the screen, not inferred from the card titles.
+ */
+const FIRST_STEP: Partial<Record<CreativeCategory, string>> = {
+  videos: "Pick a video type below and Populr writes the script, shot list and caption before anything is filmed.",
+  images: "Pick a format below. Every image is generated against your brand and sized for the platform it's going to.",
+  motion: "Pick a motion format below. Populr storyboards it from your campaign, so it matches what you're already publishing.",
+  ugc: "Describe the product and the change it creates — Populr writes the hooks and scripts a creator can film.",
+};
+
 const COMPOSER_FORMAT: Partial<Record<CreativeCategory, ContentFormat>> = {
   documents: "blog",
   ads: "post",
@@ -29,6 +41,10 @@ export default function StudioSection({ category }: { category: CreativeCategory
       </header>
 
       {composerFormat && <Composer initialFormat={composerFormat} />}
+
+      {!composerFormat && FIRST_STEP[category] && (
+        <p className="st-first">{FIRST_STEP[category]}</p>
+      )}
 
       {kinds.length === 0 ? (
         <div className="st-empty">

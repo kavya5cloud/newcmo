@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { humanError, humanThrow } from "@/lib/ui/errors";
 import {
   CREATOR_STYLES, CREATOR_STYLE_META, FORMAT_META, UGC_FORMATS, VOICE_STYLES, VOICE_STYLE_META,
   type CreatorStyle, type UgcFormat, type UgcPackage, type UgcVersion, type VoiceStyle,
@@ -55,9 +56,9 @@ export default function UgcWorkspace() {
     try {
       const r = await fetch("/api/ugc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json();
-      if (!r.ok || d.error) { setErr(String(d.hint || d.error || `request failed (${r.status})`)); return null; }
+      if (!r.ok || d.error) { setErr(humanError(d, r.status)); return null; }
       return d;
-    } catch { setErr("network error — check your connection"); return null; }
+    } catch (e) { setErr(humanThrow(e)); return null; }
     finally { setBusy(null); }
   }, []);
 

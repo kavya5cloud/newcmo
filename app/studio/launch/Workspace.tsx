@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flagDependents } from "@/lib/launch/dependencies";
 import { AUTOMATION_KEYS, AUTOMATION_META, type Automation, type ItemAction, type ItemStatus } from "@/lib/launch/workspace";
 import { COMMAND_EXAMPLES } from "@/lib/launch/command";
+import { humanError, humanThrow } from "@/lib/ui/errors";
 import type {
   AdaptationProposal, CampaignExecutionStatus, CampaignHealth, ExecutionMode,
   HealthStatus, Notification, StepAction, StepState, WorkflowStep,
@@ -198,9 +199,9 @@ export default function LaunchWorkspaceClient({ plan }: { plan: LaunchPlan }) {
     try {
       const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json();
-      if (!r.ok || d.error) { setNote(String(d.error || `request failed (${r.status})`)); return null; }
+      if (!r.ok || d.error) { setNote(humanError(d, r.status)); return null; }
       return d;
-    } catch { setNote("network error — check your connection"); return null; }
+    } catch (e) { setNote(humanThrow(e)); return null; }
     finally { setBusy(null); }
   }, []);
 

@@ -1,4 +1,5 @@
 "use client";
+import { humanError } from "@/lib/ui/errors";
 import { useCallback, useEffect, useState } from "react";
 import { loadState, workspaceId, type Profile } from "@/lib/store";
 import { CAMPAIGN_GOALS, type CampaignTask } from "@/lib/services/contracts";
@@ -169,7 +170,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
         body: JSON.stringify({ wsid: workspaceId(), url, profile, campaign: { ...(campaign as object), goal: goalId } }),
       });
       const d = await res.json();
-      if (!res.ok || d.error) throw new Error(d.error === "invalid_campaign" ? "plan came back malformed — try again" : d.error || "save failed");
+      if (!res.ok || d.error) throw new Error(d.error === "invalid_campaign" ? "The plan came back malformed. Try again." : humanError(d, res.status));
       refresh();
       setOpenId(d.id);
     } catch (e) {
@@ -239,7 +240,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
         body: JSON.stringify({ wsid: workspaceId(), campaignId: c.id, assets: graph }),
       });
       const d = await res.json();
-      if (!res.ok || d.error) throw new Error(d.error || "save failed");
+      if (!res.ok || d.error) throw new Error(humanError(d, res.status));
       loadAssets(c.id);
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e).slice(0, 160));
@@ -307,7 +308,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
         }),
       });
       const dd = await res.json();
-      if (!res.ok || dd.error) throw new Error(dd.error || "couldn't save the new asset");
+      if (!res.ok || dd.error) throw new Error(humanError(dd, res.status));
       loadAssets(c.id);
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e).slice(0, 160));
@@ -339,7 +340,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
         }),
       });
       const dd = await res.json();
-      if (!res.ok || dd.error) throw new Error(dd.error || "couldn't save the deliverable");
+      if (!res.ok || dd.error) throw new Error(humanError(dd, res.status));
       loadAssets(c.id);
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e).slice(0, 160));

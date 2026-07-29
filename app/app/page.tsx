@@ -983,7 +983,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               ))}
               <span style={{ whiteSpace: "nowrap" }}>
                 <span className="src-sep" aria-hidden="true">·</span>
-                <span className="src-soon">more soon</span>
+                <span className="src-soon">more sources in early access</span>
               </span>
             </div>
             <p className="ob-note">read-only · nothing publishes without you</p>
@@ -1514,7 +1514,16 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <span className="app-wordmark app-wordmark-lg">Populr.</span>
             <h2>Your free month has ended</h2>
             <p>Upgrade to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
-            <button className="acct-btn pri" style={{ marginTop: 18 }} disabled title="Billing coming soon">Upgrade — $15/mo</button>
+            <a
+              className="acct-btn pri"
+              style={{ marginTop: 18, display: "inline-block", textDecoration: "none" }}
+              href="mailto:team@trypopulr.in?subject=Upgrade%20my%20Populr%20workspace&body=I%27d%20like%20to%20keep%20using%20Populr%20past%20the%20trial."
+            >
+              Upgrade — $15/mo
+            </a>
+            <p className="acct-dim" style={{ marginTop: 10, fontSize: 12 }}>
+              Card payments aren&apos;t self-serve yet — we&apos;ll set you up by email, usually the same day.
+            </p>
             <div className="trial-lock-foot">
               <a href="/account">Account</a>
               <span> · </span>

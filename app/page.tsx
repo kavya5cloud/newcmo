@@ -261,7 +261,7 @@ export default function Landing() {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
                       </span>
                       <span className="agent-name">{a.name}</span>
-                      {a.soon && <span className="soon">SOON</span>}
+                      {a.soon && <span className="soon">Early access</span>}
                     </span>
                     <span className="agent-copy">{a.desc}</span>
                     <span className="flip-hint">Click for details</span>

@@ -1651,3 +1651,7 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .appui .brief-rec{flex-direction:column;align-items:stretch;gap:12px}
   .appui .brief-rec-go{text-align:center}
 }
+
+/* The one line that tells a first-time visitor what to do on an asset section. */
+.st-section .st-first{font-size:14px;line-height:1.6;color:var(--dim);max-width:64ch;
+  margin:-8px 0 26px}
