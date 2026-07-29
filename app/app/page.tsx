@@ -1142,11 +1142,13 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           {/* ANALYTICS */}
           {mtab === "analytics" && (
           <div className="col">
-            <div className="col-head"><span className="ct">Analytics</span></div>
-            <div className="tabs">
-              {(["overview", "seo"] as const).map((t) => (
-                <button key={t} className={"tab" + (tab === t ? " on" : "")} onClick={() => setTab(t)}>{t === "overview" ? "Overview" : "SEO"}</button>
-              ))}
+            <div className="col-head">
+              <span className="ct">Analytics</span>
+              <div className="tabs">
+                {(["overview", "seo"] as const).map((t) => (
+                  <button key={t} className={"tab" + (tab === t ? " on" : "")} onClick={() => setTab(t)}>{t === "overview" ? "Overview" : "SEO"}</button>
+                ))}
+              </div>
             </div>
             <div className="col-body">
               {gsc.configured && authUser && !gsc.connected && (
@@ -1324,11 +1326,16 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       </span>
                     </div>
                   ))}
-                  {(["linkedin", "x", "reddit", "hn", "articles"] as PublishChannel[]).map((ch) => (
-                    <div className="pq-window" key={ch}>{formatWindowLabel(ch)}</div>
-                  ))}
+                  {/* The posting window for the channels you actually have work in. Listing all
+                      five was five rows of chrome under a queue of one. */}
+                  {(["linkedin", "x", "reddit", "hn", "articles"] as PublishChannel[])
+                    .filter((ch) => pendingDrafts.some((d) => d.channel === ch))
+                    .map((ch) => (
+                      <div className="pq-window" key={ch}>{formatWindowLabel(ch)}</div>
+                    ))}
                 </div>
               )}
+              <div className="agentlist">
               {visibleAgents.map((a) => {
                 const fe = feed[a.id];
                 const items = fe?.items?.length ? fe.items : contextualFeed[a.id]?.items || a.items;
@@ -1357,6 +1364,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                 </div>
                 );
               })}
+              </div>
             </div>
           </div>
           )}
@@ -1400,7 +1408,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                   <AIProcessing requestType={chatMode === "copy" ? "creative" : "strategy"} active={typing} />
                 </div>
               )}
-              <div ref={chatEndRef} />
+              <div className="chat-end" ref={chatEndRef} />
             </div>
             <div className="chat-foot">
               <div className="chatbox">
@@ -1546,7 +1554,7 @@ function Chart({ labels, primary, secondary }: { labels: string[]; primary: numb
         <polyline points={line(secondary)} fill="none" stroke="#55565E" strokeWidth="1.5" strokeDasharray="4 4" />
         {primary.map((_, i) => { const [x, y] = pt(primary, i); return <circle key={i} cx={x} cy={y} r="2.6" fill="#CDA6F2" />; })}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Geist Mono',monospace", fontSize: "9.5px", color: "var(--faint)", padding: "0 2px" }}>
+      <div className="chartlabels">
         {labels.map((l, i) => <span key={i}>{l}</span>)}
       </div>
     </>
