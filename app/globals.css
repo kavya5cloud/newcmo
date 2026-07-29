@@ -229,7 +229,11 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
   .appui .termstrip{height:84px}
   .appui .appshell.term-collapsed .termstrip{height:30px}
   .appui .term-toggle{background:rgba(0,0,0,.75);padding:2px 7px;border-radius:6px}
-  .appui .dash{display:block;flex:0 0 auto;min-height:0;overflow:visible}
+  /* Grow to fill a viewport the content does not reach, but never shrink below the
+     content. Short dashboard: this takes the slack so the tab bar sits on the bottom edge
+     instead of floating mid-screen. Tall dashboard: it grows past the fold and the page
+     scrolls, which is what was broken before. `0 auto` filled neither case. */
+  .appui .dash{display:block;flex:1 0 auto;min-height:0;overflow:visible}
   .appui .col{display:none;border-right:0;height:auto}
   .appui .col.mactive{display:flex}
   /* Content flows into the page scroll instead of a nested scroller that has no height. */
