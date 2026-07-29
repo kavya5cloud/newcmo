@@ -1,5 +1,31 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { SHOW_CONTENT_ENGINE } from "@/lib/flags";
+
+// The ways into the product. Derived rather than hand-numbered: the content engine is
+// behind a flag, and a hardcoded "01/02/03" under a hardcoded "Three ways in." would go
+// stale the moment it is hidden. Index 0 is the primary — exactly one, always.
+const WAYS: { href: string; title: string; desc: string }[] = [
+  ...(SHOW_CONTENT_ENGINE
+    ? [{
+        href: "/app?next=/studio/documents",
+        title: "Create content",
+        desc: "One prompt becomes a post, thread, blog, email or landing page — sized to each platform's limits, with hashtags, CTAs and a schedule. Paste your site first so it writes about your product, not a generic one.",
+      }]
+    : []),
+  {
+    href: "/app",
+    title: "Launch workspace",
+    desc: "A whole launch, planned and executed — campaigns, assets, approvals and publishing, run by seven AI specialists you can watch and interrupt.",
+  },
+  {
+    href: "/app",
+    title: "Campaigns",
+    desc: "Everything already in flight, and what each one is doing next.",
+  },
+];
+
+const COUNT_WORD = ["No", "One", "Two", "Three", "Four"][WAYS.length] ?? String(WAYS.length);
 
 const AGENTS: { c: string; name: string; desc: string; soon?: boolean; icon: React.ReactNode }[] = [
   { c: "#3ECF8E", name: "Influencer Agent", desc: "Finds creators who match your audience and drafts the outreach.", icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
@@ -171,48 +197,24 @@ export default function Landing() {
       <section id="start" className="start">
         <div className="wrap">
           <p className="label">Start here</p>
-          <h2 style={{ marginTop: 14 }}>Three ways in.</h2>
+          <h2 style={{ marginTop: 14 }}>{COUNT_WORD} ways in.</h2>
           <p className="start-lede">
-            All three start the same way — paste your site, and Populr reads it before it writes
-            anything. You land exactly where you were heading.
+            {WAYS.length === 2 ? "Both" : `All ${COUNT_WORD.toLowerCase()}`} start the same way — paste
+            your site, and Populr reads it before it writes anything. You land exactly where you were
+            heading.
           </p>
 
           <div className="start-grid">
-            <a href="/app?next=/studio/documents" className="start-row start-primary">
-              <span className="start-n">01</span>
-              <span className="start-b">
-                <span className="start-t">Create content</span>
-                <span className="start-d">
-                  One prompt becomes a post, thread, blog, email or landing page — sized to each
-                  platform&apos;s limits, with hashtags, CTAs and a schedule. Paste your site first so it
-                  writes about your product, not a generic one.
+            {WAYS.map((w, i) => (
+              <a key={w.title} href={w.href} className={"start-row" + (i === 0 ? " start-primary" : "")}>
+                <span className="start-n">{String(i + 1).padStart(2, "0")}</span>
+                <span className="start-b">
+                  <span className="start-t">{w.title}</span>
+                  <span className="start-d">{w.desc}</span>
                 </span>
-              </span>
-              <span className="start-a">→</span>
-            </a>
-
-            <a href="/app" className="start-row">
-              <span className="start-n">02</span>
-              <span className="start-b">
-                <span className="start-t">Launch workspace</span>
-                <span className="start-d">
-                  A whole launch, planned and executed — campaigns, assets, approvals and publishing,
-                  run by seven AI specialists you can watch and interrupt.
-                </span>
-              </span>
-              <span className="start-a">→</span>
-            </a>
-
-            <a href="/app" className="start-row">
-              <span className="start-n">03</span>
-              <span className="start-b">
-                <span className="start-t">Campaigns</span>
-                <span className="start-d">
-                  Everything already in flight, and what each one is doing next.
-                </span>
-              </span>
-              <span className="start-a">→</span>
-            </a>
+                <span className="start-a">→</span>
+              </a>
+            ))}
           </div>
         </div>
       </section>

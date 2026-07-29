@@ -212,16 +212,29 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 /* mobile: single panel + bottom tab bar */
 .appui .mobilenav{display:none}
 @media(max-width:720px){
-  .appui .appshell{height:100svh;overflow:hidden}
+  /* The shell is a fixed-height desktop frame: 100svh, overflow hidden, one flexible row.
+     That only holds while the chrome is small. Once the Daily Brief and the quick bar
+     joined it, the fixed children came to 857px inside 812px — so .dash was squeezed to
+     zero, the dashboard vanished, and nothing scrolled because the only scroll container
+     left was 24px tall.
+
+     On a phone the page itself is the scroller. The shell grows to fit its content, the
+     top bar and tab bar pin to the edges, and every inner panel stops competing for a
+     share of a viewport that was never big enough. This also avoids nested overflow
+     scrollers inside 100svh, which iOS Safari handles badly. */
+  .appui .appshell{height:auto;min-height:100svh;overflow:visible}
+  .appui .topbar{position:sticky;top:0;z-index:40}
   .appui .tb-l .sep,.appui .tb-l .mono{display:none}
   .appui .whoemail{display:none}
   .appui .termstrip{height:84px}
   .appui .appshell.term-collapsed .termstrip{height:30px}
   .appui .term-toggle{background:rgba(0,0,0,.75);padding:2px 7px;border-radius:6px}
-  .appui .dash{display:block;flex:1;min-height:0;overflow:hidden}
-  .appui .col{display:none;border-right:0;height:100%}
+  .appui .dash{display:block;flex:0 0 auto;min-height:0;overflow:visible}
+  .appui .col{display:none;border-right:0;height:auto}
   .appui .col.mactive{display:flex}
-  .appui .mobilenav{display:flex;flex:0 0 auto;border-top:1px solid var(--line);background:#000;padding-bottom:env(safe-area-inset-bottom)}
+  /* Content flows into the page scroll instead of a nested scroller that has no height. */
+  .appui .col-body{overflow:visible;min-height:0;flex:0 0 auto}
+  .appui .mobilenav{display:flex;flex:0 0 auto;position:sticky;bottom:0;z-index:40;border-top:1px solid var(--line);background:#000;padding-bottom:env(safe-area-inset-bottom)}
   .appui .mobilenav button{flex:1;background:none;border:0;color:var(--faint);font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.04em;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px}
   .appui .mobilenav button.on{color:var(--acc)}
   .appui .mobilenav button .mi{font-size:18px;line-height:1}
@@ -825,6 +838,10 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
 
 /* ---- mobile topbar overflow menu (desktop unchanged) ---- */
 .appui .topbar{position:relative;padding-top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* The rule above needs `relative` so the overflow menu can anchor to the bar, but it also
+   sits after the mobile block and was quietly cancelling the sticky header there. Restated
+   here, after it, so the phone keeps its pinned bar and its safe-area padding. */
+@media(max-width:720px){.appui .topbar{position:sticky;top:0;z-index:40}}
 .appui .tb-burger{display:none;place-items:center;width:30px;height:30px;border-radius:6px;background:none;border:1px solid var(--line);color:var(--dim);padding:0}
 .appui .tb-burger svg{width:17px;height:17px;display:block}
 .appui .tb-burger:hover{color:var(--fg)}
@@ -1694,3 +1711,7 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .st-nav .st-links-2 .st-link{opacity:.72}
 .st-nav .st-links-2 .st-link:hover,.st-nav .st-links-2 .st-link.on{opacity:1}
 @media(max-width:820px){.st-nav .st-links-2{margin-top:0;padding-top:0;border-top:0}}
+
+/* The blitz feed shows the script, since that is the artefact that exists. */
+.blitz-script{display:flex;flex-direction:column;gap:10px;padding:14px 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:10px 0}
