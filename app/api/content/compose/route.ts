@@ -60,6 +60,14 @@ export async function POST(req: NextRequest) {
       confidence: generation.confidence, platforms: platforms.length, cached: generation.cached,
     });
 
+    // Edits made in the workspace win over the generated text. Publishing what the user
+    // is no longer looking at is the worst possible outcome of an editable document.
+    const overrides = (body.overrides && typeof body.overrides === "object" ? body.overrides : {}) as Record<string, string>;
+    const applyOverride = (platform: string, generated: string): string => {
+      const edited = overrides[platform] ?? overrides[""];
+      return typeof edited === "string" && edited.trim() ? edited : generated;
+    };
+
     const action = String(body.publish || "");
     if (!action) {
       return NextResponse.json({
@@ -86,8 +94,10 @@ export async function POST(req: NextRequest) {
       const account = accounts.find((a) => a.platform === variant.platform && a.status === "connected");
       if (!account) continue;
 
+      const text = applyOverride(variant.platform, variant.text);
+
       if (action === "draft") {
-        const draft = await engine.createDraft(tenant, composed.title, [variant.platform], { text: variant.text, assetIds: [] });
+        const draft = await engine.createDraft(tenant, composed.title, [variant.platform], { text, assetIds: [] });
         results.push({ platform: variant.platform, jobId: draft.id, state: "draft", at: null });
         continue;
       }
@@ -95,8 +105,10 @@ export async function POST(req: NextRequest) {
       // Idempotent on the composed id: re-running the same prompt never double-posts.
       const request = {
         tenant, accountId: account.id, platform: variant.platform,
-        content: { text: variant.text, assetIds: [] }, assets: [],
-        idempotencyKey: `compose:${composed.id}:${variant.platform}`,
+        content: { text, assetIds: [] }, assets: [],
+        // The key includes the text, so editing and re-publishing is a new post rather
+        // than being de-duplicated against the version that already went out.
+        idempotencyKey: `compose:${composed.id}:${variant.platform}:${text.length}`,
       };
 
       if (action === "schedule") {

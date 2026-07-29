@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CONTENT_FORMATS, FORMAT_META, type ContentFormat } from "@/lib/content/compose";
 import type { SocialPlatform } from "@/lib/social/types";
 
@@ -69,6 +69,17 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   const [tab, setTab] = useState<string>("");
   const [details, setDetails] = useState(false);
 
+  /**
+   * Edits per version, keyed by tab. Independent by construction: editing the LinkedIn
+   * variant cannot touch X, because they are different keys.
+   */
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const [sel, setSel] = useState<{ start: number; end: number; top: number } | null>(null);
+  const [refining, setRefining] = useState<string | null>(null);
+  /** A refinement not yet accepted. Keeping the original is what makes reject possible. */
+  const [pending, setPending] = useState<{ start: number; end: number; original: string; next: string } | null>(null);
+
   useEffect(() => {
     fetch("/api/social/dashboard").then((r) => r.json())
       .then((d) => { if (d?.ok) setConnected([...new Set((d.accounts as { platform: string; status: string }[]).filter((a) => a.status === "connected").map((a) => a.platform))]); })
@@ -102,12 +113,75 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
   }, [call, prompt]);
 
   const publish = useCallback(async (action: "draft" | "schedule" | "now") => {
-    const d = await call({ publish: action }, action);
+    // Publish what the user is looking at. Edits would otherwise be silently discarded.
+    const d = await call({ publish: action, overrides: edits }, action);
     if (d?.ok) { setComposed(d.composed); setResults(d.results); setNote(d.message); readMeta(d); }
   }, [call]);
 
   const active = composed?.variants.find((v) => v.platform === tab);
-  const bodyText = active ? active.text : composed?.body ?? "";
+  const generated = active ? active.text : composed?.body ?? "";
+  /** What is actually in the editor: the user's edit if they made one, else the generation. */
+  const bodyText = edits[tab] ?? generated;
+
+  // Fresh generations replace the editor; edits to other tabs are untouched.
+  useEffect(() => { setEdits({}); setPending(null); setSel(null); }, [composed?.id]);
+
+  const setBody = useCallback((next: string) => {
+    setEdits((e) => ({ ...e, [tab]: next }));
+  }, [tab]);
+
+  /** Track the selection so the toolbar can act on exactly what is highlighted. */
+  const readSelection = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const { selectionStart: start, selectionEnd: end } = el;
+    if (start === end) { setSel(null); return; }
+    // Position the toolbar near the selection without measuring glyphs: line height
+    // times the line the selection starts on is close enough and never wrong by much.
+    const line = el.value.slice(0, start).split("\n").length - 1;
+    setSel({ start, end, top: Math.max(0, line * 27 - el.scrollTop) });
+  }, []);
+
+  const refine = useCallback(async (action: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const start = sel?.start ?? el.selectionStart;
+    const end = sel?.end ?? el.selectionEnd;
+    const text = bodyText;
+    const selection = text.slice(start, end);
+    if (!selection && action !== "continue") return;
+
+    setRefining(action); setErr(null);
+    try {
+      const r = await fetch("/api/content/refine", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action, selection,
+          before: text.slice(0, start), after: text.slice(end),
+          platform: tab || undefined,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) { setErr(String(d.hint || "That edit didn't go through. Your text is unchanged.")); return; }
+
+      const insert = action === "continue" ? `${selection}${selection ? " " : ""}${d.text}` : d.text;
+      // Show the change in place, but hold it as pending until it is accepted — an AI
+      // edit that silently overwrites your sentence is one you cannot get back.
+      setPending({ start, end, original: selection, next: insert });
+      setBody(text.slice(0, start) + insert + text.slice(end));
+      setSel(null);
+    } catch { setErr("network error — your text is unchanged"); }
+    finally { setRefining(null); }
+  }, [sel, bodyText, tab, setBody]);
+
+  const rejectPending = useCallback(() => {
+    if (!pending) return;
+    const text = bodyText;
+    setBody(text.slice(0, pending.start) + pending.original + text.slice(pending.start + pending.next.length));
+    setPending(null);
+  }, [pending, bodyText, setBody]);
+
+  const edited = edits[tab] !== undefined && edits[tab] !== generated;
 
   return (
     <div className="cmp">
@@ -181,9 +255,54 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
 
           <article className="cmp-piece">
             {tab === "" && <h2 className="cmp-title">{composed.title}</h2>}
-            <div className="cmp-body">{bodyText}</div>
+
+            {/* The document is the editor. Highlight anything to bring AI to it. */}
+            <div className="cmp-editor">
+              <textarea
+                ref={editorRef}
+                className="cmp-body cmp-editable"
+                value={bodyText}
+                aria-label="Content"
+                onChange={(e) => { setBody(e.target.value); setPending(null); }}
+                onSelect={readSelection}
+                onKeyUp={readSelection}
+                onMouseUp={readSelection}
+                onBlur={() => setTimeout(() => setSel(null), 160)}
+                rows={Math.max(6, bodyText.split("\n").length + 2)}
+              />
+
+              {sel && !pending && (
+                <div className="cmp-float" style={{ top: sel.top }} role="toolbar" aria-label="AI edits">
+                  {([
+                    ["rewrite", "Rewrite"], ["shorten", "Shorten"], ["expand", "Expand"],
+                    ["improve", "Improve"], ["professional", "Professional"], ["casual", "Casual"],
+                    ["engaging", "Engaging"], ["grammar", "Grammar"], ["cta", "Make a CTA"],
+                    ["hashtags", "Hashtags"], ["continue", "Continue"],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className="cmp-float-b" disabled={refining !== null}
+                      onMouseDown={(e) => e.preventDefault()} onClick={() => refine(id)}>
+                      {refining === id ? "…" : label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {pending && (
+              <div className="cmp-pending">
+                <span>AI edit applied.</span>
+                <button className="cmp-alt cmp-accept" onClick={() => setPending(null)}>Keep</button>
+                <button className="cmp-alt" onClick={rejectPending}>Undo</button>
+              </div>
+            )}
+
             {tab === "" && composed.hashtags.length > 0 && <p className="cmp-tags">{composed.hashtags.join("  ")}</p>}
             {active && !active.fits && <p className="cmp-note">{active.note}</p>}
+            {edited && (
+              <p className="cmp-edited">
+                Edited. <button className="cmp-linkbtn" onClick={() => { setEdits((e) => { const n = { ...e }; delete n[tab]; return n; }); setPending(null); }}>Revert to the original</button>
+              </p>
+            )}
           </article>
 
           {meta && (
