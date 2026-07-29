@@ -11,6 +11,17 @@ export const maxDuration = 60;
 
 // The minute hand of automated publishing.
 //
+// NOT registered in vercel.json. Vercel's Hobby plan allows two cron jobs at daily
+// granularity, and a once-a-day publishing cron is not a schedule — so this is driven by
+// an external scheduler instead (any service that can make an authenticated GET every
+// minute). On a Pro plan, add it back to vercel.json with "* * * * *" and drop the
+// external trigger. Either way the endpoint is identical:
+//
+//   GET /api/cron/automation-publish
+//   Authorization: Bearer $CRON_SECRET
+//
+// It is idempotent, so an overlapping or repeated call cannot double-publish.
+//
 // Find due slots → claim → publish through the M12 engine → record → retry what can be
 // retried → extend the horizon so recurring schedules never run dry.
 //
@@ -122,7 +133,18 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, at: now, tenants: report.length, report });
+    // Flush the Publishing Engine's own scheduled queue in the same run, after the
+    // automation slots have been claimed. Two separate every-minute crons touching the
+    // same engine raced each other and doubled the cron count for no benefit; ordering
+    // them in one pass means a slot created this minute also dispatches this minute.
+    let dispatched = 0;
+    try {
+      dispatched = (await socialEngine().dispatchDue(now)).length;
+    } catch (e) {
+      console.warn(JSON.stringify({ event: "dispatch_due_failed", error: String(e).slice(0, 200) }));
+    }
+
+    return NextResponse.json({ ok: true, at: now, tenants: report.length, dispatched, report });
   } catch (e) {
     return NextResponse.json({ error: "cron_failed", detail: String(e).slice(0, 200) }, { status: 503 });
   }

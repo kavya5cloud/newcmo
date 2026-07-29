@@ -41,7 +41,7 @@ export default function EarlyAccessBanner() {
   const [hover, setHover] = useState(false);
 
   // Never render on the /app product shell (fixed 100svh layout).
-  const suppressed = path?.startsWith("/app") ?? false;
+  const suppressed = path?.startsWith("/app") || path === "/studio/blitz";
   const hidden = dismissed || suppressed;
 
   // Publish the banner height so sticky sub-navs can offset below it (0 when hidden).

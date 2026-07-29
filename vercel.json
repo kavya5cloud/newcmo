@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/outcome-snapshots",
       "schedule": "0 6 * * 1"
-    },
-    {
-      "path": "/api/cron/automation-publish",
-      "schedule": "* * * * *"
     }
   ]
 }

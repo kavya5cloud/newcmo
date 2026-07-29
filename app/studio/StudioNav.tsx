@@ -26,6 +26,7 @@ const ICONS: Record<CreativeCategory, ReactNode> = {
 
 export default function StudioNav() {
   const path = usePathname();
+  if (path === "/studio" || path === "/studio/blitz") return <BlitzNav />;
   return (
     <nav className="st-nav" aria-label="Creative Studio sections">
       <Link href="/studio" className="st-brand">
@@ -80,6 +81,34 @@ export default function StudioNav() {
         <span className="st-link-ic">{svg(<path d="M15 5l-7 7 7 7" />)}</span>
         <span className="st-link-label">Back to app</span>
       </Link>
+    </nav>
+  );
+}
+
+function BlitzNav() {
+  const items = [
+    ["⌂", "Home", "/app"], ["♢", "Blitz", "/studio/blitz"], ["ϟ", "Automations", "/studio/launch"],
+    ["✣", "AI Studio", "/studio"], ["♙", "Influencers", "/studio/ugc"], ["▣", "Content", "/studio/documents"],
+    ["▧", "Library", "/studio/library"], ["□", "Calendar", "/studio/publishing"], ["▥", "Analytics", "/studio/learning"],
+    ["♧", "Warmed Accounts", "/studio/integrations"],
+  ] as const;
+  const path = usePathname();
+  return (
+    <nav className="st-nav blitz-nav" aria-label="Populr workspace">
+      <Link href="/studio/blitz" className="blitz-brand"><span className="blitz-brand-mark">P</span><span>populr</span><i /></Link>
+      <div className="blitz-nav-divider" />
+      <div className="blitz-nav-links">
+        {items.map(([icon, label, href]) => <Link key={label} href={href} className={"blitz-nav-link" + (path === href ? " on" : "")}><span>{icon}</span>{label}{label === "Content" && <b />}</Link>)}
+      </div>
+      <div className="blitz-nav-bottom">
+        <Link href="/early-access" className="blitz-upgrade"><span>◉</span>Upgrade</Link>
+        <Link href="/early-access" className="blitz-nav-link"><span>♧</span>Refer &amp; Earn</Link>
+        <Link href="/app" className="blitz-nav-link"><span>▣</span>Brand<b /></Link>
+        <Link href="/studio" className="blitz-nav-link"><span>⌑</span>Guide</Link>
+        <Link href="/app" className="blitz-nav-link"><span>□</span>Feedback</Link>
+        <Link href="/app" className="blitz-nav-link"><span>◌</span>Discord</Link>
+        <Link href="/account" className="blitz-nav-link"><span>⚙</span>Settings</Link>
+      </div>
     </nav>
   );
 }

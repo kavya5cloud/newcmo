@@ -201,8 +201,18 @@ export class SocialPublishingEngine {
     });
   }
 
-  /** Dispatch every due job (scheduled time reached + backoff elapsed). Run repeatedly. */
+  /** Dispatch every due job (scheduled time reached + backoff elapsed). Run repeatedly.
+   *
+   * The cron worker may run in a different serverless instance from the request that
+   * created the job, so always refresh the working set from the durable job store first.
+   */
   async dispatchDue(now = this.now()): Promise<PublishJob[]> {
+    const stored = await this.jobs.list();
+    for (const job of stored) {
+      if (!this.jobMem.has(job.id) || this.jobMem.get(job.id)!.updatedAt < job.updatedAt) {
+        this.jobMem.set(job.id, job);
+      }
+    }
     const due = [...this.jobMem.values()].filter((j) => isDue(j, now));
     const out: PublishJob[] = [];
     for (const j of due) out.push((await this.runJob(j.id))!);

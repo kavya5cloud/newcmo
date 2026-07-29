@@ -114,3 +114,34 @@ structure, adapter-sourced limits, sentence-boundary trimming, media flags, empt
 behaviour, schedule staggering and honest rationale; UGC hook ranking, objection gating,
 brief-derived scripts, per-format scripts, version variation, approval isolation, edit
 recomputation, and a regression for acronym casing in style prefixes.
+
+
+## Running automated publishing
+
+The automation endpoint is deliberately **not** in `vercel.json`. Vercel's Hobby plan
+allows two cron jobs at daily granularity, and a once-a-day publishing cron is not a
+schedule. Registering a third at `* * * * *` fails the deployment outright — which is how
+this was found.
+
+Drive it from any external scheduler that can make an authenticated request each minute:
+
+```
+GET https://<your-domain>/api/cron/automation-publish
+Authorization: Bearer $CRON_SECRET
+```
+
+The endpoint is idempotent — slot claims are guarded state transitions and each publish
+carries the slot id as its idempotency key — so an overlapping call, a retry, or a
+duplicate scheduler cannot double-publish. Calling it more often than needed is safe;
+calling it less often just delays posts.
+
+**On a Pro plan**, add it back and drop the external trigger:
+
+```json
+{ "path": "/api/cron/automation-publish", "schedule": "* * * * *" }
+```
+
+One run does everything in order: retry what is due, claim and publish due slots, dispatch
+the Publishing Engine's own scheduled queue, then extend the horizon. It was previously two
+separate every-minute crons racing each other over the same engine; merging them removed
+the race and halved the cron count.

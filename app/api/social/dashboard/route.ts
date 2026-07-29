@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const engine = socialEngine();
 
   const [accounts, jobs, history] = await Promise.all([engine.listAccounts(tenant), engine.listJobs(tenant), engine.listHistory(tenant)]);
-  const calendar = engine.scheduledJobs(tenant).map((j) => ({
+  const calendar = jobs.filter((j) => j.state === "scheduled").map((j) => ({
     id: j.id, platform: j.platform, accountId: j.accountId, scheduledAt: j.scheduledAt,
     localTime: j.scheduledAt ? formatInZone(j.scheduledAt, j.timezone || tz) : null, text: j.content.text.slice(0, 80),
   }));

@@ -4,6 +4,8 @@ import { createAdapterRegistry } from "@/lib/social/registry";
 import { seal, open } from "@/lib/social/crypto";
 import { zonedTimeToEpoch, parseSchedule, backoffMs, isDue } from "@/lib/social/scheduler";
 import { SOCIAL_PLATFORMS, type PublishRequest, type Asset, type SocialAdapter, type SocialPlatform } from "@/lib/social/types";
+import { InMemoryCredentialStore } from "@/lib/social/oauth";
+import { InMemoryAccountStore, InMemoryHistoryStore, InMemoryJobStore } from "@/lib/social/store";
 
 const clock = () => { let t = 1_000_000; return () => (t += 1000); };
 
@@ -100,6 +102,24 @@ describe("Publishing engine", () => {
     expect(isDue(job, now())).toBe(false);        // not due yet
     expect((await engine.dispatchDue(at + 1000)).length).toBe(1); // due at time
     expect((await engine.getJob(job.id))!.state).toBe("published");
+  });
+
+  it("dispatches a persisted schedule after a cold worker start", async () => {
+    const now = clock();
+    const stores = {
+      accounts: new InMemoryAccountStore(),
+      credentials: new InMemoryCredentialStore(),
+      jobs: new InMemoryJobStore(),
+      history: new InMemoryHistoryStore(),
+    };
+    const first = new SocialPublishingEngine({ now, stores });
+    const acc = await connected(first);
+    const at = now() + 10_000;
+    const scheduled = await first.schedule(req(acc.id), at, "UTC");
+
+    const worker = new SocialPublishingEngine({ now, stores });
+    expect((await worker.dispatchDue(at + 1)).map((job) => job.id)).toEqual([scheduled.id]);
+    expect((await worker.getJob(scheduled.id))!.state).toBe("published");
   });
 
   it("cancels a scheduled job", async () => {

@@ -21,7 +21,7 @@ type Composed = {
   schedule: { platform: SocialPlatform; at: number; rationale: string }[];
   campaignSuggestion: { title: string; goal: string; rationale: string };
 };
-type Result = { platform: SocialPlatform; jobId: string; state: string; at: number | null };
+type Result = { platform: SocialPlatform; jobId: string; state: string; at: number | null; error?: string };
 /** Where the words came from. Shown because a founder should never have to guess. */
 type Provenance = {
   source: "llm" | "deterministic"; provider: string | null; model: string | null;
@@ -319,7 +319,7 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
           {results && (
             <div className="cmp-result">
               {results.map((r) => (
-                <p key={r.jobId}><b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""}</p>
+                <p key={r.jobId}><b>{r.platform}</b> — {r.state}{r.at ? ` · ${when(r.at)}` : ""}{r.error ? ` · ${r.error}` : ""}</p>
               ))}
               <p className="lw-muted">Retries, failures and approvals live in <a href="/studio/social">Cross-Post</a>.</p>
             </div>
