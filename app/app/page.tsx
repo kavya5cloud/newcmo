@@ -1,4 +1,5 @@
 "use client";
+import Brief from "./Brief";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
@@ -1088,6 +1089,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <button className="term-toggle" onClick={() => setTermCollapsed((v) => !v)}>{termCollapsed ? "[+] expand" : "[–] collapse"}</button>
           <div className="tlog" ref={tlogRef} />
         </div>
+
+        <Brief company={profile?.name} />
 
         {/* Primary actions. Every link goes to a route that exists and does real work —
             the studio composer, the launch workspace, generation, UGC, and drafts. */}

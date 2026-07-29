@@ -1599,3 +1599,55 @@ html{scroll-padding-top:var(--eab-h,0px)}
   padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .cmp-linkbtn:hover{color:var(--fg)}
 @media(prefers-reduced-motion:reduce){.cmp-float{animation:none}}
+
+/* ---- Daily Brief ----
+   Prose first, one recommendation, a single line of counters. Not a grid of tiles: the
+   brief has ten seconds to leave someone with one thing to do, and tiles lose that. */
+.appui .brief{padding:26px 16px 22px;border-bottom:1px solid var(--line);max-width:74ch}
+.appui .brief-hello{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+.appui .brief-summary{font-size:15px;line-height:1.65;color:var(--fg);margin-bottom:20px}
+
+.appui .brief-rec{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.appui .brief-rec-body{display:flex;flex-direction:column;gap:5px}
+.appui .brief-rec-title{font-size:13.5px;font-weight:600;color:var(--acc)}
+.appui .brief-rec-why{font-size:12.5px;line-height:1.55;color:var(--dim)}
+.appui .brief-rec-go{flex:0 0 auto;font-size:12.5px;font-weight:600;color:#0e1206;
+  background:var(--acc);border-radius:10px;padding:8px 14px;text-decoration:none;
+  transition:background .16s var(--ease)}
+.appui .brief-rec-go:hover{background:#e2ff96}
+
+.appui .brief-counts{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:12.5px}
+.appui .brief-count{color:var(--dim);text-decoration:none;transition:color .16s var(--ease)}
+.appui .brief-count:hover{color:var(--fg)}
+.appui .brief-count b{color:var(--fg);font-weight:600}
+.appui .brief-count-flat{color:var(--faint)}
+
+.appui .brief-more{display:flex;gap:4px;margin-top:14px}
+.appui .brief-toggle{font-family:inherit;font-size:12.5px;color:var(--faint);background:none;
+  border:0;padding:6px 10px 6px 0;cursor:pointer;transition:color .16s var(--ease)}
+.appui .brief-toggle:hover:not(:disabled){color:var(--fg)}
+.appui .brief-toggle:disabled{opacity:.5;cursor:default}
+
+.appui .brief-detail{margin-top:16px;display:flex;flex-direction:column;gap:18px;
+  animation:settle .18s var(--ease) both}
+.appui .brief-k{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);display:block;margin-bottom:7px}
+.appui .brief-block ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.appui .brief-block li{font-size:12.5px;line-height:1.55;color:var(--dim)}
+.appui .brief-metric{font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--faint)}
+.appui .brief-at{font-family:'Geist Mono',monospace;font-size:10px;color:var(--faint);margin-right:6px}
+.appui .brief-src{font-size:11.5px;color:var(--faint);margin:0}
+
+/* Skeleton: reserve the height so nothing below jumps when the brief lands. */
+.appui .brief-skel{height:14px;border-radius:6px;background:var(--panel);margin-bottom:10px;
+  animation:pulse 1.4s ease-in-out infinite}
+.appui .brief-skel-h{width:180px;height:10px}
+.appui .brief-skel-s{width:60%}
+@media(prefers-reduced-motion:reduce){.appui .brief-skel,.appui .brief-detail{animation:none}}
+@media(max-width:640px){
+  .appui .brief{padding:20px 12px 18px}
+  .appui .brief-rec{flex-direction:column;align-items:stretch;gap:12px}
+  .appui .brief-rec-go{text-align:center}
+}
