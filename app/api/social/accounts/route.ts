@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { socialEngine } from "@/lib/social/shared";
-import { createAdapterRegistry } from "@/lib/social/registry";
+import { createAdapterRegistry, liveAdapterPlatforms } from "@/lib/social/registry";
 
 export const runtime = "nodejs";
 
@@ -15,6 +15,15 @@ export async function GET(req: NextRequest) {
 
   const tenant = (await workspaceKey(req.nextUrl.searchParams.get("wsid"))) ?? "default";
   const accounts = await socialEngine().listAccounts(tenant);
-  const platforms = createAdapterRegistry().list().map((a) => a.constraints());
-  return NextResponse.json({ ok: true, accounts, platforms });
+
+  // `live` is the difference between a post that reaches LinkedIn and one that is recorded
+  // as published and goes nowhere. The UI has to be able to say which it is, so it ships
+  // with the constraints rather than being inferred somewhere else.
+  const live = new Set(liveAdapterPlatforms());
+  const platforms = createAdapterRegistry().list().map((a) => ({
+    ...a.constraints(),
+    live: live.has(a.platform),
+  }));
+
+  return NextResponse.json({ ok: true, accounts, platforms, liveMode: live.size > 0 });
 }

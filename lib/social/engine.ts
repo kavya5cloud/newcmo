@@ -56,6 +56,22 @@ export class SocialPublishingEngine {
 
   async connectAccount(tenant: string, platform: SocialPlatform, code: string, handle?: string): Promise<ConnectedAccount> {
     const token = await this.oauth.complete(platform, code, handle);
+    return this.saveConnection(tenant, platform, token);
+  }
+
+  /**
+   * Store a token obtained elsewhere — the live OAuth flow, which already exchanged the
+   * code and identified the account with the real provider.
+   *
+   * Kept separate from connectAccount rather than folded into it: that one owns the
+   * reference exchange, and a single method doing either depending on configuration is how
+   * a live connection quietly falls back to a fake one.
+   */
+  async connectAccountWithToken(tenant: string, platform: SocialPlatform, token: OAuthToken): Promise<ConnectedAccount> {
+    return this.saveConnection(tenant, platform, token);
+  }
+
+  private async saveConnection(tenant: string, platform: SocialPlatform, token: OAuthToken): Promise<ConnectedAccount> {
     const id = `acc_${platform}_${token.externalId}`;
     const account: ConnectedAccount = {
       id, tenant, platform, handle: token.handle, externalId: token.externalId,
