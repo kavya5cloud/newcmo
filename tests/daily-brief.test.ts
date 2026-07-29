@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assembleBrief, fingerprint } from "@/lib/brief/assemble";
 import { candidates, recommend, type RecommendInput } from "@/lib/brief/recommend";
 import { deterministicSummary, writeSummary } from "@/lib/brief/summary";
+import { headline } from "@/lib/brief/headline";
 import { readCache, writeCache, isFresh, clearAll, MAX_AGE_MS } from "@/lib/brief/cache";
 import type { DailyBrief } from "@/lib/brief/types";
 
@@ -165,6 +166,54 @@ describe("fingerprint and cache", () => {
   it("is scoped per tenant", () => {
     writeCache("a", brief({ signature: "s" }), NOW);
     expect(readCache("b", NOW)).toBeNull();
+  });
+});
+
+describe("headline", () => {
+  // The one line the dashboard shows under the greeting. It is the whole of the text
+  // budget above the fold, so it has to be facts, ordered, and short.
+  const brief = (over: Partial<DailyBrief> = {}): DailyBrief => ({
+    tenant: "t", company: "Populr", greeting: "Good afternoon", summary: "", summarySource: "deterministic",
+    publishing: { today: 0, awaitingApproval: 0, failed: 0, retryable: 0, nextAt: null, nextPlatform: null, links: [] },
+    campaigns: { running: 0, completed: 0, blocked: 0, lines: [], links: [] },
+    market: { trends: [], competitors: [], opportunities: [], keywords: [], links: [] },
+    performance: { bestPlatform: null, winningFormat: null, bestTime: null, improvements: [], detail: [] },
+    approvals: { count: 0, items: [] },
+    recommendation: { kind: "none", title: "t", why: "w", href: null, command: null, priority: 0 },
+    activity: [], upcoming: { today: [], tomorrow: [], thisWeek: [] },
+    quiet: false, generatedAt: NOW, signature: "",
+    ...over,
+  });
+
+  it("is one line of facts, never a paragraph", () => {
+    const h = headline(brief({
+      campaigns: { running: 2, completed: 0, blocked: 3, lines: [], links: [] },
+      market: { trends: [], competitors: [], opportunities: ["own the term"], keywords: [], links: [] },
+    }));
+    expect(h).toBe("3 campaigns blocked • 1 opportunity found • 2 campaigns running");
+    expect(h).not.toContain(".");
+  });
+
+  it("puts what is broken before what is merely happening", () => {
+    const h = headline(brief({
+      publishing: { today: 4, awaitingApproval: 0, failed: 1, retryable: 1, nextAt: null, nextPlatform: null, links: [] },
+      approvals: { count: 2, items: [] },
+    }));
+    expect(h.startsWith("1 publish failed")).toBe(true);
+  });
+
+  it("shows at most three facts", () => {
+    const h = headline(brief({
+      publishing: { today: 1, awaitingApproval: 1, failed: 1, retryable: 1, nextAt: null, nextPlatform: null, links: [] },
+      campaigns: { running: 1, completed: 0, blocked: 1, lines: [], links: [] },
+      approvals: { count: 1, items: [] },
+    }));
+    expect(h.split(" • ")).toHaveLength(3);
+  });
+
+  it("says so plainly when there is nothing to do", () => {
+    expect(headline(brief())).toBe("Nothing needs you right now.");
+    expect(headline(brief({ quiet: true }))).toContain("Nothing set up yet");
   });
 });
 

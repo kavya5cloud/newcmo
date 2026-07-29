@@ -1,5 +1,5 @@
 "use client";
-import Brief from "./Brief";
+import Today from "./Today";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
@@ -327,18 +327,6 @@ const DOCS = [
   { id: "articles", name: "Articles", icon: "▸", count: "(39)" },
 ];
 
-// The boot log is derived from the real workspace — brand, host, the channels that
-// actually have work, and the real agent count — not hardcoded numbers.
-function buildTermLines(brand: string, host: string, channels: string[], agentCount: number): [string, string][] {
-  const lines: [string, string][] = [["tl-p", `$ populr run --daily ${host}`]];
-  const shown = channels.slice(0, 6);
-  for (const ch of shown) lines.push(["", `> [${ch}] scanning for ${brand} opportunities…`]);
-  lines.push(["", "> fetching analytics…"]);
-  lines.push(["", "> reviewing documents and preparing your CMO…"]);
-  lines.push(["tl-ok", `✓ AI CMO ready — ${agentCount} agent${agentCount === 1 ? "" : "s"} on ${host}`]);
-  return lines;
-}
-
 const CHART = {
   "7d": { labels: ["7/5", "7/6", "7/7", "7/8", "7/9", "7/10", "7/11"], visits: [2100, 3050, 2700, 1900, 2050, 2350, 2600], clicks: [420, 510, 480, 390, 410, 460, 520], saw: "82.4K", sawD: "+12.3%", clicked: "3.9K", clickedD: "+48.2%", visited: "15.1K", visitedD: "+21.4%" },
   "30d": { labels: ["6/12", "6/17", "6/22", "6/27", "7/2", "7/7", "7/11"], visits: [1500, 1800, 2400, 2200, 2900, 2600, 3100], clicks: [280, 330, 450, 410, 520, 480, 560], saw: "301K", sawD: "+9.8%", clicked: "13.2K", clickedD: "+31.5%", visited: "54.7K", visitedD: "+17.9%" },
@@ -407,6 +395,22 @@ function isSafeNext(v: string): boolean {
   return /^\/(studio|app)(\/|$|\?)/.test(v);
 }
 
+/** How far the page can be stepped up or down, and where it starts. */
+const ZOOMS = [0.85, 0.9, 1, 1.1, 1.25, 1.4] as const;
+const ZOOM_KEY = "cosmos.zoom";
+
+/** The four screens of the app. Exactly one is mounted at a time. */
+type Panel = "today" | "analytics" | "agents" | "chat";
+
+const PANELS: [Panel, React.ReactNode, string][] = [
+  ["today", <><path d="M4 13.5 12 6l8 7.5" key="a" /><path d="M6.5 12v7h11v-7" key="b" /></>, "Today"],
+  ["analytics", <><path d="M4 19V5M4 19h16" key="a" /><path d="M8 15.5l3.5-5 3 2.5 4.5-6" key="b" /></>, "Analytics"],
+  ["agents", <><circle cx="12" cy="12" r="8.5" key="a" /><path d="M12 7.5v5l3 1.8" key="b" /></>, "Agents"],
+  ["chat", <><path d="M4.5 5.5h15v10h-9l-4 3.5v-3.5h-2z" key="a" /></>, "Chat"],
+];
+
+const isPanel = (v: string | null): v is Panel => !!v && PANELS.some(([id]) => id === v);
+
 export default function AppPage() {
   const [entered, setEntered] = useState(false);
   const [cloud, setCloud] = useState(false);
@@ -428,7 +432,6 @@ export default function AppPage() {
   const [pushBusy, setPushBusy] = useState(false);
   const [doc, setDoc] = useState<{ title: string; body: string } | null>(null);
   const [toast, setToast] = useState("");
-  const [termCollapsed, setTermCollapsed] = useState(false);
   const [demo, setDemo] = useState(false);
   const [progress, setProgress] = useState<number>(-1);
   const [busyItem, setBusyItem] = useState<string>("");
@@ -444,7 +447,11 @@ export default function AppPage() {
   const [trial, setTrial] = useState<{ active: boolean; daysLeft: number; endsAt: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const [mtab, setMtab] = useState<"company" | "analytics" | "agents" | "chat">("company");
+  // Page size is a preference, not a session detail — it survives a reload.
+  const [zoom, setZoom] = useState(1);
+  // One screen at a time, on every viewport. The dashboard is the default because it is
+  // the only one that answers "what now?"; the other four are where the work happens.
+  const [mtab, setMtab] = useState<Panel>("today");
   const [gsc, setGsc] = useState<{ configured: boolean; connected: boolean; sites: string[] }>({ configured: false, connected: false, sites: [] });
   const [gscError, setGscError] = useState<string | null>(null);
   const [verifyPopup, setVerifyPopup] = useState(false);
@@ -461,8 +468,7 @@ export default function AppPage() {
     hourClicks: { hour: number; clicks: number }[];
   }>(null);
 
-  const tlogRef = useRef<HTMLDivElement>(null);
-  const chatBodyRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLCanvasElement>(null);
   const hydrated = useRef(false);
 
@@ -482,6 +488,21 @@ export default function AppPage() {
   useEffect(() => {
     const tick = setInterval(() => setNowTick(Date.now()), 60_000);
     return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const z = Number(localStorage.getItem(ZOOM_KEY));
+      if (ZOOMS.includes(z as (typeof ZOOMS)[number])) setZoom(z);
+    } catch {}
+  }, []);
+
+  const stepZoom = useCallback((dir: 1 | -1) => {
+    setZoom((z) => {
+      const next = ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(z as (typeof ZOOMS)[number]) + dir))];
+      try { localStorage.setItem(ZOOM_KEY, String(next)); } catch {}
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -550,11 +571,6 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, [entered, profile, authUser, accountsEnabled]);
 
-  /* collapse the decorative terminal by default on small screens */
-  useEffect(() => {
-    if (entered && typeof window !== "undefined" && window.innerWidth <= 720) setTermCollapsed(true);
-  }, [entered]);
-
   /* ---- Google Search Console status (+ handle OAuth redirect) ---- */
   useEffect(() => {
     fetch("/api/google/status").then((r) => r.json()).then((g) => {
@@ -585,9 +601,11 @@ export default function AppPage() {
       try { sessionStorage.setItem(NEXT_KEY, nxt); } catch { /* private mode */ }
     }
     const t = qs.get("tab");
-    if (t === "agents" || t === "analytics" || t === "company" || t === "chat") setMtab(t);
+    // ?tab=company still resolves: the company analysis lives on the dashboard now.
+    if (t === "company") setMtab("today");
+    else if (isPanel(t)) setMtab(t);
     const ch = qs.get("channel");
-    if (ch) setOpen((o) => ({ ...o, [ch]: true }));
+    if (ch) { setOpen((o) => ({ ...o, [ch]: true })); setMtab("agents"); }
   }, [authUser, url]);
 
   /* ---- one-time "site not verified" popup when connected but no verified property ---- */
@@ -665,31 +683,12 @@ export default function AppPage() {
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", dsize); };
   }, [entered]);
 
-  /* ---- terminal strip stream on enter ---- */
+  // The page is the only scroller, so following the conversation means moving the page —
+  // not a nested box. Nothing scrolls while the user is on another screen.
   useEffect(() => {
-    if (!entered) return;
-    const el = tlogRef.current; if (!el) return;
-    const host = hostOf(url) || "your site";
-    const brand = profile?.name || host;
-    const channels = (Object.keys(feed).length ? Object.keys(feed) : visibleAgents.map((a) => a.id));
-    const lines = buildTermLines(brand, host, channels, visibleAgents.length);
-    el.innerHTML = "";
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) { el.innerHTML = lines.map(([c, t]) => `<div class="${c}">${esc(t)}</div>`).join(""); return; }
-    let i = 0; let timer: ReturnType<typeof setTimeout>;
-    const next = () => {
-      if (!tlogRef.current) return;
-      if (i >= lines.length) { el.insertAdjacentHTML("beforeend", '<div><span class="tl-p">populr@ai:~$</span> <span style="display:inline-block;width:7px;height:12px;background:var(--fg);vertical-align:-2px"></span></div>'); el.scrollTop = el.scrollHeight; return; }
-      const [c, t] = lines[i++];
-      el.insertAdjacentHTML("beforeend", `<div class="${c}">${esc(t)}</div>`); el.scrollTop = el.scrollHeight;
-      timer = setTimeout(next, 240 + Math.random() * 260);
-    };
-    timer = setTimeout(next, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entered]);
-
-  useEffect(() => { chatBodyRef.current?.scrollTo(0, chatBodyRef.current.scrollHeight); }, [chat, typing]);
+    if (mtab !== "chat" || (!chat.length && !typing)) return;
+    chatEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [chat, typing, mtab]);
 
   /* ---- analyze ---- */
   const analyze = useCallback(async () => {
@@ -1005,7 +1004,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   /* ================= DASHBOARD ================= */
   return (
     <div className="appui">
-      <div className={"appshell" + (termCollapsed ? " term-collapsed" : "")}>
+      <div className="appshell" style={{ ["--app-zoom" as string]: zoom } as React.CSSProperties}>
         <div className="topbar">
           <div className="tb-l">
             <span className="app-wordmark">Populr.</span>
@@ -1085,33 +1084,30 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           </div>
         )}
 
-        <div className="termstrip">
-          <button className="term-toggle" onClick={() => setTermCollapsed((v) => !v)}>{termCollapsed ? "[+] expand" : "[–] collapse"}</button>
-          <div className="tlog" ref={tlogRef} />
-        </div>
+        <nav className="appnav" aria-label="Sections">
+          {PANELS.map(([id, icon, label]) => (
+            <button key={id} className={mtab === id ? "on" : ""} aria-current={mtab === id ? "page" : undefined} onClick={() => setMtab(id)}>
+              <span className="mi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icon}</svg>
+              </span>
+              {label}
+            </button>
+          ))}
+          {/* Desktop only: a phone already has pinch-zoom and a browser text-size setting. */}
+          <span className="zoomer">
+            <button onClick={() => stepZoom(-1)} disabled={zoom === ZOOMS[0]} aria-label="Smaller page" title="Smaller">−</button>
+            <span>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => stepZoom(1)} disabled={zoom === ZOOMS[ZOOMS.length - 1]} aria-label="Larger page" title="Larger">+</button>
+          </span>
+        </nav>
 
-        <Brief company={profile?.name} />
-
-        {/* Primary actions. Every link goes to a route that exists and does real work —
-            the studio composer, the launch workspace, generation, UGC, and drafts. */}
-        <div className="quickbar" aria-label="Quick actions">
-          <a className="qa qa-primary" href="/studio/documents">
-            <span className="qa-t">Create Content</span>
-            <span className="qa-s">One prompt → every platform</span>
-          </a>
-          <a className="qa qa-primary" href="/studio/launch">
-            <span className="qa-t">Launch Workspace</span>
-            <span className="qa-s">Plan and run a whole launch</span>
-          </a>
-          <a className="qa" href="/app/campaigns"><span className="qa-t">Create Campaign</span></a>
-          <a className="qa" href="/studio/images"><span className="qa-t">Generate Images</span></a>
-          <a className="qa" href="/studio/ugc"><span className="qa-t">Create UGC</span></a>
-          <a className="qa" href="/studio/social"><span className="qa-t">Open Drafts</span></a>
-        </div>
-
-        <div className="dash">
-          {/* COMPANY */}
-          <div className={"col" + (mtab === "company" ? " mactive" : "")}>
+        {/* One panel is mounted at a time. The four heavy ones — each with its own fetches,
+            charts and feeds — cost nothing until they are the screen you are looking at. */}
+        <main className="dash">
+          {/* The dashboard: the company analysis first — it is what the whole workspace is
+              built on — and today's answer to "what now?" underneath it. */}
+          {mtab === "today" && (
+          <div className="col company-col">
             <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" onClick={reset}>⚙</button></span></div>
             <div className="col-body">
               <p className="company-desc">{profile?.description || profile?.positioning || "—"}</p>
@@ -1140,9 +1136,12 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               </div>
             </div>
           </div>
+          )}
+          {mtab === "today" && <Today company={profile?.name} />}
 
           {/* ANALYTICS */}
-          <div className={"col" + (mtab === "analytics" ? " mactive" : "")}>
+          {mtab === "analytics" && (
+          <div className="col">
             <div className="col-head"><span className="ct">Analytics</span></div>
             <div className="tabs">
               {(["overview", "seo"] as const).map((t) => (
@@ -1296,9 +1295,11 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               )}
             </div>
           </div>
+          )}
 
           {/* AGENTS FEED */}
-          <div className={"col" + (mtab === "agents" ? " mactive" : "")}>
+          {mtab === "agents" && (
+          <div className="col">
             <div className="col-head">
               <span className="ct">Agents Feed</span>
               {pendingDrafts.length > 0 && <span className="draftbadge">{pendingDrafts.length}</span>}
@@ -1358,11 +1359,13 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               })}
             </div>
           </div>
+          )}
 
           {/* CHAT */}
-          <div className={"col" + (mtab === "chat" ? " mactive" : "")}>
+          {mtab === "chat" && (
+          <div className="col chat-col">
             <div className="col-head"><span className="ct">Talk to AI CMO</span></div>
-            <div className="col-body chat-body" ref={chatBodyRef}>
+            <div className="col-body chat-body">
               <div className="chat-tools">
                 <div className="chat-mode" role="tablist" aria-label="Chat mode">
                   <button type="button" className={chatMode === "strategy" ? "on" : ""} onClick={() => setChatMode("strategy")}>Strategy</button>
@@ -1397,6 +1400,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                   <AIProcessing requestType={chatMode === "copy" ? "creative" : "strategy"} active={typing} />
                 </div>
               )}
+              <div ref={chatEndRef} />
             </div>
             <div className="chat-foot">
               <div className="chatbox">
@@ -1405,20 +1409,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               </div>
             </div>
           </div>
-        </div>
+          )}
+        </main>
 
-        <div className="mobilenav">
-          {([
-            ["company", "▤", "Company"],
-            ["analytics", "∿", "Analytics"],
-            ["agents", "≋", "Agents"],
-            ["chat", "◍", "Chat"],
-          ] as const).map(([id, ic, label]) => (
-            <button key={id} className={mtab === id ? "on" : ""} onClick={() => setMtab(id)}>
-              <span className="mi">{ic}</span>{label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {doc && (
@@ -1559,8 +1552,6 @@ function Chart({ labels, primary, secondary }: { labels: string[]; primary: numb
     </>
   );
 }
-
-function esc(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 
 /* ---------- auth modal ---------- */
 const AUTH_ERR: Record<string, string> = {
