@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { ActivityLine, DailyBrief } from "@/lib/brief/types";
 import { headline } from "@/lib/brief/headline";
 
@@ -46,7 +46,9 @@ function ActivityIcon({ kind }: { kind: string }) {
   );
 }
 
-export default function Today({ company }: { company?: string }) {
+// Memoised: the shell re-renders once a minute to keep the trial countdown honest, and the
+// dashboard has no reason to re-render with it — `company` is the only thing it reads.
+function Today({ company }: { company?: string }) {
   const [brief, setBrief] = useState<DailyBrief | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -134,3 +136,5 @@ export default function Today({ company }: { company?: string }) {
     </section>
   );
 }
+
+export default memo(Today);
