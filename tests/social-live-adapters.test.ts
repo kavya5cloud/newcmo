@@ -171,11 +171,28 @@ describe("X adapter", () => {
 
 describe("configuration", () => {
   it("stays on the reference adapter when no credentials are set", () => {
-    // The suite runs without LINKEDIN_/X_ credentials, which is the default everywhere.
+    // The suite runs without publishing credentials, which is the default everywhere.
     expect(appCredential("linkedin")).toBeNull();
     expect(isLive("linkedin")).toBe(false);
     expect(isLive("x")).toBe(false);
     expect(Object.keys(createLiveAdapters())).toHaveLength(0);
+  });
+
+  // Regression guard: X_CLIENT_ID belongs to "sign in with X". If publishing ever reads it
+  // again, configuring login silently starts posting with scopes that cannot post.
+  it("does not go live for X just because social login is configured", () => {
+    vi.stubEnv("X_CLIENT_ID", "login-id");
+    vi.stubEnv("X_CLIENT_SECRET", "login-secret");
+    expect(appCredential("x")).toBeNull();
+    expect(isLive("x")).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it("goes live for X only on its own publishing credentials", () => {
+    vi.stubEnv("X_PUBLISH_CLIENT_ID", "id");
+    vi.stubEnv("X_PUBLISH_CLIENT_SECRET", "secret");
+    expect(isLive("x")).toBe(true);
+    vi.unstubAllEnvs();
   });
 
   it("refuses to build a consent URL without credentials instead of producing a broken one", () => {

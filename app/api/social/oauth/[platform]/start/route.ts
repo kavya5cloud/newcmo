@@ -34,8 +34,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ platform: s
     return NextResponse.json({ error: "no_live_oauth", hint: `${platform} has no live connection yet.` }, { status: 501 });
   }
   if (!appCredential(platform)) {
+    const prefix = platform === "linkedin" ? "LINKEDIN" : "X_PUBLISH";
     return NextResponse.json(
-      { error: "not_configured", hint: `Set ${platform === "linkedin" ? "LINKEDIN" : "X"}_CLIENT_ID and _CLIENT_SECRET.` },
+      { error: "not_configured", hint: `Set ${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET.` },
       { status: 503 },
     );
   }

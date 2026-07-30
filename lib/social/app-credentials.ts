@@ -19,7 +19,12 @@ export type AppCredential = {
  */
 const ENV_KEYS: Partial<Record<SocialPlatform, { id: string; secret: string }>> = {
   linkedin: { id: "LINKEDIN_CLIENT_ID", secret: "LINKEDIN_CLIENT_SECRET" },
-  x: { id: "X_CLIENT_ID", secret: "X_CLIENT_SECRET" },
+  // Not X_CLIENT_ID: that name is already taken by "sign in with X" in
+  // app/api/auth/providers/route.ts. Sharing it would mean configuring social login
+  // silently switched publishing to live — with login scopes that have no tweet.write, so
+  // every post would 403. Publishing gets its own name so each is turned on deliberately.
+  // The same X developer app can supply both values; that is then a choice, not an accident.
+  x: { id: "X_PUBLISH_CLIENT_ID", secret: "X_PUBLISH_CLIENT_SECRET" },
 };
 
 export function appCredential(platform: SocialPlatform): AppCredential | null {
@@ -46,6 +51,8 @@ export function livePlatforms(): SocialPlatform[] {
  * developer app *exactly* — providers compare it as a string, not as a URL.
  */
 export function redirectUri(platform: SocialPlatform): string {
-  const base = (process.env.SOCIAL_REDIRECT_BASE || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  // APP_URL is this project's existing canonical-origin variable, so it is the fallback —
+  // SOCIAL_REDIRECT_BASE only exists to override it when the two must differ.
+  const base = (process.env.SOCIAL_REDIRECT_BASE || process.env.APP_URL || "").replace(/\/+$/, "");
   return `${base}/api/social/oauth/${platform}/callback`;
 }
