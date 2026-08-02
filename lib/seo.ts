@@ -7,14 +7,21 @@
 /**
  * The canonical origin, no trailing slash. Non-www is the chosen host.
  *
- * www and non-www serving the same content is duplicate content, so www redirects here
- * (301, in next.config.ts) rather than both answering. Everything that emits a URL —
- * canonicals, sitemap, robots, structured data, OG tags — reads this, so there is one
- * place to change if the decision ever reverses.
+ * www and non-www serving the same content is duplicate content, so one must redirect to
+ * the other. That redirect lives in Vercel's domain settings, not in this app — see
+ * WWW_HOST below. Everything that emits a URL — canonicals, sitemap, robots, structured
+ * data, OG tags — reads this constant, so there is one place to change if the decision
+ * reverses.
  */
 export const CANONICAL_HOST = "https://trypopulr.in";
 
-/** The www form, which must redirect to CANONICAL_HOST rather than serve. */
+/**
+ * The www form. Kept for reference only — nothing in the app redirects on it.
+ *
+ * Enforcing the canonical host is Vercel's job, in the project's domain settings. When this
+ * was also enforced here the two pointed in opposite directions and every URL on the site
+ * became a redirect loop.
+ */
 export const WWW_HOST = "www.trypopulr.in";
 
 export const SITE_URL = (process.env.APP_URL || CANONICAL_HOST).replace(/\/+$/, "");

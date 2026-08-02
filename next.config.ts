@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { CANONICAL_HOST, WWW_HOST } from "./lib/seo";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -31,30 +30,19 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
-      // Canonical host is https://trypopulr.in. www must redirect rather than serve the
-      // same pages: two hosts answering identically is duplicate content, and it splits
-      // link signals between them.
+      // NO host or protocol redirects here. They belong to the platform, and duplicating
+      // them in the app caused an outage.
       //
-      // Vercel's domain settings can also do this, and if configured there it fires first
-      // at the edge. This is here so the guarantee travels with the code and holds on any
-      // host — belt and braces, not a duplicate: whichever runs first, the result is the
-      // same 308 to the same place.
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: WWW_HOST }],
-        destination: `${CANONICAL_HOST}/:path*`,
-        permanent: true,
-      },
-      // http → https. Vercel terminates TLS and already redirects, so in practice this
-      // only matters on a host that does not. `upgrade-insecure-requests` in the CSP
-      // covers subresources; this covers the document itself.
-      {
-        source: "/:path*",
-        has: [{ type: "header", key: "x-forwarded-proto", value: "http" }],
-        destination: `${CANONICAL_HOST}/:path*`,
-        permanent: true,
-      },
-
+      // A previous version redirected www → non-www from here, reasoning that it was
+      // harmless insurance on top of Vercel's own domain redirect. That was wrong. Vercel's
+      // primary domain was www, so it redirected non-www → www while this redirected
+      // www → non-www, and every URL on the site bounced between the two until the browser
+      // gave up. "Belt and braces" only holds when both point the same way; two redirects
+      // pointing at each other is not redundancy, it is a loop.
+      //
+      // The canonical host is declared once, in lib/seo.ts, and enforced in exactly one
+      // place: Vercel's domain settings. To switch to non-www, change it there — nothing
+      // here needs to know.
       { source: "/privacy-policy", destination: "/privacy", permanent: true },
       { source: "/terms-of-service", destination: "/terms", permanent: true },
       { source: "/terms-and-conditions", destination: "/terms", permanent: true },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CANONICAL_HOST, DISALLOWED, PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_URL, WWW_HOST, url } from "@/lib/seo";
+import { CANONICAL_HOST, DISALLOWED, PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_URL, url } from "@/lib/seo";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
 
@@ -123,22 +123,31 @@ describe("canonical host", () => {
     expect(CANONICAL_HOST).not.toContain("www.");
   });
 
-  it("redirects www to it rather than serving both", async () => {
+  // Regression guard for a real outage. A www -> non-www redirect used to live in
+  // next.config.ts while Vercel's primary domain redirected non-www -> www. The two pointed
+  // at each other and every URL on the site bounced until the browser gave up.
+  //
+  // Host and protocol redirects belong to the platform, which sees the request first and is
+  // the only place that knows the whole domain setup. The app must not have an opinion.
+  it("does not redirect on host or protocol from the app", async () => {
     const { default: config } = await import("../next.config");
     const redirects = await config.redirects!();
-    const www = redirects.find((r) => r.has?.some((h) => h.type === "host" && h.value === WWW_HOST));
-    expect(www).toBeDefined();
-    expect(www!.permanent).toBe(true);            // 308 — a temporary redirect passes no equity
-    expect(www!.destination).toContain(CANONICAL_HOST);
+    for (const r of redirects) {
+      for (const h of r.has ?? []) {
+        expect(h.type, `redirect on ${r.source} matches host — that is the platform's job`).not.toBe("host");
+        expect(h.key, `redirect on ${r.source} matches protocol — that is the platform's job`).not.toBe("x-forwarded-proto");
+      }
+      // Nothing here should send traffic to another origin either.
+      expect(r.destination.startsWith("http")).toBe(false);
+    }
   });
 
-  it("redirects http to https", async () => {
+  it("still redirects the legacy content paths", async () => {
     const { default: config } = await import("../next.config");
     const redirects = await config.redirects!();
-    const http = redirects.find((r) => r.has?.some((h) => h.key === "x-forwarded-proto" && h.value === "http"));
-    expect(http).toBeDefined();
-    expect(http!.permanent).toBe(true);
-    expect(http!.destination).toMatch(/^https:\/\//);
+    const sources = redirects.map((r) => r.source);
+    expect(sources).toContain("/privacy-policy");
+    expect(sources).toContain("/terms-of-service");
   });
 });
 
