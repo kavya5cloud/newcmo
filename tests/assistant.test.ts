@@ -211,3 +211,55 @@ describe("when a post goes out, in words", () => {
     expect(describeWhen(now + 20 * 86_400_000, now, "UTC")).toMatch(/^Jan 25/);
   });
 });
+
+describe("the home hero's suggestions", () => {
+  // A chip that leads nowhere is worse than no chip. These assert each suggested phrase
+  // classifies as something the hero has a real destination for.
+  const SUGGESTIONS = [
+    "Launch my product next week",
+    "Grow my LinkedIn",
+    "Announce version 2",
+    "Bring more traffic",
+  ];
+
+  it("routes every suggestion to a real destination", async () => {
+    const { routeIntent } = await import("@/lib/services/intent-router");
+    // The hero handles all six intents: campaign/strategy → plans, analysis → results,
+    // content/edit/transform → create. So any classification is handled — what matters is
+    // that routing is deterministic and never throws on these phrases.
+    for (const s of SUGGESTIONS) {
+      const routed = routeIntent(s);
+      expect(["campaign", "strategy", "analysis", "content", "edit", "transform"]).toContain(routed.intent);
+    }
+  });
+
+  it("sends a launch to the plan, not to a report", async () => {
+    const { routeIntent } = await import("@/lib/services/intent-router");
+    expect(routeIntent("Launch my product next week").intent).toBe("campaign");
+  });
+
+  it("recognises a platform ask as something to write", async () => {
+    const { routeIntent } = await import("@/lib/services/intent-router");
+    const r = routeIntent("Grow my LinkedIn");
+    expect(r.intent).toBe("content");
+    expect(r.asset).toBe("linkedin_post");
+  });
+});
+
+describe("page titles", () => {
+  // Regression: the root layout appends the brand via a title template, so a page that also
+  // writes it renders "Create — Populr — Populr". This has now happened twice.
+  it("never repeat the brand, because the template already adds it", async () => {
+    const mods = await Promise.all([
+      import("@/app/studio/layout"),
+      import("@/app/privacy/page"),
+      import("@/app/terms/page"),
+      import("@/app/early-access/layout"),
+      import("@/app/worked/layout"),
+    ]);
+    for (const m of mods) {
+      const t = m.metadata?.title;
+      if (typeof t === "string") expect(t).not.toMatch(/Populr/);
+    }
+  });
+});

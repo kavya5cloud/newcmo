@@ -1,4 +1,5 @@
 "use client";
+import HomeHero from "./HomeHero";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
@@ -1093,6 +1094,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <button className="term-toggle" onClick={() => setTermCollapsed((v) => !v)}>{termCollapsed ? "[+] expand" : "[–] collapse"}</button>
           <div className="tlog" ref={tlogRef} />
         </div>
+
+        {/* The first thing, above everything else: is my marketing handled, and does
+            anything need me. The columns below are for anyone who wants to dig. */}
+        <HomeHero company={profile?.name} />
 
         <div className="dash">
           {/* COMPANY */}

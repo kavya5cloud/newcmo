@@ -390,7 +390,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
         <span className="m-wordmark">Populr.</span>
       </div>
 
-      <h1>Marketing Missions</h1>
+      <h1>Marketing plans</h1>
       <p className="m-sub">
         Your AI CMO assigns work, not tips. Pick a mission — Populr decides the channels from measured outcomes,
         writes the creative brief, and plans every task.

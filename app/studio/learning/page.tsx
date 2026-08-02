@@ -42,7 +42,7 @@ export default async function LearningDashboard() {
     <section className="st-section lw">
       <header className="st-shead">
         <span className="label">Marketing · Learning</span>
-        <h1>Populr gets smarter every campaign</h1>
+        <h1>What&apos;s working</h1>
         <p>
           {result.processedEvents} performance events → {result.patterns.length} patterns,
           brand DNA v{result.brandVersion}, {result.memoryUpdates} creative-memory updates.

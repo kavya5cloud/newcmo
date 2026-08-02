@@ -55,7 +55,7 @@ export default function MarketDashboard() {
     <section className="st-section lw">
       <header className="st-shead">
         <span className="label">Intelligence · Market</span>
-        <h1>Market Intelligence</h1>
+        <h1>Opportunities</h1>
         <p>Populr watches the market and surfaces opportunities before competitors act. Every card carries the evidence it came from.</p>
 
         <div className="lw-chips" style={{ marginTop: 14 }}>

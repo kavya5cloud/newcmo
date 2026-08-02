@@ -1783,3 +1783,42 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .asst-facts dd{text-align:left}
   .asst-actions{flex-direction:column;align-items:stretch}
 }
+
+/* ---- Home hero: greeting + status + ask ---------------------------------
+   The first thing on the screen after signing in. Roomy and quiet on purpose —
+   it should read as "handled", not as a control panel. */
+.home-hero{flex:0 0 auto;padding:34px 28px 30px;border-bottom:1px solid var(--line)}
+.home-greet{margin:0 0 6px;font-size:13.5px;color:var(--faint)}
+.home-line{margin:0 0 16px;font-size:26px;letter-spacing:-.03em;font-weight:500;line-height:1.2}
+
+.home-facts{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-direction:column;gap:7px}
+.home-facts li{display:flex;align-items:center;gap:9px;font-size:14.5px;color:var(--dim)}
+.home-facts li span{color:var(--green);font-size:13px}
+
+.home-needs{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:20px}
+.home-needs p{margin:0;font-size:14.5px;color:var(--dim)}
+.home-needs strong{color:var(--fg);font-weight:500}
+.home-cta{display:inline-flex;align-items:center;padding:9px 18px;border-radius:9px;
+  background:var(--acc);color:#0a0d0b;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap}
+
+.home-ask label{display:block;font-size:13px;color:var(--faint);margin-bottom:8px}
+.home-ask-row{display:flex;gap:8px}
+.home-ask-row input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--fg);font-size:14.5px;font-family:inherit}
+.home-ask-row input:focus{outline:none;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+.home-ask-row button{padding:11px 18px;border:0;border-radius:10px;background:var(--panel2);
+  color:var(--fg);font-size:14px}
+.home-ask-row button:disabled{opacity:.4}
+.home-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.home-chips button{padding:6px 12px;border:1px solid var(--line);border-radius:100px;background:none;
+  color:var(--dim);font-size:12.5px}
+.home-chips button:hover{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 35%,var(--line))}
+.home-note{margin:10px 0 0;font-size:13px;color:var(--faint)}
+
+@media(max-width:720px){
+  .home-hero{padding:22px 18px 24px}
+  .home-line{font-size:22px}
+  .home-needs{flex-direction:column;align-items:stretch}
+  .home-cta{justify-content:center}
+}
