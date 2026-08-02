@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DISALLOWED, PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_URL, url } from "@/lib/seo";
+import { CANONICAL_HOST, DISALLOWED, PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_URL, WWW_HOST, url } from "@/lib/seo";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
 
@@ -59,6 +59,86 @@ describe("sitemap", () => {
     for (const p of ["/app", "/studio", "/account", "/early-access/admin"]) {
       expect(paths).not.toContain(url(p));
     }
+  });
+});
+
+describe("per-page metadata", () => {
+  // Titles and descriptions are what a search result shows. Two pages sharing either is the
+  // state this site was actually in — every page inherited the root title — so it is worth
+  // asserting rather than eyeballing.
+  async function collect() {
+    const [root, ea, worked, privacy, terms] = await Promise.all([
+      import("@/app/layout"),
+      import("@/app/early-access/layout"),
+      import("@/app/worked/layout"),
+      import("@/app/privacy/page"),
+      import("@/app/terms/page"),
+    ]);
+    const title = (m: { title?: unknown }) =>
+      typeof m.title === "string" ? m.title : String((m.title as { default?: string })?.default ?? "");
+    return [
+      { path: "/", title: title(root.metadata), meta: root.metadata },
+      { path: "/early-access", title: title(ea.metadata), meta: ea.metadata },
+      { path: "/worked", title: title(worked.metadata), meta: worked.metadata },
+      { path: "/privacy", title: title(privacy.metadata), meta: privacy.metadata },
+      { path: "/terms", title: title(terms.metadata), meta: terms.metadata },
+    ];
+  }
+
+  it("covers every route in the sitemap", async () => {
+    const pages = await collect();
+    expect(pages.map((p) => p.path).sort()).toEqual(PUBLIC_ROUTES.map((r) => r.path).sort());
+  });
+
+  it("gives every page a unique title", async () => {
+    const titles = (await collect()).map((p) => p.title);
+    expect(titles.every((t) => t.length > 0)).toBe(true);
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  it("gives every page a unique description", async () => {
+    const descs = (await collect()).map((p) => String(p.meta.description ?? ""));
+    expect(descs.every((d) => d.length > 0)).toBe(true);
+    expect(new Set(descs).size).toBe(descs.length);
+  });
+
+  it("gives every page a canonical pointing at itself", async () => {
+    for (const p of await collect()) {
+      expect(p.meta.alternates?.canonical).toBe(p.path);
+    }
+  });
+
+  it("does not repeat the brand, which the title template already appends", async () => {
+    // "Privacy Policy — Populr" + template = "Privacy Policy — Populr — Populr".
+    for (const p of await collect()) {
+      if (p.path === "/") continue;   // the root default is a full title, not a template arg
+      expect(p.title).not.toMatch(/Populr/);
+    }
+  });
+});
+
+describe("canonical host", () => {
+  it("is non-www", () => {
+    expect(CANONICAL_HOST).toBe("https://trypopulr.in");
+    expect(CANONICAL_HOST).not.toContain("www.");
+  });
+
+  it("redirects www to it rather than serving both", async () => {
+    const { default: config } = await import("../next.config");
+    const redirects = await config.redirects!();
+    const www = redirects.find((r) => r.has?.some((h) => h.type === "host" && h.value === WWW_HOST));
+    expect(www).toBeDefined();
+    expect(www!.permanent).toBe(true);            // 308 — a temporary redirect passes no equity
+    expect(www!.destination).toContain(CANONICAL_HOST);
+  });
+
+  it("redirects http to https", async () => {
+    const { default: config } = await import("../next.config");
+    const redirects = await config.redirects!();
+    const http = redirects.find((r) => r.has?.some((h) => h.key === "x-forwarded-proto" && h.value === "http"));
+    expect(http).toBeDefined();
+    expect(http!.permanent).toBe(true);
+    expect(http!.destination).toMatch(/^https:\/\//);
   });
 });
 

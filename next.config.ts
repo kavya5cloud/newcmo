@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { CANONICAL_HOST, WWW_HOST } from "./lib/seo";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -30,6 +31,30 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
+      // Canonical host is https://trypopulr.in. www must redirect rather than serve the
+      // same pages: two hosts answering identically is duplicate content, and it splits
+      // link signals between them.
+      //
+      // Vercel's domain settings can also do this, and if configured there it fires first
+      // at the edge. This is here so the guarantee travels with the code and holds on any
+      // host — belt and braces, not a duplicate: whichever runs first, the result is the
+      // same 308 to the same place.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: WWW_HOST }],
+        destination: `${CANONICAL_HOST}/:path*`,
+        permanent: true,
+      },
+      // http → https. Vercel terminates TLS and already redirects, so in practice this
+      // only matters on a host that does not. `upgrade-insecure-requests` in the CSP
+      // covers subresources; this covers the document itself.
+      {
+        source: "/:path*",
+        has: [{ type: "header", key: "x-forwarded-proto", value: "http" }],
+        destination: `${CANONICAL_HOST}/:path*`,
+        permanent: true,
+      },
+
       { source: "/privacy-policy", destination: "/privacy", permanent: true },
       { source: "/terms-of-service", destination: "/terms", permanent: true },
       { source: "/terms-and-conditions", destination: "/terms", permanent: true },

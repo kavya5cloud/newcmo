@@ -5,12 +5,19 @@
 // list is worse than having neither.
 
 /**
- * The canonical origin, no trailing slash.
+ * The canonical origin, no trailing slash. Non-www is the chosen host.
  *
- * www and non-www serving the same content is duplicate content unless one redirects to the
- * other. This picks one; the DNS/host side has to redirect the other to match.
+ * www and non-www serving the same content is duplicate content, so www redirects here
+ * (301, in next.config.ts) rather than both answering. Everything that emits a URL —
+ * canonicals, sitemap, robots, structured data, OG tags — reads this, so there is one
+ * place to change if the decision ever reverses.
  */
-export const SITE_URL = (process.env.APP_URL || "https://www.trypopulr.in").replace(/\/+$/, "");
+export const CANONICAL_HOST = "https://trypopulr.in";
+
+/** The www form, which must redirect to CANONICAL_HOST rather than serve. */
+export const WWW_HOST = "www.trypopulr.in";
+
+export const SITE_URL = (process.env.APP_URL || CANONICAL_HOST).replace(/\/+$/, "");
 
 export const SITE_NAME = "Populr";
 
@@ -35,5 +42,19 @@ export const PUBLIC_ROUTES: { path: string; priority: number; changeFrequency: "
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
 ];
 
-/** Paths crawlers should not spend budget on, and should not surface. */
-export const DISALLOWED = ["/api/", "/app/", "/app", "/studio/", "/studio", "/account", "/early-access/admin"];
+/**
+ * Paths crawlers should not spend budget on, and should not surface.
+ *
+ * /auth and /dashboard have no routes today. They are listed anyway: if either is ever
+ * added it will be signed-in surface, and a robots rule that predates the route is free
+ * insurance against it being crawled the day it ships.
+ */
+export const DISALLOWED = [
+  "/api/",
+  "/app/", "/app",
+  "/studio/", "/studio",
+  "/auth/", "/auth",
+  "/dashboard/", "/dashboard",
+  "/account",
+  "/early-access/admin",
+];
