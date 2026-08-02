@@ -69,16 +69,6 @@ export default function SocialDashboard() {
     return () => clearInterval(iv);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function connect(platform: string) {
-    setBusy(true);
-    await fetch("/api/social/accounts/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ platform }) }).catch(() => {});
-    await refresh(); setBusy(false);
-  }
-  async function disconnect(id: string) {
-    setBusy(true);
-    await fetch("/api/social/accounts/disconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: id }) }).catch(() => {});
-    await refresh(); setBusy(false);
-  }
   async function publish(schedule: boolean) {
     const acc = accounts.find((a) => a.id === account);
     if (!acc) return;
@@ -97,9 +87,8 @@ export default function SocialDashboard() {
   return (
     <section className="st-section lw">
       <header className="st-shead">
-        <span className="label">Execution · Cross-Post</span>
-        <h1>Cross-Platform Publishing</h1>
-        <p>Connect social accounts, then publish now or schedule (timezone-aware) to LinkedIn, Instagram, Facebook, X, Threads and Pinterest. Tokens are stored encrypted; every post runs through a platform adapter with retries and a dead-letter queue.</p>
+        <h1>Publishing</h1>
+        <p>What&apos;s scheduled, what&apos;s gone out, and anything that needs another look. Connect your accounts in <a href="/studio/integrations">Settings</a>.</p>
       </header>
 
       {m && (
@@ -108,25 +97,9 @@ export default function SocialDashboard() {
           <div className="job-tile"><div className="job-tile-v">{m.scheduled}</div><div className="job-tile-k">Scheduled</div></div>
           <div className="job-tile"><div className="job-tile-v">{m.published}</div><div className="job-tile-k">Published</div></div>
           <div className="job-tile"><div className="job-tile-v">{m.retrying}</div><div className="job-tile-k">Retrying</div></div>
-          <div className="job-tile"><div className="job-tile-v">{m.deadLetter}</div><div className="job-tile-k">Dead-letter</div></div>
+          <div className="job-tile"><div className="job-tile-v">{m.deadLetter}</div><div className="job-tile-k">Needs attention</div></div>
         </div>
       )}
-
-      <section className="lw-block">
-        <h2 className="lw-h2">Connected Accounts</h2>
-        <div className="st-grid">
-          {platforms.map((p) => {
-            const acc = accounts.find((a) => a.platform === p.platform && a.status === "connected");
-            return (
-              <div key={p.platform} className="lw-card">
-                <div className="lw-card-h">{LABEL[p.platform] ?? p.platform}</div>
-                <div className="lw-meta">{acc ? acc.handle : "not connected"} · {p.maxText} chars{p.requiresAsset ? " · media required" : ""}</div>
-                <button className="st-card-cta st-card-gen" disabled={busy} onClick={() => (acc ? disconnect(acc.id) : connect(p.platform))}>{acc ? "Disconnect" : "Connect"}</button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       <section className="lw-block">
         <h2 className="lw-h2">Compose</h2>
@@ -146,7 +119,7 @@ export default function SocialDashboard() {
 
       {/* Draft Manager */}
       <section className="lw-block">
-        <h2 className="lw-h2">Draft Manager</h2>
+        <h2 className="lw-h2">Drafts</h2>
         <div className="job-list">
           {drafts.length ? drafts.map((d) => (
             <div key={d.id} className="job-row">
@@ -162,22 +135,23 @@ export default function SocialDashboard() {
         </div>
       </section>
 
-      {/* Integration Settings */}
+      {/* A read-only view of which accounts posts can go to. Connecting and disconnecting
+          live in Settings — one place, one real OAuth flow. */}
       <section className="lw-block">
-        <h2 className="lw-h2">Integration Settings</h2>
+        <h2 className="lw-h2">Posting to</h2>
         <div className="job-list">
-          {accounts.length ? accounts.map((a) => (
-            <div key={a.id} className="job-row">
-              <span className="job-type">{LABEL[a.platform] ?? a.platform}</span>
-              <span className={"job-state " + (STATE_CLASS[a.status] ?? "")}>{a.status}</span>
-              <span className="lw-muted">{a.handle}</span>
-              <span className="job-meta">
-                <button className="lw-chip" onClick={() => (a.status === "connected" ? disconnect(a.id) : connect(a.platform))}>
-                  {a.status === "connected" ? "disconnect" : "reconnect"}
-                </button>
-              </span>
+          {accounts.filter((a) => a.status === "connected").length ? (
+            accounts.filter((a) => a.status === "connected").map((a) => (
+              <div key={a.id} className="job-row">
+                <span className="job-type">{LABEL[a.platform] ?? a.platform}</span>
+                <span className="lw-muted">{a.handle}</span>
+              </div>
+            ))
+          ) : (
+            <div className="lw-muted">
+              No accounts connected yet — <a href="/studio/integrations">connect one in Settings</a>.
             </div>
-          )) : <div className="lw-muted">No accounts connected yet.</div>}
+          )}
         </div>
       </section>
 
@@ -191,7 +165,7 @@ export default function SocialDashboard() {
       </section>
 
       <section className="lw-block">
-        <h2 className="lw-h2">Queue</h2>
+        <h2 className="lw-h2">Up next</h2>
         <div className="job-list">
           {jobs.length ? jobs.map((j) => (
             <div key={j.id} className="job-row">
@@ -208,7 +182,7 @@ export default function SocialDashboard() {
       </section>
 
       <section className="lw-block">
-        <h2 className="lw-h2">Publish History</h2>
+        <h2 className="lw-h2">Already published</h2>
         <div className="job-list">
           {history.length ? history.map((h) => (
             <div key={h.id} className="job-row"><span className="job-type">{LABEL[h.platform] ?? h.platform}</span><span className={"job-state " + (STATE_CLASS[h.state] ?? "")}>{h.state.replace(/_/g, " ")}</span><span className="lw-muted">{h.permalink ?? "—"}</span><span className="job-meta">{h.attempts} attempt{h.attempts === 1 ? "" : "s"}</span></div>

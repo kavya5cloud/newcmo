@@ -1838,3 +1838,20 @@ html{scroll-padding-top:var(--eab-h,0px)}
   font-size:14px;line-height:1;padding:0}
 .conn-x:hover{color:var(--fg);background:var(--panel2)}
 .conn-note{margin:12px 0 0;font-size:11.5px;line-height:1.5;color:var(--faint)}
+
+/* ---- Settings ------------------------------------------------------------
+   Accounts is the page; the connector cockpit is a disclosure under it. */
+.set-block{margin-top:30px}
+.set-h2{font-size:15px;font-weight:500;margin:0 0 14px;letter-spacing:-.01em}
+.set-disclose{background:none;border:0;padding:0;color:var(--dim);font-size:14px}
+.set-disclose:hover{color:var(--fg)}
+.set-adv-hint,.set-adv-note{margin:6px 0 0;font-size:12.5px;color:var(--faint);line-height:1.55}
+.set-adv{margin-top:16px}
+.set-adv-note{max-width:60ch;margin-bottom:18px}
+
+/* Full-width variant of the account rows, used on Settings. */
+.conn-full{margin:0;padding:0;border-bottom:0;max-width:560px}
+.conn-full .conn-row{min-height:52px;padding:10px 0;border-bottom:1px solid var(--line)}
+.conn-full .conn-name{display:flex;flex-direction:column;gap:3px;font-size:14.5px}
+.conn-handle{font-style:normal;font-size:12.5px;color:var(--faint)}
+.conn-full .conn-note{margin-top:16px}

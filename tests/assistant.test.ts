@@ -234,31 +234,31 @@ describe("page titles", () => {
 describe("what a connection row is allowed to claim", () => {
   // The expensive lie this screen could tell is "Connected" on a platform that will not
   // publish. A stored token is not the same as a working connection.
-  const row = (over: Partial<import("@/app/app/Connections").Row> = {}) => ({
+  const row = (over: Partial<import("@/app/components/AccountConnections").Row> = {}) => ({
     platform: "linkedin" as const, label: "LinkedIn", account: null,
     live: false, earlyAccess: false, ...over,
   });
   const connected = { id: "a1", platform: "linkedin" as const, handle: "@me", status: "connected" };
 
   it("says Connected only when an account is linked AND the platform can publish", async () => {
-    const { stateOf } = await import("@/app/app/Connections");
+    const { stateOf } = await import("@/app/components/AccountConnections");
     expect(stateOf(row({ account: connected, live: true }))).toBe("connected");
   });
 
   it("refuses to say Connected when a token exists but nothing can go out", async () => {
-    const { stateOf } = await import("@/app/app/Connections");
+    const { stateOf } = await import("@/app/components/AccountConnections");
     // Exactly the state left behind by the old reference connect flow.
     expect(stateOf(row({ account: connected, live: false }))).toBe("linked_not_live");
   });
 
   it("offers Connect only where connecting actually works", async () => {
-    const { stateOf } = await import("@/app/app/Connections");
+    const { stateOf } = await import("@/app/components/AccountConnections");
     expect(stateOf(row({ live: true }))).toBe("connect");
     expect(stateOf(row({ live: false, earlyAccess: true }))).toBe("soon");
   });
 
   it("treats a disconnected account as not connected", async () => {
-    const { stateOf } = await import("@/app/app/Connections");
+    const { stateOf } = await import("@/app/components/AccountConnections");
     const stale = { ...connected, status: "disconnected" };
     expect(stateOf(row({ account: stale, live: true }))).toBe("connect");
   });

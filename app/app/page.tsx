@@ -1,6 +1,6 @@
 "use client";
 import HomeHero from "./HomeHero";
-import Connections from "./Connections";
+import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
@@ -1297,7 +1297,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <div className="col-body">
               {/* The agents publish through these accounts, so this is where linking them
                   belongs — not on a settings page you have to know exists. */}
-              <Connections />
+              <AccountConnections />
 
               {pendingDrafts.length > 0 && (
                 <div className="pubqueue">

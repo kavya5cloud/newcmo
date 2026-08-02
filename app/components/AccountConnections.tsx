@@ -5,15 +5,20 @@ import { workspaceId } from "@/lib/store";
 import { PLATFORM_CHOICES } from "@/lib/assistant/types";
 import type { SocialPlatform } from "@/lib/social/types";
 
-// Connecting your accounts, in the Agents column where the agents that use them live.
+// Connecting your accounts. The only implementation of this in the product.
 //
-// One question is being answered per row: can Populr post here for me? Not "is a token
-// stored", not "is an adapter registered" — those are true of things that still cannot
-// publish, and a row that says Connected when nothing will go out is the single most
-// expensive lie this screen could tell.
+// There used to be three: this one, the publishing page, and the connector cockpit. Two of
+// them posted to the reference endpoint, which fabricates a connection — a Connect button
+// that turns green and links nothing. One place, one real OAuth flow.
 //
-// So a row is Connected only when an account is linked AND that platform can actually
-// reach the provider. Everything else is either an action or an honest "not yet".
+// One question is answered per row: can Populr post here for me? Not "is a token stored",
+// not "is an adapter registered" — both are true of things that still cannot publish, and a
+// row claiming Connected when nothing will go out is the most expensive lie here.
+//
+// So Connected requires an account AND a platform that can reach the provider. Everything
+// else is either an action or an honest "not yet".
+//
+// Two shapes, same logic: `compact` for the dashboard column, `full` for Settings.
 
 type Account = { id: string; platform: SocialPlatform; handle: string; status: string };
 type PlatformInfo = { platform: SocialPlatform; live: boolean };
@@ -46,7 +51,8 @@ const COPY: Record<RowState, { status: string; hint?: string }> = {
   soon: { status: "Soon" },
 };
 
-export default function Connections() {
+export default function AccountConnections({ variant = "compact" }: { variant?: "compact" | "full" } = {}) {
+  const full = variant === "full";
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -115,13 +121,15 @@ export default function Connections() {
   const connectedCount = rows.filter((r) => stateOf(r) === "connected").length;
 
   return (
-    <div className="conn">
-      <div className="conn-head">
-        <span className="label">Accounts</span>
-        <span className="conn-count">
-          {connectedCount > 0 ? `${connectedCount} connected` : "None connected yet"}
-        </span>
-      </div>
+    <div className={"conn" + (full ? " conn-full" : "")}>
+      {!full && (
+        <div className="conn-head">
+          <span className="label">Accounts</span>
+          <span className="conn-count">
+            {connectedCount > 0 ? `${connectedCount} connected` : "None connected yet"}
+          </span>
+        </div>
+      )}
 
       {err && <p className="conn-err" role="alert">{err}</p>}
 
@@ -131,7 +139,11 @@ export default function Connections() {
           const copy = COPY[state];
           return (
             <div className="conn-row" key={r.platform}>
-              <span className="conn-name">{r.label}</span>
+              <span className="conn-name">
+                {r.label}
+                {full && state === "connected" && <em className="conn-handle">{r.account!.handle}</em>}
+                {full && state === "soon" && <em className="conn-handle">Populr writes for it now</em>}
+              </span>
 
               {state === "connect" ? (
                 <button className="conn-btn" disabled={busy === r.platform} onClick={() => connect(r.platform)}>
@@ -141,8 +153,10 @@ export default function Connections() {
                 <span className="conn-right">
                   <span className={"conn-status conn-" + state}>{copy.status}</span>
                   {state === "connected" && (
-                    <button className="conn-x" title={`Disconnect ${r.label}`}
-                      disabled={busy === r.account!.id} onClick={() => disconnect(r.account!.id)}>×</button>
+                    <button className={full ? "conn-btn" : "conn-x"} title={`Disconnect ${r.label}`}
+                      disabled={busy === r.account!.id} onClick={() => disconnect(r.account!.id)}>
+                      {full ? "Disconnect" : "×"}
+                    </button>
                   )}
                 </span>
               )}
