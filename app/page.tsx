@@ -6,6 +6,14 @@ import { SHOW_CONTENT_ENGINE } from "@/lib/flags";
 // behind a flag, and a hardcoded "01/02/03" under a hardcoded "Three ways in." would go
 // stale the moment it is hidden. Index 0 is the primary — exactly one, always.
 const WAYS: { href: string; title: string; desc: string }[] = [
+  // First, because it is the shortest path from "I have a website" to "my marketing is
+  // running". A new visitor should not have to work out which of the other entries is the
+  // one that sets things up. `next` carries them here through sign-in.
+  {
+    href: "/app?next=/app/assistant",
+    title: "Set up my marketing",
+    desc: "Four questions, about a minute — how often to post, where, how much you want to review, and what you're aiming for. Then Populr takes it from there.",
+  },
   ...(SHOW_CONTENT_ENGINE
     ? [{
         href: "/app?next=/studio/documents",

@@ -1802,19 +1802,6 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .home-cta{display:inline-flex;align-items:center;padding:9px 18px;border-radius:9px;
   background:var(--acc);color:#0a0d0b;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap}
 
-.home-ask label{display:block;font-size:13px;color:var(--faint);margin-bottom:8px}
-.home-ask-row{display:flex;gap:8px}
-.home-ask-row input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
-  background:var(--bg);color:var(--fg);font-size:14.5px;font-family:inherit}
-.home-ask-row input:focus{outline:none;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
-.home-ask-row button{padding:11px 18px;border:0;border-radius:10px;background:var(--panel2);
-  color:var(--fg);font-size:14px}
-.home-ask-row button:disabled{opacity:.4}
-.home-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
-.home-chips button{padding:6px 12px;border:1px solid var(--line);border-radius:100px;background:none;
-  color:var(--dim);font-size:12.5px}
-.home-chips button:hover{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 35%,var(--line))}
-.home-note{margin:10px 0 0;font-size:13px;color:var(--faint)}
 
 @media(max-width:720px){
   .home-hero{padding:22px 18px 24px}
