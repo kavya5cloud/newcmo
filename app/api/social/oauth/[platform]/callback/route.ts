@@ -46,13 +46,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ platform: s
   // attacker can hand a victim a callback URL and attach their own account to the session.
   const raw = req.cookies.get(cookieName)?.value;
   if (!raw) return clear(back(req, { connect: "error", reason: "The connection took too long. Start again." }));
-  let saved: { state?: string; verifier?: string | null };
+  let saved: { state?: string; verifier?: string | null; redirectUri?: string };
   try { saved = JSON.parse(raw); } catch { return clear(back(req, { connect: "error", reason: "The connection could not be verified. Start again." })); }
   if (!saved.state || saved.state !== state) {
     return clear(back(req, { connect: "error", reason: "The connection could not be verified. Start again." }));
   }
 
-  const exchanged = await exchangeCode(platform, code, saved.verifier ?? null);
+  // Replay the exact redirect_uri from the start of the flow. Older in-flight cookies may
+  // predate this field; falling back keeps them working rather than failing outright.
+  const uri = saved.redirectUri || `${req.nextUrl.origin}/api/social/oauth/${platform}/callback`;
+  const exchanged = await exchangeCode(platform, code, saved.verifier ?? null, uri);
   if (!exchanged.ok) return clear(back(req, { connect: "error", reason: exchanged.error.slice(0, 160) }));
 
   const tenant = (await workspaceKey(req.nextUrl.searchParams.get("wsid"))) ?? "default";

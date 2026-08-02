@@ -43,16 +43,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ platform: s
 
   const state = createState();
   const pkce = platform === "x" ? createPkce() : undefined;
-  const built = buildAuthUrl(platform, state, pkce);
+  const built = buildAuthUrl(platform, state, pkce, req.nextUrl.origin);
   if ("error" in built) return NextResponse.json({ error: "oauth_unavailable", hint: built.error }, { status: 503 });
 
   const res = NextResponse.redirect(built.authUrl, 302);
-  res.cookies.set(`populr_oauth_${platform}`, JSON.stringify({ state, verifier: pkce?.verifier ?? null }), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",   // must survive the provider's redirect back to us
-    path: "/",
-    maxAge: FLOW_TTL_S,
-  });
+  // The redirect_uri travels with the state: the provider re-validates it at exchange time
+  // and it must match byte for byte. Rebuilding it in the callback would silently break the
+  // flow the moment the host differs between the two requests.
+  res.cookies.set(
+    `populr_oauth_${platform}`,
+    JSON.stringify({ state, verifier: pkce?.verifier ?? null, redirectUri: built.redirectUri }),
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",   // must survive the provider's redirect back to us
+      path: "/",
+      maxAge: FLOW_TTL_S,
+    },
+  );
   return res;
 }

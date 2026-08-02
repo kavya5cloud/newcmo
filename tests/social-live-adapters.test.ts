@@ -260,3 +260,82 @@ describe("PKCE", () => {
     expect(a.challenge).toMatch(/^[A-Za-z0-9_-]+$/);        // base64url, no padding
   });
 });
+
+describe("redirect URI", () => {
+  // The single most common reason an OAuth flow fails in production. Providers compare
+  // redirect_uri as an exact string and will not follow a redirect to reach it, so a URI
+  // built from a static env var breaks as soon as the site answers on a second host —
+  // which trypopulr.in does, 308-ing to www.
+  it("is built from the host the request actually arrived on", () => {
+    expect(redirectUri("linkedin", "https://www.trypopulr.in"))
+      .toBe("https://www.trypopulr.in/api/social/oauth/linkedin/callback");
+    expect(redirectUri("x", "https://trypopulr.in"))
+      .toBe("https://trypopulr.in/api/social/oauth/x/callback");
+  });
+
+  it("never leaves a trailing slash to double up", () => {
+    expect(redirectUri("linkedin", "https://www.trypopulr.in/"))
+      .toBe("https://www.trypopulr.in/api/social/oauth/linkedin/callback");
+  });
+
+  it("lets an explicit override win, for proxies and previews", () => {
+    vi.stubEnv("SOCIAL_REDIRECT_BASE", "https://fixed.example");
+    expect(redirectUri("linkedin", "https://preview-abc.vercel.app"))
+      .toBe("https://fixed.example/api/social/oauth/linkedin/callback");
+    vi.unstubAllEnvs();
+  });
+
+  it("puts the same URI in the consent URL that it hands back for the exchange", () => {
+    vi.stubEnv("LINKEDIN_CLIENT_ID", "id");
+    vi.stubEnv("LINKEDIN_CLIENT_SECRET", "secret");
+
+    const built = buildAuthUrl("linkedin", "state123", undefined, "https://www.trypopulr.in");
+    expect("error" in built).toBe(false);
+    if ("error" in built) return;
+
+    // The two must agree, or the exchange fails after the user has already consented —
+    // the worst place to discover a mismatch.
+    const sent = new URL(built.authUrl).searchParams.get("redirect_uri");
+    expect(sent).toBe(built.redirectUri);
+    expect(sent).toBe("https://www.trypopulr.in/api/social/oauth/linkedin/callback");
+
+    vi.unstubAllEnvs();
+  });
+
+  it("sends X through PKCE with a challenge, never the verifier", () => {
+    vi.stubEnv("X_PUBLISH_CLIENT_ID", "id");
+    vi.stubEnv("X_PUBLISH_CLIENT_SECRET", "secret");
+
+    const pkce = createPkce();
+    const built = buildAuthUrl("x", "s", pkce, "https://www.trypopulr.in");
+    expect("error" in built).toBe(false);
+    if ("error" in built) return;
+
+    const q = new URL(built.authUrl).searchParams;
+    expect(q.get("code_challenge")).toBe(pkce.challenge);
+    expect(q.get("code_challenge_method")).toBe("S256");
+    expect(built.authUrl).not.toContain(pkce.verifier);
+    expect(q.get("scope")).toContain("tweet.write");
+
+    vi.unstubAllEnvs();
+  });
+
+  it("replays the given URI at exchange time rather than rebuilding it", async () => {
+    vi.stubEnv("LINKEDIN_CLIENT_ID", "id");
+    vi.stubEnv("LINKEDIN_CLIENT_SECRET", "secret");
+
+    let sentBody = "";
+    stubFetch((url, init) => {
+      if (url.includes("accessToken")) { sentBody = String(init?.body); return { status: 200, body: { access_token: "at" } }; }
+      return { status: 200, body: { sub: "member1", name: "Kavya" } };
+    });
+
+    const { exchangeCode } = await import("@/lib/social/oauth-live");
+    const out = await exchangeCode("linkedin", "code1", null, "https://www.trypopulr.in/api/social/oauth/linkedin/callback");
+
+    expect(out.ok).toBe(true);
+    expect(decodeURIComponent(sentBody)).toContain("https://www.trypopulr.in/api/social/oauth/linkedin/callback");
+
+    vi.unstubAllEnvs();
+  });
+});

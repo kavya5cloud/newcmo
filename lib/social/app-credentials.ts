@@ -50,9 +50,20 @@ export function livePlatforms(): SocialPlatform[] {
  * Where the provider sends the user back. Must match the redirect URI registered in the
  * developer app *exactly* — providers compare it as a string, not as a URL.
  */
-export function redirectUri(platform: SocialPlatform): string {
-  // APP_URL is this project's existing canonical-origin variable, so it is the fallback —
-  // SOCIAL_REDIRECT_BASE only exists to override it when the two must differ.
-  const base = (process.env.SOCIAL_REDIRECT_BASE || process.env.APP_URL || "").replace(/\/+$/, "");
+export function redirectUri(platform: SocialPlatform, requestOrigin?: string): string {
+  // Prefer the origin the request actually arrived on.
+  //
+  // Providers compare redirect_uri as an exact string, and they do not follow redirects to
+  // reach it. A static value is wrong the moment the site is reachable on more than one
+  // host — trypopulr.in serves a 308 to www.trypopulr.in, so a URI built from the non-www
+  // APP_URL points at a redirect, and the flow dies with redirect_uri_mismatch.
+  //
+  // Using the live origin also guarantees the callback lands on the same host that started
+  // the flow, which is what makes the state cookie readable when it gets there.
+  //
+  // SOCIAL_REDIRECT_BASE still wins when set, for the case where the public URL differs
+  // from what the app sees (a proxy, or a preview deployment that must use the prod URI).
+  const base = (process.env.SOCIAL_REDIRECT_BASE || requestOrigin || process.env.APP_URL || "")
+    .replace(/\/+$/, "");
   return `${base}/api/social/oauth/${platform}/callback`;
 }

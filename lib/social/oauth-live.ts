@@ -51,13 +51,14 @@ export function buildAuthUrl(
   platform: SocialPlatform,
   state: string,
   pkce?: Pkce,
-): { authUrl: string; scopes: string[] } | { error: string } {
+  requestOrigin?: string,
+): { authUrl: string; scopes: string[]; redirectUri: string } | { error: string } {
   const app = appCredential(platform);
   if (!app) return { error: `${platform} has no app credentials configured` };
   const scopes = liveScopes(platform);
-  const uri = redirectUri(platform);
+  const uri = redirectUri(platform, requestOrigin);
   if (!uri.startsWith("http")) {
-    return { error: "SOCIAL_REDIRECT_BASE is not set, so the callback URL would be relative" };
+    return { error: "No public origin is known, so the callback URL would be relative" };
   }
 
   if (platform === "linkedin") {
@@ -68,7 +69,7 @@ export function buildAuthUrl(
       state,
       scope: scopes.join(" "),
     });
-    return { authUrl: `https://www.linkedin.com/oauth/v2/authorization?${q}`, scopes };
+    return { authUrl: `https://www.linkedin.com/oauth/v2/authorization?${q}`, scopes, redirectUri: uri };
   }
 
   if (platform === "x") {
@@ -82,7 +83,7 @@ export function buildAuthUrl(
       code_challenge: pkce.challenge,
       code_challenge_method: "S256",
     });
-    return { authUrl: `https://twitter.com/i/oauth2/authorize?${q}`, scopes };
+    return { authUrl: `https://twitter.com/i/oauth2/authorize?${q}`, scopes, redirectUri: uri };
   }
 
   return { error: `${platform} has no live OAuth flow` };
@@ -92,15 +93,20 @@ export function buildAuthUrl(
 
 type Exchange = { ok: true; token: OAuthToken } | { ok: false; error: string };
 
+/**
+ * `uri` must be byte-identical to the redirect_uri sent at the start of the flow — every
+ * provider re-validates it at exchange time. It is passed in rather than rebuilt so the two
+ * cannot disagree if the host or config changes mid-flow.
+ */
 export async function exchangeCode(
   platform: SocialPlatform,
   code: string,
   verifier: string | null,
+  uri: string,
   now: () => number = Date.now,
 ): Promise<Exchange> {
   const app = appCredential(platform);
   if (!app) return { ok: false, error: `${platform} has no app credentials configured` };
-  const uri = redirectUri(platform);
 
   if (platform === "linkedin") {
     const res = await request("https://www.linkedin.com/oauth/v2/accessToken", {
