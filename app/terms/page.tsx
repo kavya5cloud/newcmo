@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Populr",
+  // Brand is appended by the root layout's title template — repeating it here
+  // produced "Terms of Service — Populr — Populr".
+  title: "Terms of Service",
   description: "The terms that govern your use of Populr.",
+  // Without this the root layout's canonical is inherited, pointing this page at
+  // the home page and telling Google it is a duplicate not worth indexing.
+  alternates: { canonical: "/terms" },
 };
 
 export default function Terms() {
