@@ -3,6 +3,8 @@ import { socialEngine } from "@/lib/social/shared";
 import { automationRepo } from "@/lib/automation/shared";
 import { extend, retryFailed, runDue, type PublishPort } from "@/lib/automation/runner";
 import { resolveContent, type ResolvedContent } from "@/lib/automation/sources";
+import { angleKeyFor, topicForSlot } from "@/lib/automation/topic";
+import { assistantStore } from "@/lib/assistant/shared";
 import { recordGeneration } from "@/lib/content/generation-log";
 import type { Automation, QueueItem } from "@/lib/automation/types";
 
@@ -46,10 +48,9 @@ function authCron(req: NextRequest): boolean {
  * brand, website, market, memory, learning — supplies it. The statement is passed through
  * as a hint so a rule that *does* name a subject is honoured.
  */
-function topicFor(a: Automation | undefined, slot: QueueItem): string {
-  const stated = a?.statement?.replace(/\b\d+\b|\bposts?\b|\bevery\b|\bdaily\b|\bweekly\b|\bmonthly\b/gi, "").trim();
-  return stated && stated.length > 12 ? stated : `an update for ${slot.platform} about what we shipped recently`;
-}
+// What to write about now lives in lib/automation/topic.ts. The old version here derived it
+// from the automation's own statement by deleting numbers and cadence words, which produced
+// prompts like "LinkedIn   week" and asked for the identical thing every single day.
 
 export async function GET(req: NextRequest) {
   if (!authCron(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -64,6 +65,19 @@ export async function GET(req: NextRequest) {
     for (const tenant of await repo.activeTenants()) {
       const automations = await repo.listAutomations(tenant);
       let queue = await repo.listQueue(tenant);
+
+      // The goal shapes which angles get used. Absent, every angle is in play, which is
+      // still far better than one prompt repeated forever.
+      const settings = await assistantStore().get(tenant).catch(() => null);
+
+      // Recently written openings, so today is told what not to repeat. fromAiQueue saves
+      // every generated post as a draft, so the drafts are the record of what has been said.
+      // Cheap, and more reliable than asking a model to "be original".
+      const recentTexts = (await socialEngine().listDrafts(tenant).catch(() => []))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 5)
+        .map((d) => d.content.text)
+        .filter(Boolean);
 
       // Retries first: a slot whose backoff has elapsed rejoins this same run.
       const retry = retryFailed(queue, { now });
@@ -90,13 +104,28 @@ export async function GET(req: NextRequest) {
           }));
         },
         content: async (slot) => {
-          const automation = automations.find((a) => a.id === slot.automationId);
           const resolved = await resolveContent(slot, {
-            topic: topicFor(automation, slot),
+            // The composer already assembles brand voice, market brief and what has
+            // performed (lib/content/generation-context.ts). What it never received was
+            // anything that changed between one day and the next — that is this.
+            topic: topicForSlot(slot, {
+              goal: settings?.goal,
+              recent: [...recentTexts, ...scheduledTexts],
+            }),
             audience: "founders",
             now,
           });
           if (resolved) provenance.set(slot.id, resolved);
+
+          // The angle is the reason this post says what it says. Logging it makes a run
+          // reviewable — "seven posts, seven angles" is checkable; "seven posts" is not.
+          console.info(JSON.stringify({
+            event: "slot_topic", tenant, slot: slot.id, platform: slot.platform,
+            day: new Date(slot.at).toISOString().slice(0, 10),
+            angle: angleKeyFor(slot, settings?.goal),
+            resolved: !!resolved,
+          }));
+
           return resolved ? { text: resolved.text, assetIds: resolved.assetIds } : null;
         },
       });
