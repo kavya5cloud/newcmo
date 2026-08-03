@@ -49,8 +49,11 @@ describe("sitemap", () => {
     }
   });
 
-  it("leads with the home page", () => {
-    expect(entries[0].url).toBe(url("/"));
+  it("leads with the home page, spelled the same way its canonical is", () => {
+    // Search Console reported a duplicate because the sitemap said ".../" while the page's
+    // own canonical said "..." — same page, two strings.
+    expect(entries[0].url).toBe(SITE_URL);
+    expect(entries[0].url.endsWith("/")).toBe(false);
     expect(entries[0].priority).toBe(1);
   });
 

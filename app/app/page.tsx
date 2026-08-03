@@ -1,5 +1,6 @@
 "use client";
 import HomeHero from "./HomeHero";
+import { buildAgentFeed } from "@/lib/agent-feed";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
@@ -159,63 +160,22 @@ function feedLooksGeneric(entry?: FeedEntry) {
   return !text || /cosmos(?:\.ai)?|populr|short (?:thread angle|keyword or fix|ai-search gap|post idea|article title)|draft reply|fix gap|review|open/.test(text) || text.length < 30;
 }
 
-function buildFallbackFeed(profile: Profile | null, url: string): Record<string, FeedEntry> {
+/**
+ * What each agent is working on today.
+ *
+ * The pools and the day rotation live in lib/agent-feed.ts. This used to be two fixed lines
+ * per agent derived from the profile and URL — both stable, so the board never changed.
+ */
+function buildFallbackFeed(profile: Profile | null, url: string, at: number = Date.now()): Record<string, FeedEntry> {
   const host = hostOf(url);
   const brand = profile?.name || host;
-  const oneLiner = profile?.oneLiner || "your product";
-  const audience = profile?.audience || "buyers";
-  const position = profile?.positioning || `Position ${brand} around the main pain it solves.`;
-  return {
-    reddit: {
-      summary: `3 discussion angles for ${host}`,
-      items: [
-        [`Lead with the pain ${audience} feel before they buy`, "Draft reply"],
-        [`Reply with a concrete example from ${brand}`, "Draft reply"],
-      ],
-    },
-    seo: {
-      summary: `3 search opportunities for ${host}`,
-      items: [
-        [`Comparison page: ${brand} vs alternatives`, "Draft post"],
-        [`FAQ page based on "${oneLiner}"`, "Draft post"],
-      ],
-    },
-    geo: {
-      summary: `AI citation opportunities for ${host}`,
-      items: [
-        [`Add a crisp definition of ${brand} for AI answers`, "Fix gap"],
-        [`Use FAQ schema so ${position.slice(0, 48).replace(/\s+/g, " ")}…`, "Fix gap"],
-      ],
-    },
-    x: {
-      summary: `Social angles for ${host}`,
-      items: [
-        [`Thread: the one thing ${brand} does that others don't`, "Draft"],
-        [`Post: a before/after story for ${audience}`, "Draft"],
-      ],
-    },
-    linkedin: {
-      summary: `Founder posts for ${host}`,
-      items: [
-        [`Founder post: why ${brand} exists and what it refuses to do`, "Review"],
-        [`Post: one lesson from building ${oneLiner}`, "Review"],
-      ],
-    },
-    articles: {
-      summary: `Long-form topics for ${host}`,
-      items: [
-        [`"${brand} vs the old way: what changes"`, "Open"],
-        [`"How ${audience} should evaluate tools like ${brand}"`, "Open"],
-      ],
-    },
-    hn: {
-      summary: `Launch angles for ${host}`,
-      items: [
-        [`Show HN draft: ${brand} — ${oneLiner}`, "Review"],
-        [`Comment angle: explain the problem ${brand} removes`, "Review"],
-      ],
-    },
-  };
+  return buildAgentFeed({
+    host,
+    brand,
+    oneLiner: profile?.oneLiner || "your product",
+    audience: profile?.audience || "buyers",
+    position: profile?.positioning || `Position ${brand} around the main pain it solves.`,
+  }, at);
 }
 
 function normalizeFeed(feed: Record<string, FeedEntry> | undefined, profile: Profile | null, url: string) {
@@ -906,7 +866,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
   const estimated = !gscData && !!estTraffic;
   const d = estTraffic ? buildEstData(estTraffic, range, url || "cosmos") : CHART[range];
-  const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url]);
+  // Keyed on the calendar day so the board turns over at midnight, and so a reload during
+  // the day shows the same list rather than reshuffling under the reader.
+  const today = Math.floor(Date.now() / 86_400_000);
+  const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url, today]);
   const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
   const suggestedQuestions = useMemo(() => {
     const brand = profile?.name || hostOf(url) || "this site";
