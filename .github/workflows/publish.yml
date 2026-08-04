@@ -1,0 +1,78 @@
+name: Publish due posts
+
+# The job that actually publishes.
+#
+# Populr plans posts and shows "next post tomorrow 9:00 AM", but something has to come along
+# and send them. That used to be a Vercel cron; it was removed when the Hobby plan's two-cron
+# limit broke a deploy, and nothing replaced it — so slots came due and sat there while the
+# app said marketing was running.
+#
+# Vercel Hobby allows two cron jobs at daily granularity, and both are spent on
+# publish-reminders and outcome-snapshots. Daily is too coarse here: a post scheduled for
+# 09:00 would go out whenever the single daily run happened. GitHub Actions gives a finer
+# interval at no cost, and lives in the repo rather than a third-party dashboard.
+#
+# One call does everything: the route drains due automation slots and dispatches scheduled
+# social jobs in the same pass.
+#
+# Setup — both under Settings → Secrets and variables → Actions:
+#   Secret   CRON_SECRET   the same value as CRON_SECRET in Vercel
+#   Variable SITE_URL      optional; defaults to the production host below
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub's minimum is 5, and scheduled runs are best-effort — they can
+    # be delayed under load — so treat this as "within ten minutes or so", not to the second.
+    # Publishing is idempotent, so a late or repeated run is safe; a missed one is not.
+    - cron: "*/10 * * * *"
+  # So the first real run can be triggered by hand rather than waited for.
+  workflow_dispatch:
+
+# A run that overlaps the previous one would do no harm — slots are idempotent — but there is
+# no reason to pay for two at once.
+concurrency:
+  group: publish-due
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish anything due
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.trypopulr.in' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET is not set. Add it under Settings → Secrets and variables → Actions."
+            echo "Without it the endpoint returns 401 and nothing publishes."
+            exit 1
+          fi
+
+          echo "GET ${SITE_URL}/api/cron/automation-publish"
+
+          # A GET, matching the route, and idempotent — so --retry is safe.
+          #
+          # Separate the body from the status so a failure can show what the server said.
+          # --fail is deliberately NOT used: it would discard the body on an error status,
+          # which is the one time the body is worth reading.
+          status=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 120 --retry 2 --retry-delay 5 --retry-connrefused \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${SITE_URL}/api/cron/automation-publish")
+
+          echo "status: ${status}"
+          echo "response:"
+          cat /tmp/out.json || true
+          echo
+
+          case "${status}" in
+            200) echo "::notice::Publish pass completed." ;;
+            401) echo "::error::Rejected. CRON_SECRET here does not match the one in Vercel."; exit 1 ;;
+            # A silent failure is the whole problem this workflow exists to prevent, so any
+            # non-200 fails the run and shows up in the Actions tab.
+            *)   echo "::error::Publish pass failed with status ${status}."; exit 1 ;;
+          esac
