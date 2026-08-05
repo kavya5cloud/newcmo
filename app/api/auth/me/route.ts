@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { db, ensureSchema } from "@/lib/db";
+import { bonusDaysFor } from "@/lib/referrals-store";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ user: null, accountsEnabled: !!sql });
 
   let createdAt: string | null = null;
-  let trial: { endsAt: string; daysLeft: number; active: boolean } | null = null;
+  let trial: { endsAt: string; daysLeft: number; active: boolean; bonusDays: number } | null = null;
 
   if (sql) {
     try {
@@ -21,11 +22,15 @@ export async function GET() {
       const rows = (await sql`SELECT created_at FROM users WHERE id = ${session.userId}`) as { created_at: string }[];
       if (rows[0]) {
         createdAt = new Date(rows[0].created_at).toISOString();
-        const end = new Date(rows[0].created_at).getTime() + TRIAL_DAYS * DAY;
+        // Months earned by referring people extend the trial. Computed the same way as
+        // lib/trial.ts, from the same rows, so the days shown and the days enforced agree.
+        const bonus = await bonusDaysFor(session.userId).catch(() => 0);
+        const end = new Date(rows[0].created_at).getTime() + (TRIAL_DAYS + bonus) * DAY;
         trial = {
           endsAt: new Date(end).toISOString(),
           daysLeft: Math.max(0, Math.ceil((end - Date.now()) / DAY)),
           active: Date.now() < end,
+          bonusDays: bonus,
         };
       }
     } catch {

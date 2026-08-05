@@ -1,4 +1,5 @@
 import { db, ensureSchema } from "@/lib/db";
+import { bonusDaysFor } from "@/lib/referrals-store";
 
 const TRIAL_DAYS = Number(process.env.TRIAL_DAYS || 30);
 const DAY = 86_400_000;
@@ -12,7 +13,10 @@ export async function isTrialActive(userId: string): Promise<boolean> {
     await ensureSchema(sql);
     const rows = (await sql`SELECT created_at FROM users WHERE id = ${userId}`) as { created_at: string }[];
     if (!rows[0]) return true;
-    const end = new Date(rows[0].created_at).getTime() + TRIAL_DAYS * DAY;
+    // Referred months are added here rather than written back to the account, so the length
+    // of a trial is always a function of the referral rows — it cannot drift from them.
+    const bonus = await bonusDaysFor(userId).catch(() => 0);
+    const end = new Date(rows[0].created_at).getTime() + (TRIAL_DAYS + bonus) * DAY;
     return Date.now() < end;
   } catch {
     return true;

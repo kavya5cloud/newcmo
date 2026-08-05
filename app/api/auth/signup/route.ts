@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "@/lib/db";
 import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
+import { normalizeCode } from "@/lib/referrals";
+import { creditReferral } from "@/lib/referrals-store";
 
 export const runtime = "nodejs";
 
@@ -13,11 +15,12 @@ export async function POST(req: NextRequest) {
   const sql = db();
   if (!sql) return NextResponse.json({ error: "no_database", hint: "set DATABASE_URL to enable accounts" }, { status: 503 });
 
-  let email: string, password: string;
+  let email: string, password: string, ref: string | null;
   try {
     const b = await req.json();
     email = String(b.email || "").trim().toLowerCase();
     password = String(b.password || "");
+    ref = normalizeCode(b.ref as string | undefined);
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
@@ -31,6 +34,12 @@ export async function POST(req: NextRequest) {
     const id = crypto.randomUUID();
     const hash = await hashPassword(password);
     await sql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${hash})`;
+
+    // Credit the referrer, if there was one. Deliberately after the account exists and
+    // deliberately unable to fail the request: a lost referral credit is an annoyance, a
+    // lost signup is not recoverable.
+    if (ref) await creditReferral(ref, id).catch(() => ({ credited: false }));
+
     await createSession(id, email);
     return NextResponse.json({ user: { email } });
   } catch (e) {

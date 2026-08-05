@@ -29,5 +29,15 @@ export async function ensureSchema(sql: Sql) {
     state JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`;
+  // Referrals. referred_user_id is the primary key, not a plain column: one account can be
+  // credited to exactly one referrer, exactly once, enforced by the database rather than by
+  // remembering to check. A replayed signup cannot mint a second month.
+  await sql`CREATE TABLE IF NOT EXISTS referrals (
+    referred_user_id TEXT PRIMARY KEY,
+    referrer_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS referrals_referrer_idx ON referrals (referrer_id)`;
   schemaReady = true;
 }

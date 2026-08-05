@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { SHOW_CONTENT_ENGINE } from "@/lib/flags";
+import { captureReferral } from "@/lib/referral-client";
 
 // The ways into the product. Derived rather than hand-numbered: the content engine is
 // behind a flag, and a hardcoded "01/02/03" under a hardcoded "Three ways in." would go
@@ -81,6 +82,10 @@ function esc(s: string) {
 }
 
 export default function Landing() {
+  // A referral link lands here. Store the code straight away — the account may not be
+  // created until several screens later, long after the URL has changed.
+  useEffect(() => { captureReferral(window.location.search); }, []);
+
   const dotsRef = useRef<HTMLCanvasElement>(null);
   const termRef = useRef<HTMLDivElement>(null);
   const [flippedAgent, setFlippedAgent] = useState<string | null>(null);

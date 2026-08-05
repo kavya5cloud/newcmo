@@ -1,6 +1,7 @@
 "use client";
 import HomeHero from "./HomeHero";
 import { buildAgentFeed } from "@/lib/agent-feed";
+import { captureReferral, clearReferral, readReferral } from "@/lib/referral-client";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
@@ -1549,12 +1550,15 @@ function AuthModal({ onClose, forced }: { onClose: () => void; forced?: boolean 
       const r = await fetch(mode === "signup" ? "/api/auth/signup" : "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pw }),
+        // A referral code arrives in the URL and has to survive until the account exists —
+        // which may be several screens later — so it is parked in storage on arrival.
+        body: JSON.stringify({ email, password: pw, ref: mode === "signup" ? readReferral() : undefined }),
       });
       const d = await r.json();
       if (!r.ok || d.error) { setErr(AUTH_ERR[d.error] || d.hint || "Something went wrong."); setBusy(false); return; }
       // On signup, carry the anonymous workspace over so the just-analyzed site isn't lost.
       if (mode === "signup") {
+        clearReferral();
         try {
           const local = localStorage.getItem("cosmos.state");
           if (local && JSON.parse(local)?.profile) {
