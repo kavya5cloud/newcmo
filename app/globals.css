@@ -233,11 +233,16 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(-
      content. Short dashboard: this takes the slack so the tab bar sits on the bottom edge
      instead of floating mid-screen. Tall dashboard: it grows past the fold and the page
      scrolls, which is what was broken before. `0 auto` filled neither case. */
-  .appui .dash{display:block;flex:1 0 auto;min-height:0;overflow:visible}
+  /* A column fills the space the dash has, so anything pinned after the scrolling part —
+     the chat composer — sits at the bottom of the screen rather than immediately under the
+     last message with dead space beneath it. */
+  .appui .dash{display:flex;flex-direction:column;flex:1 0 auto;min-height:0;overflow:visible}
   .appui .col{display:none;border-right:0;height:auto}
-  .appui .col.mactive{display:flex}
-  /* Content flows into the page scroll instead of a nested scroller that has no height. */
-  .appui .col-body{overflow:visible;min-height:0;flex:0 0 auto}
+  .appui .col.mactive{display:flex;flex:1 0 auto;min-height:0}
+  /* Content flows into the page scroll instead of a nested scroller that has no height.
+     `1 0 auto` rather than `0 0 auto`: it takes the slack so a trailing composer is pushed
+     to the bottom, but still never shrinks below its content — which was the original bug. */
+  .appui .col-body{overflow:visible;min-height:0;flex:1 0 auto}
   .appui .mobilenav{display:flex;flex:0 0 auto;position:sticky;bottom:0;z-index:40;border-top:1px solid var(--line);background:#000;padding-bottom:env(safe-area-inset-bottom)}
   .appui .mobilenav button{flex:1;background:none;border:0;color:var(--faint);font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.04em;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px}
   .appui .mobilenav button.on{color:var(--acc)}
