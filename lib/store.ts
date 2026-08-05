@@ -34,6 +34,9 @@ export type Saved = {
   chat: ChatMsg[];
   drafts: Draft[];
   feed?: Record<string, FeedEntry>;
+  /** When `feed` was generated. Without it a saved feed is treated as stale, because it
+   *  predates the rotation and would otherwise freeze the board forever. */
+  feedAt?: number;
   rankings?: Ranking[];
   docs?: Record<string, string>;
   estTraffic?: { impressions: number; clicks: number; visits: number } | null;

@@ -1,4 +1,4 @@
-import { dayIndex } from "@/lib/automation/topic";
+
 
 // What each agent is working on today.
 //
@@ -7,9 +7,14 @@ import { dayIndex } from "@/lib/automation/topic";
 // ninety. A board that never changes stops being read — and worse, it makes a product whose
 // whole promise is "your marketing is being worked on" look like a screenshot.
 //
-// Each agent now has a pool of angles and shows a couple, chosen by calendar day. Same two
-// rules as the daily posting brief: consecutive days differ, and a given day is stable, so
-// reloading at lunchtime does not shuffle the list you were half way through.
+// Each agent has a pool of angles and shows a couple, chosen by 12-hour slot: the board
+// turns over morning and evening. Stable within a slot, so reloading at lunchtime does not
+// shuffle a list you were half way through.
+//
+// Rotating the suggestions was necessary but not sufficient. The dashboard renders a *saved*
+// feed when one exists, and that feed is written once and persisted — so the rotation was
+// invisible to anyone who had ever generated one. A saved feed now expires after a slot too,
+// see FEED_TTL_MS.
 
 export type FeedItem = [string, string];
 export type AgentFeedEntry = { summary: string; items: FeedItem[] };
@@ -24,6 +29,29 @@ export type FeedFacts = {
 
 /** How many suggestions an agent shows at once. Enough to choose from, few enough to read. */
 const PER_AGENT = 2;
+
+/** How long a slot lasts. Twice a day: the board is different morning and evening. */
+export const FEED_SLOT_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * How long a generated feed stays put before the rotating one takes over again.
+ *
+ * The same length as a slot, so a saved feed cannot outlive the rotation it was meant to
+ * sit inside. Without this the board froze on whatever was generated first — which is
+ * exactly what it did.
+ */
+export const FEED_TTL_MS = FEED_SLOT_MS;
+
+/** Which 12-hour slot a moment falls in. */
+export function slotIndex(at: number): number {
+  return Math.floor(at / FEED_SLOT_MS);
+}
+
+/** Whether a feed generated at `generatedAt` is still current. */
+export function feedIsFresh(generatedAt: number | undefined, now: number = Date.now()): boolean {
+  if (!generatedAt) return false;          // no stamp means it predates this and is stale
+  return now - generatedAt < FEED_TTL_MS;
+}
 
 type Pool = { summary: (f: FeedFacts) => string; angles: ((f: FeedFacts) => FeedItem)[] };
 
@@ -125,10 +153,10 @@ function offsetFor(agentId: string, size: number): number {
  * The feed for one calendar day.
  *
  * `at` is injected rather than read from the clock so the result is testable and so a
- * reload mid-afternoon shows the same list as the morning.
+ * reload inside the same slot shows the same list.
  */
 export function buildAgentFeed(facts: FeedFacts, at: number = Date.now()): Record<string, AgentFeedEntry> {
-  const day = dayIndex(at);
+  const day = slotIndex(at);
   const out: Record<string, AgentFeedEntry> = {};
 
   for (const [id, pool] of Object.entries(POOLS)) {

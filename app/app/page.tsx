@@ -1,6 +1,6 @@
 "use client";
 import HomeHero from "./HomeHero";
-import { buildAgentFeed } from "@/lib/agent-feed";
+import { buildAgentFeed, FEED_SLOT_MS, feedIsFresh } from "@/lib/agent-feed";
 import { captureReferral, clearReferral, readReferral } from "@/lib/referral-client";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -179,9 +179,23 @@ function buildFallbackFeed(profile: Profile | null, url: string, at: number = Da
   }, at);
 }
 
-function normalizeFeed(feed: Record<string, FeedEntry> | undefined, profile: Profile | null, url: string) {
+/**
+ * Merge a saved feed over the rotating one — but only while the saved one is current.
+ *
+ * This was the reason the board never changed. The spread put the saved feed last, so it
+ * won every time, and a saved feed is written once and persisted forever. Rotating the
+ * fallback underneath it changed nothing anyone could see.
+ */
+function normalizeFeed(
+  feed: Record<string, FeedEntry> | undefined,
+  profile: Profile | null,
+  url: string,
+  feedAt?: number,
+) {
   const fallback = buildFallbackFeed(profile, url);
-  const out: Record<string, FeedEntry> = { ...fallback, ...(feed || {}) };
+  // Past its slot, the saved feed is history. The rotation takes over.
+  const saved = feedIsFresh(feedAt) ? feed || {} : {};
+  const out: Record<string, FeedEntry> = { ...fallback, ...saved };
   for (const id of ["hn", "linkedin"] as const) {
     if (feedLooksGeneric(out[id])) out[id] = fallback[id];
   }
@@ -384,6 +398,10 @@ export default function AppPage() {
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [feed, setFeed] = useState<Record<string, FeedEntry>>({});
+  /** When `feed` was generated. Undefined means it predates the rotation, so it reads as
+   *  stale and the rotating board takes over — which is the correct result for the saved
+   *  feeds that were freezing the dashboard. */
+  const [feedAt, setFeedAt] = useState<number | undefined>(undefined);
   const [rankings, setRankings] = useState<Ranking[]>([]);
   const [estTraffic, setEstTraffic] = useState<{ impressions: number; clicks: number; visits: number } | null>(null);
   const [docCache, setDocCache] = useState<Record<string, string>>({});
@@ -472,7 +490,7 @@ export default function AppPage() {
       if (saved?.profile) {
         setUrl(saved.url); setProfile(saved.profile);
         setCompetitors(saved.competitors || []); setChat(saved.chat || []);
-        setDrafts(saved.drafts || []); setFeed(saved.feed || {});
+        setDrafts(saved.drafts || []); setFeed(saved.feed || {}); setFeedAt(saved.feedAt);
         setRankings(saved.rankings || []); setDocCache(saved.docs || {});
         setEstTraffic(saved.estTraffic || null);
         setGscSite(saved.gscSite || "");
@@ -597,9 +615,9 @@ export default function AppPage() {
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
     if (!hydrated.current || !entered || !profile || demo) return;
-    const s: Saved = { url, profile, competitors, chat, drafts, feed, rankings, docs: docCache, estTraffic, gscSite, recIds };
+    const s: Saved = { url, profile, competitors, chat, drafts, feed, feedAt, rankings, docs: docCache, estTraffic, gscSite, recIds };
     saveState(s);
-  }, [url, profile, competitors, chat, drafts, feed, rankings, docCache, estTraffic, entered, demo, gscSite, recIds]);
+  }, [url, profile, competitors, chat, drafts, feed, feedAt, rankings, docCache, estTraffic, entered, demo, gscSite, recIds]);
 
   /* ---- onboarding dot canvas ---- */
   useEffect(() => {
@@ -716,8 +734,9 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       await Promise.allSettled([insP, trafP]);
       // Honest numbers only: the feed shown, the counts spoken, and the dataset logged
       // all come from the same real items — no invented "36 opportunities" copy.
-      const finalFeed = withHonestSummaries(normalizeFeed(genFeed ?? undefined, p, u));
+      const finalFeed = withHonestSummaries(normalizeFeed(genFeed ?? undefined, p, u, Date.now()));
       setFeed(finalFeed);
+      setFeedAt(Date.now());
       logRecBatch(u, p, finalFeed).then((ids) => { if (Object.keys(ids).length) setRecIds(ids); });
       setDocCache({});
       const chCount = Object.keys(finalFeed).length;
@@ -867,10 +886,13 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
   const estimated = !gscData && !!estTraffic;
   const d = estTraffic ? buildEstData(estTraffic, range, url || "cosmos") : CHART[range];
-  // Keyed on the calendar day so the board turns over at midnight, and so a reload during
-  // the day shows the same list rather than reshuffling under the reader.
-  const today = Math.floor(Date.now() / 86_400_000);
-  const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url, today]);
+  // Keyed on the 12-hour slot so the board turns over twice a day, and so a reload inside
+  // a slot shows the same list rather than reshuffling under the reader.
+  const slot = Math.floor(Date.now() / FEED_SLOT_MS);
+  // Whether the generated feed is still inside its slot. Depends on `slot` so it is
+  // re-evaluated when the board is due to turn over.
+  const fresh = useMemo(() => feedIsFresh(feedAt), [feedAt, slot]);
+  const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url, slot]);
   const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
   const suggestedQuestions = useMemo(() => {
     const brand = profile?.name || hostOf(url) || "this site";
@@ -1289,7 +1311,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               )}
               {visibleAgents.map((a) => {
                 const fe = feed[a.id];
-                const items = fe?.items?.length ? fe.items : contextualFeed[a.id]?.items || a.items;
+                // A saved entry only wins while it is current; after that the rotation does.
+                const items = fresh && fe?.items?.length ? fe.items : contextualFeed[a.id]?.items || a.items;
                 const draftN = pendingDrafts.filter((d) => d.channel === a.id).length;
                 return (
                 <div className={"agent" + (open[a.id] ? " open" : "")} key={a.id}>
@@ -1297,7 +1320,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     <span className="aico" style={{ ["--ac" as string]: a.color } as React.CSSProperties}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{a.icon}</svg>
                     </span>
-                    <span><div className="an">{a.name}</div><div className="as">{fe?.summary || a.sum}</div></span>
+                    <span><div className="an">{a.name}</div><div className="as">{(fresh && fe?.summary) || contextualFeed[a.id]?.summary || a.sum}</div></span>
                     {draftN > 0 && <span className="abadge">{draftN}</span>}
                     <span className="chev">▾</span>
                   </button>
