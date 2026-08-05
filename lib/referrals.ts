@@ -35,12 +35,17 @@ export function normalizeCode(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
 
-  // A pasted share link carries the code in ?ref=, so the query string is the part that
-  // matters — an earlier version stripped it and could never read its own links.
+  // A pasted link can carry the code two ways: in the path (/join/ABCD2345, what sharing
+  // produces now) or in ?ref= (older links, still in the wild in messages and bookmarks).
+  // Both must keep working — a referral link that stops crediting is worse than one that
+  // never existed, because someone already spent their goodwill on it.
   let candidate = trimmed;
   if (/^https?:\/\//i.test(trimmed)) {
     try {
-      candidate = new URL(trimmed).searchParams.get("ref") ?? "";
+      const u = new URL(trimmed);
+      const fromQuery = u.searchParams.get("ref");
+      const fromPath = u.pathname.split("/").filter(Boolean).pop() ?? "";
+      candidate = fromQuery || fromPath;
     } catch {
       return null;
     }
@@ -110,7 +115,13 @@ export function canCredit(opts: {
   return { ok: true };
 }
 
-/** The link a user shares. */
+/**
+ * The link a user shares.
+ *
+ * Points at /join, which opens the sign-up form directly. Sending someone to the marketing
+ * page and hoping they find their way to an account loses most of them — a referral link
+ * has already done the persuading, so the next screen should be the form.
+ */
 export function shareLink(siteUrl: string, code: string): string {
-  return `${siteUrl.replace(/\/+$/, "")}/?ref=${code}`;
+  return `${siteUrl.replace(/\/+$/, "")}/join/${code}`;
 }

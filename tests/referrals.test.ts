@@ -131,12 +131,18 @@ describe("what the panel says", () => {
 });
 
 describe("the share link", () => {
-  it("is a normal landing-page URL with the code attached", () => {
-    expect(shareLink("https://www.trypopulr.in", "ABCD2345")).toBe("https://www.trypopulr.in/?ref=ABCD2345");
+  it("opens the sign-up page directly", () => {
+    // Not the marketing page: the link already did the persuading.
+    expect(shareLink("https://www.trypopulr.in", "ABCD2345")).toBe("https://www.trypopulr.in/join/ABCD2345");
   });
 
   it("does not double the slash", () => {
-    expect(shareLink("https://www.trypopulr.in/", "ABCD2345")).toBe("https://www.trypopulr.in/?ref=ABCD2345");
+    expect(shareLink("https://www.trypopulr.in/", "ABCD2345")).toBe("https://www.trypopulr.in/join/ABCD2345");
+  });
+
+  it("still reads older ?ref= links, which are already out in the wild", () => {
+    const code = codeForUser("user-1");
+    expect(normalizeCode(`https://www.trypopulr.in/?ref=${code}`)).toBe(code);
   });
 
   it("round-trips back to the same code", () => {

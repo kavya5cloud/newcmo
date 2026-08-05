@@ -1887,3 +1887,30 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .refer-link{flex-direction:column}
   .refer-link button{width:100%}
 }
+
+/* ---- Join (referral sign-up) ---------------------------------------------
+   One screen, one job: turn an invitation into an account. */
+.join-page{min-height:100svh;display:grid;place-items:center;padding:32px 20px;
+  background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(213,255,114,.07),transparent 70%)}
+.join-card{width:100%;max-width:400px}
+.join-brand{display:block;font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
+.join-acc{color:var(--acc)}
+.join-card h1{font-size:28px;letter-spacing:-.03em;margin:0 0 10px;line-height:1.15}
+.join-lede{margin:0 0 20px;font-size:14.5px;line-height:1.55;color:var(--dim)}
+
+.join-offer{display:flex;flex-direction:column;gap:3px;padding:13px 16px;margin-bottom:24px;
+  border:1px solid color-mix(in srgb,var(--acc) 26%,var(--line));border-radius:11px;
+  background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.join-offer strong{font-size:14.5px;font-weight:600}
+.join-offer span{font-size:12.5px;color:var(--dim)}
+
+.join-form{display:flex;flex-direction:column}
+.join-form label{font-size:12.5px;color:var(--faint);margin-bottom:6px}
+.join-form input{padding:11px 13px;margin-bottom:14px;border:1px solid var(--line);border-radius:9px;
+  background:var(--bg);color:var(--fg);font-size:14.5px;font-family:inherit}
+.join-form input:focus{outline:none;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+.join-submit{padding:13px;border:0;border-radius:10px;background:var(--acc);color:#0a0d0b;
+  font-size:15px;font-weight:600;margin-top:4px}
+.join-submit:disabled{opacity:.4}
+.join-alt{margin:16px 0 0;font-size:13px;color:var(--faint);text-align:center}
+.join-alt a{color:var(--dim)}
