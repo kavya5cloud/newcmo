@@ -73,16 +73,57 @@ export async function creditReferral(code: string, newUserId: string): Promise<{
   }
 }
 
-/** How many accounts this user has brought in, and what that has earned. */
+/**
+ * Mark a referred account as having done something real.
+ *
+ * Called when the account first analyses a website — the cheapest action that a throwaway
+ * signup will not bother with, and the point at which the referral was actually worth
+ * something. Idempotent: qualifying twice does not double anything, because the reward is
+ * counted from rows, not incremented.
+ */
+export async function qualifyReferral(userId: string): Promise<void> {
+  const sql = db();
+  if (!sql) return;
+  try {
+    await ensureSchema(sql);
+    await sql`UPDATE referrals SET qualified_at = now()
+      WHERE referred_user_id = ${userId} AND qualified_at IS NULL`;
+  } catch {
+    /* a missed qualification is recoverable; failing the caller is not */
+  }
+}
+
+/**
+ * How many accounts this user has brought in, and what that has earned.
+ *
+ * Counts only qualified referrals. Signups that never did anything are recorded but do not
+ * pay out — without email verification, crediting a bare signup means a free month costs
+ * about thirty seconds of anyone's time.
+ */
 export async function progressForUser(userId: string): Promise<ReferralProgress> {
   const sql = db();
   if (!sql) return progressFor(0);
   try {
     await ensureSchema(sql);
-    const rows = (await sql`SELECT COUNT(*)::int AS n FROM referrals WHERE referrer_id = ${userId}`) as { n: number }[];
+    const rows = (await sql`SELECT COUNT(*)::int AS n FROM referrals
+      WHERE referrer_id = ${userId} AND qualified_at IS NOT NULL`) as { n: number }[];
     return progressFor(rows[0]?.n ?? 0);
   } catch {
     return progressFor(0);
+  }
+}
+
+/** Signups from this user's link that have not done anything yet. Shown as "pending". */
+export async function pendingForUser(userId: string): Promise<number> {
+  const sql = db();
+  if (!sql) return 0;
+  try {
+    await ensureSchema(sql);
+    const rows = (await sql`SELECT COUNT(*)::int AS n FROM referrals
+      WHERE referrer_id = ${userId} AND qualified_at IS NULL`) as { n: number }[];
+    return rows[0]?.n ?? 0;
+  } catch {
+    return 0;
   }
 }
 

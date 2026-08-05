@@ -36,8 +36,13 @@ export async function ensureSchema(sql: Sql) {
     referred_user_id TEXT PRIMARY KEY,
     referrer_id TEXT NOT NULL,
     code TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- A signup alone is not worth a free month: without email verification anyone can make
+    -- one in seconds. The row is written at signup so the link is not lost, but it only
+    -- counts towards a reward once the account does something real.
+    qualified_at TIMESTAMPTZ
   )`;
+  await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ`;
   await sql`CREATE INDEX IF NOT EXISTS referrals_referrer_idx ON referrals (referrer_id)`;
   schemaReady = true;
 }

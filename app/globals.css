@@ -1914,3 +1914,47 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .join-submit:disabled{opacity:.4}
 .join-alt{margin:16px 0 0;font-size:13px;color:var(--faint);text-align:center}
 .join-alt a{color:var(--dim)}
+
+/* ---- Mobile: touch targets and a nav that fits -----------------------------
+   Audited at 375x812. Three things were wrong: the Connect buttons were 25px
+   tall, the Advanced disclosure 17px, and the five nav items measured 529px in
+   a 375px viewport — so the last of them sat off-screen behind a scroll nobody
+   would think to try. A nav you have to discover by swiping is a hidden nav. */
+@media(max-width:720px){
+  /* Fit five items in 375px. Tighter than desktop on purpose: at this width the
+     icons carry most of the recognition and the labels confirm it. */
+  .st-nav{gap:2px;padding:8px 10px}
+  .st-links{gap:2px}
+  .st-link{padding:9px 7px;gap:6px}
+  .st-link-label{font-size:12.5px}
+  /* The wordmark and "Home" both link to /app. On a 375px screen that duplication
+     costs about 85px — the difference between every nav item being visible and the
+     last one hiding behind a scroll. The wordmark is the one to drop: "Home" says
+     where it goes, which the logo only implies. */
+  .st-brand{display:none}
+
+  /* Primary actions have to be tappable. 25px was a miss, not a style choice. */
+  .conn-btn{min-height:40px;padding:0 16px}
+  .conn-x{width:40px;height:40px;font-size:18px}
+  .conn-row{min-height:52px}
+
+  /* A text button still needs a target. Padding is negative-margined back so the
+     row does not visibly grow. */
+  .set-disclose{min-height:44px;display:inline-flex;align-items:center;padding:0 4px;margin:0 -4px}
+
+  /* The share link is long by nature; let it wrap rather than scroll sideways
+     inside a box on a screen this narrow. */
+  .refer-link code{white-space:normal;word-break:break-all;overflow-x:visible;line-height:1.5;padding:10px 12px}
+  .refer-link button{min-height:44px}
+  .refer-pips span{width:22px}
+
+  /* The tab bar is sticky, so mid-scroll it sits over whatever is beneath it. Without
+     clearance the last line of a column is readable only once you reach the very bottom. */
+  .appui .col-body{padding-bottom:64px}
+
+  /* Comfortable rather than merely legal on the invite page. */
+  .join-form input{padding:13px}
+  .join-submit{min-height:48px}
+  .join-alt{padding:6px 0}
+}
+.refer-pending{margin:12px 0 0;font-size:12.5px;color:var(--faint);line-height:1.5}

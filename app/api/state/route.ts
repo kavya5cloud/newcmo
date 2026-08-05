@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { qualifyReferral } from "@/lib/referrals-store";
 import { rateLimit, requestKey } from "@/lib/throttle";
 
 export const runtime = "nodejs";
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
       VALUES (${key}, ${JSON.stringify(state)}, now())
       ON CONFLICT (wsid) DO UPDATE SET state = EXCLUDED.state, updated_at = now()
     `;
+    // A saved workspace with a profile means this account analysed a real website — the
+    // point at which a referral stopped being a signup and became a customer. Cheap to
+    // check, impossible to fake without doing the thing that makes the referral worth
+    // rewarding. Never allowed to fail the save.
+    if (session && state?.profile?.name) {
+      await qualifyReferral(session.userId).catch(() => {});
+    }
+
     return NextResponse.json({ enabled: true, ok: true });
   } catch (e) {
     return NextResponse.json({ enabled: false, error: String(e).slice(0, 200) }, { status: 500 });

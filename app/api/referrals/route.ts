@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { SITE_URL } from "@/lib/seo";
 import { REFERRALS_PER_REWARD, REWARD_DAYS, codeForUser, describeProgress, shareLink } from "@/lib/referrals";
-import { progressForUser } from "@/lib/referrals-store";
+import { pendingForUser, progressForUser } from "@/lib/referrals-store";
 
 export const runtime = "nodejs";
 
@@ -23,13 +23,19 @@ export async function GET(req: NextRequest) {
   }
 
   const code = codeForUser(session.userId);
-  const progress = await progressForUser(session.userId);
+  const [progress, pending] = await Promise.all([
+    progressForUser(session.userId),
+    pendingForUser(session.userId),
+  ]);
 
   return NextResponse.json({
     ok: true,
     code,
     link: shareLink(SITE_URL, code),
     ...progress,
+    // Signed up but not yet counted. Reported so a referrer who sent five links and sees
+    // two counted knows why, rather than assuming the programme is broken.
+    pending,
     summary: describeProgress(progress),
     terms: { perReward: REFERRALS_PER_REWARD, rewardDays: REWARD_DAYS },
   });

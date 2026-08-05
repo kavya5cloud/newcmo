@@ -16,6 +16,7 @@ type Progress = {
   rewards: number;
   bonusDays: number;
   toNextReward: number;
+  pending: number;
   summary: string;
   terms: { perReward: number; rewardDays: number };
 };
@@ -72,6 +73,13 @@ export default function ReferAndEarn() {
         <span className="refer-count">{data.summary}</span>
       </div>
 
+      {data.pending > 0 && (
+        <p className="refer-pending">
+          {data.pending} signed up but {data.pending === 1 ? "hasn't" : "haven't"} added a
+          website yet — {data.pending === 1 ? "it counts" : "they count"} once they do.
+        </p>
+      )}
+
       {data.bonusDays > 0 && (
         <p className="refer-earned">
           <strong>{data.bonusDays} days</strong> added to your trial so far.
@@ -81,8 +89,8 @@ export default function ReferAndEarn() {
       {/* Said plainly, because the alternative is someone sending twenty links and then
           asking why nothing was credited. */}
       <p className="refer-fine">
-        A referral counts when someone creates an account from your link. Your own account
-        doesn&apos;t count.
+        A referral counts once they create an account from your link and add their website.
+        Your own account doesn&apos;t count.
       </p>
     </div>
   );
