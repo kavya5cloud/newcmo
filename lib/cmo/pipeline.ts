@@ -1,4 +1,5 @@
 import { confidenceOf, type CmoContext } from "@/lib/services/cmo-context";
+import { channelName } from "./planner";
 import { routeIntent, ASSET_LABEL, type RoutedIntent, type AssetKind } from "@/lib/services/intent-router";
 import type { CmoRequest, DecisionArtifact, EvidenceFact, EvidenceKind, EvidencePack } from "@/lib/cmo/contracts";
 
@@ -27,17 +28,17 @@ export function buildEvidencePack(ctx: CmoContext): EvidencePack {
   const campaign: EvidenceFact[] = ctx.missions.map((m) => fact("observed", `Campaign progress: ${m.title}`, `${m.done}/${m.total} tasks done`, "campaign_events", 0.8));
 
   const channels: EvidenceFact[] = ctx.channelRanking.map((r) =>
-    fact(r.yours ? "measured" : "network_prior", `Channel: ${r.channel}`, `score ${r.score}${r.yours ? ` (${r.yours.approved}/${r.yours.generated} approved)` : " (prior)"}`, "decision_engine", r.yours ? 0.7 : 0.4)
+    fact(r.yours ? "measured" : "network_prior", `Channel: ${channelName(r.channel)}`, `score ${r.score}${r.yours ? ` (${r.yours.approved}/${r.yours.generated} approved)` : " (prior)"}`, "decision_engine", r.yours ? 0.7 : 0.4)
   );
 
   const outcomes: EvidenceFact[] = ctx.whatWorked.map((w) =>
-    fact("measured", `Worked: ${w.title}`, `score ${(w.score * 100).toFixed(0)}${w.clicksPct != null ? `, clicks ${w.clicksPct >= 0 ? "+" : ""}${(w.clicksPct * 100).toFixed(0)}%` : ""} [${w.channel}]`, "recommendation_scores", 0.8)
+    fact("measured", `Worked: ${w.title}`, `score ${(w.score * 100).toFixed(0)}${w.clicksPct != null ? `, clicks ${w.clicksPct >= 0 ? "+" : ""}${(w.clicksPct * 100).toFixed(0)}%` : ""} [${channelName(w.channel)}]`, "recommendation_scores", 0.8)
   );
   if (ctx.latestMetrics) {
     outcomes.push(fact("measured", "Search Console", `${ctx.latestMetrics.clicks} clicks, ${ctx.latestMetrics.impressions} impressions, CTR ${(ctx.latestMetrics.ctr * 100).toFixed(1)}%, position ${ctx.latestMetrics.position.toFixed(1)}`, "outcome_snapshots", 0.9));
   }
 
-  const history: EvidenceFact[] = ctx.dismissed.map((d) => fact("observed", `Rejected: ${d.title}`, `dismissed [${d.channel}] — do not re-propose`, "recommendation_events", 0.9));
+  const history: EvidenceFact[] = ctx.dismissed.map((d) => fact("observed", `Rejected: ${d.title}`, `dismissed [${channelName(d.channel)}] — do not re-propose`, "recommendation_events", 0.9));
 
   const constraints: EvidenceFact[] = [];
   if (!ctx.latestMetrics) constraints.push(fact("observed", "Measurement constraint", "No live Search Console snapshot is available", "outcome_snapshots", 0.9));
@@ -74,9 +75,11 @@ export function decide(ctx: CmoContext, evidence: EvidencePack): DecisionArtifac
   }
 
   const rankedOptions = ctx.channelRanking.slice(0, 4).map((r) => ({
-    action: `Invest in ${r.channel}`,
+    action: `Invest in ${channelName(r.channel)}`,
     score: r.score,
-    reason: r.yours ? `${r.yours.approved}/${r.yours.generated} of your ${r.channel} recs approved` : "network prior (no first-party data yet)",
+    reason: r.yours
+      ? `${r.yours.approved} of ${r.yours.generated} ${channelName(r.channel)} suggestions approved`
+      : "based on what works for similar businesses (no data of your own yet)",
   }));
   const top = rankedOptions[0];
 

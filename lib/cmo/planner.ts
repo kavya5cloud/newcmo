@@ -84,6 +84,31 @@ const CHANNEL_PROFILE: Record<string, { impact: number; speed: number; cheapness
 };
 const DEFAULT_PROFILE = { impact: 0.5, speed: 0.6, cheapness: 0.8, safety: 0.7, simplicity: 0.6 };
 
+/**
+ * How a channel is written when a person will read it.
+ *
+ * The ids are lowercase identifiers — fine in a database, wrong in a sentence. They were
+ * being interpolated straight into the CMO's prose, so the chat said "prioritizing seo is
+ * the way to go" and "invest in linkedin". Worse, the model then copies whatever it is
+ * handed, so a lowercase id in the evidence becomes a lowercase id in the answer.
+ */
+const CHANNEL_NAME: Record<string, string> = {
+  seo: "SEO",
+  articles: "your blog",
+  geo: "AI search visibility",
+  reddit: "Reddit",
+  email: "email",
+  linkedin: "LinkedIn",
+  x: "X",
+  hn: "Hacker News",
+};
+
+/** A channel id written for a reader. Unknown ids fall back to themselves rather than
+ *  disappearing, so a new channel is merely unstyled instead of invisible. */
+function channelName(id: string): string {
+  return CHANNEL_NAME[id] ?? id;
+}
+
 const CHANNEL_ACTIONS: Record<string, string[]> = {
   seo: ["Fix technical SEO — crawlability, metadata, and page speed", "Build high-intent landing pages for your top queries"],
   articles: ["Publish 2–3 cornerstone articles on buyer-intent topics", "Interlink them to your key conversion pages"],
@@ -189,6 +214,8 @@ export function scoreStrategy(ctx: CmoContext, channel: string, rankScore: numbe
 }
 
 /** Generate multiple candidate strategies (never just one) from the ranked channels. */
+export { channelName };
+
 export function generateCandidates(ctx: CmoContext): CandidateStrategy[] {
   const ranked = ctx.channelRanking.length
     ? ctx.channelRanking
@@ -198,13 +225,15 @@ export function generateCandidates(ctx: CmoContext): CandidateStrategy[] {
     const score = scoreStrategy(ctx, r.channel, r.score);
     const worked = ctx.whatWorked.find((w) => w.channel === r.channel);
     const rationale = worked
-      ? `${r.channel} has already produced measured wins here (${(worked.score * 100).toFixed(0)}/100), so doubling down compounds a proven play.`
+      ? `${channelName(r.channel)} has already produced measured wins here (${(worked.score * 100).toFixed(0)}/100), so doubling down compounds a proven play.`
       : ctx.channelRanking.find((c) => c.channel === r.channel)?.yours
-        ? `${r.channel} is where your approvals cluster and the decision engine ranks it strongly for this business.`
-        : `${r.channel} scores well on impact-vs-effort for a business at this stage, even without first-party data yet.`;
+        // "decision engine" is machinery. A founder reading this wants to know it fits their
+        // business, not which subsystem ranked it.
+        ? `${channelName(r.channel)} is where your approvals cluster, and it ranks strongly for a business like yours.`
+        : `${channelName(r.channel)} scores well on impact-vs-effort for a business at this stage, even without first-party data yet.`;
     return {
       id: `strat_${r.channel}`,
-      title: `Invest in ${r.channel}`,
+      title: `Invest in ${channelName(r.channel)}`,
       channel: r.channel,
       rationale,
       requiredActions: CHANNEL_ACTIONS[r.channel] ?? DEFAULT_ACTIONS,
@@ -236,7 +265,7 @@ export function planDecision(ctx: CmoContext, evidence: EvidencePack, routed: Ro
       : `${brand} needs to concentrate effort on the channel with the best evidence-backed return.`;
 
   const reasoningSummary = recommended
-    ? `Scored ${candidates.length} channel strategies on impact, historical performance, alignment, confidence, cost, speed, risk and dependencies. ${recommended.channel} leads (${(recommended.score.total * 100).toFixed(0)}/100)${alternatives[0] ? `, ahead of ${alternatives[0].channel} (${(alternatives[0].score.total * 100).toFixed(0)}/100)` : ""}.`
+    ? `Scored ${candidates.length} channel strategies on impact, historical performance, alignment, confidence, cost, speed, risk and dependencies. ${channelName(recommended.channel)} leads (${(recommended.score.total * 100).toFixed(0)}/100)${alternatives[0] ? `, ahead of ${channelName(alternatives[0].channel)} (${(alternatives[0].score.total * 100).toFixed(0)}/100)` : ""}.`
     : "No channels available to plan against yet.";
 
   const relatedOutcomes = ctx.whatWorked.map((w) => `${w.title} [${w.channel}]`);
@@ -285,7 +314,7 @@ export function planToArtifact(plan: DecisionPlan, ctx: CmoContext): DecisionArt
   return {
     status,
     recommendation: plan.recommendedStrategy
-      ? `Prioritize ${plan.recommendedStrategy.channel} — ${plan.recommendedStrategy.rationale}`
+      ? `Prioritize ${channelName(plan.recommendedStrategy.channel)} — ${plan.recommendedStrategy.rationale}`
       : plan.reasoningSummary,
     rankedOptions: [plan.recommendedStrategy, ...plan.alternativeStrategies]
       .filter(Boolean)
