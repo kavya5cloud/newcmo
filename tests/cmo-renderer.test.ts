@@ -90,3 +90,44 @@ describe("renderCmoPrompt", () => {
     expect(p).toMatch(/Do not invent specifics/i);
   });
 });
+
+describe("the prompt forbids the failure modes seen in real answers", () => {
+  // A production answer about "boosting social media reach in Europe" opened with
+  // "Europeans are 2.5x more likely to engage with content that's relevant to their
+  // interests" — a number with no source, and circular besides: everyone engages more with
+  // relevant content. It then advised translating content, using influencers, and posting at
+  // good times, which is true of every business in every market.
+  //
+  // The invented figure is the serious one. A founder may put it in a deck, and there is no
+  // source to give when someone asks.
+
+  const prompt = renderCmoPrompt({
+    context: ctx("Acme"),
+    decision: recommended,
+    evidence: emptyEvidence,
+    question: "how do I boost social media reach in Europe?",
+    recentTurns: "",
+  });
+
+  it("forbids inventing statistics", () => {
+    expect(prompt).toMatch(/never invent a statistic/i);
+  });
+
+  it("names the shape of a fabricated number, not just the concept", () => {
+    // A rule the model can pattern-match beats an abstract principle.
+    expect(prompt).toMatch(/2\.5x|studies show/i);
+  });
+
+  it("requires advice that would not survive swapping the company out", () => {
+    expect(prompt).toMatch(/true for any business|substitute a different/i);
+  });
+
+  it("refuses to treat a continent as an audience", () => {
+    expect(prompt).toMatch(/continent is not an audience/i);
+  });
+
+  it("still forbids the padding and category-verb failures", () => {
+    expect(prompt).toMatch(/do not pad/i);
+    expect(prompt).toMatch(/are not actions/i);
+  });
+});
