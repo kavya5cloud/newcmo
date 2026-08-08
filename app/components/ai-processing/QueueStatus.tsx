@@ -1,4 +1,5 @@
 "use client";
+import Icon from "@/app/components/Icon";
 import { formatWait } from "./stages";
 
 // High-demand experience — shown when a request is queued or providers are busy. Never an
@@ -6,7 +7,7 @@ import { formatWait } from "./stages";
 export default function QueueStatus({ estimatedTime, queuePosition }: { estimatedTime?: number; queuePosition?: number }) {
   return (
     <div className="aip-queue">
-      <div className="aip-queue-ic" aria-hidden="true">🧊</div>
+      <div className="aip-queue-ic" aria-hidden="true"><Icon name="queue" size={26} /></div>
       <h3 className="aip-queue-title">Populr is experiencing high demand</h3>
       <p className="aip-queue-body">
         We&apos;re currently processing a large number of creative requests to maintain quality.

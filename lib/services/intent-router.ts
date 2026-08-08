@@ -40,6 +40,18 @@ function detectAsset(text: string): AssetKind | null {
   return null;
 }
 
+/**
+ * Whether the founder is asking rather than commissioning.
+ *
+ * Either an interrogative opener or a trailing question mark counts. Deliberately generous:
+ * mistaking a content request for a question costs one clarifying reply, while mistaking a
+ * question for a content request hands back a whole asset nobody asked for.
+ */
+function isQuestion(text: string): boolean {
+  return /\?\s*$/.test(text)
+    || /^\s*(how|what|whats|what's|why|when|where|which|who|whom|should|shall|is|are|was|were|do|does|did|can|could|would|will|am|any|got|anyone)\b/i.test(text);
+}
+
 // Ordered most-specific → most-general. First match wins.
 const RULES: { intent: Intent; re: RegExp }[] = [
   // Transform: convert existing content into another format.
@@ -90,8 +102,18 @@ export function routeIntent(message: string, hasSelection = false): RoutedIntent
     }
   }
 
-  // Unmatched: if it names an asset it's probably a content ask; else default to strategy.
-  if (asset) return { intent: "content", asset, target: null };
+  // Unmatched.
+  //
+  // A bare asset noun used to be enough to trigger generation, which produced the single
+  // most absurd behaviour in the product: "how long should a LinkedIn post be?" matched
+  // `linkedin`, found no rule, fell through here, and answered with a LinkedIn post. So did
+  // "any tips for blog SEO?" — a whole blog draft instead of the tip. The founder asked a
+  // question and got a deliverable.
+  //
+  // A noun is only a request to produce something when nobody is asking a question. Every
+  // genuine content ask still routes above, on the create verb ("write me a LinkedIn post"),
+  // which is where it belongs — including when it is phrased as one ("can you write…").
+  if (asset && !isQuestion(text)) return { intent: "content", asset, target: null };
   return { intent: "strategy", asset: null, target: null };
 }
 

@@ -11,6 +11,8 @@ import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from
 import { AIProcessing } from "@/app/components/ai-processing";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { isContentEnginePath } from "@/lib/flags";
+import Icon from "@/app/components/Icon";
+import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
 // Bounded so a stalled request can never freeze the flow: without a timeout an
@@ -298,7 +300,7 @@ const AGENTS: AgentDef[] = [
 const DOCS = [
   { id: "product", name: "Product Information", icon: "▤" },
   { id: "compet", name: "Competitor Analysis", icon: "▥" },
-  { id: "voice", name: "Brand Voice", icon: "✎" },
+  { id: "voice", name: "Brand Voice", icon: "pen" as const },
   { id: "strategy", name: "Marketing Strategy", icon: "◎" },
   { id: "llms", name: "llms.txt", icon: "⌥", tag: "new" },
   { id: "articles", name: "Articles", icon: "▸", count: "(39)" },
@@ -312,7 +314,7 @@ function buildTermLines(brand: string, host: string, channels: string[], agentCo
   for (const ch of shown) lines.push(["", `> [${ch}] scanning for ${brand} opportunities…`]);
   lines.push(["", "> fetching analytics…"]);
   lines.push(["", "> reviewing documents and preparing your CMO…"]);
-  lines.push(["tl-ok", `✓ AI CMO ready — ${agentCount} agent${agentCount === 1 ? "" : "s"} on ${host}`]);
+  lines.push(["tl-ok", `AI CMO ready — ${agentCount} agent${agentCount === 1 ? "" : "s"} on ${host}`]);
   return lines;
 }
 
@@ -553,7 +555,7 @@ export default function AppPage() {
     const p = new URLSearchParams(window.location.search).get("gsc");
     if (p) {
       const msg: Record<string, string> = {
-        connected: "Search Console connected ✓",
+        connected: "Search Console connected",
         notconfigured: "Google isn't configured on the server yet",
         denied: "Connection cancelled",
         error: "Couldn't connect — try again",
@@ -774,7 +776,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         geo: `Write an AI-search / GEO deliverable for ${brand}.`,
         articles: `Write a long-form article brief or outline for ${brand}.`,
       };
-      body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nGround the deliverable in the real page details above. Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.`, url);
+      // The same rules the server-side engines carry. Without them this path — the one that
+      // writes the posts a customer actually publishes — was the only one with nothing
+      // stopping it inventing a statistic.
+      body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nGround the deliverable in the real page details above. Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.\n\n${DELIVERABLE_RULES}`, url);
       setDemo(false);
     } catch (e) {
       showToast(`AI request failed: ${aiErrorText(e).slice(0, 160)}`);
@@ -793,7 +798,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
     setDoc({ title: name, body: "…generating…" });
     try {
-      const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.`, url);
+      const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.\n\n${DELIVERABLE_RULES}`, url);
       setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
     } catch (e) {
@@ -860,7 +865,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         if (ok) {
           const s = await fetchPushStatus();
           setPushStatus(s);
-          showToast("Publish reminders on ✓");
+          showToast("Publish reminders on");
         } else showToast("Couldn't enable — check browser permissions");
       }
     } finally { setPushBusy(false); }
@@ -1007,7 +1012,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className="tb-r">
             <a href="/app/campaigns" className="credits" style={{ textDecoration: "none", color: "inherit" }} title="Marketing Missions — your AI CMO assigns work">missions ↗</a>
             <a href="/worked" className="credits" style={{ textDecoration: "none", color: "inherit" }} title="Recommendations ranked by measured outcome">worked ↗</a>
-            <span className="credits">{cloud ? "cloud ✓" : "local"}</span>
+            <span className="credits">{cloud ? "cloud" : "local"}</span>
             {authUser && (
               <button className="bell" onClick={() => setPlanOpen(true)} title="Today's posting plan">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -1060,7 +1065,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     Publish reminders: {pushStatus.subscribed ? "on" : "off"}
                   </button>
                 )}
-                <span className="tb-drop-status">{cloud ? "cloud ✓" : "local"}{liveTrial?.active ? ` · ${liveTrial.daysLeft}d trial left` : ""}</span>
+                <span className="tb-drop-status">{cloud ? "cloud" : "local"}{liveTrial?.active ? ` · ${liveTrial.daysLeft}d trial left` : ""}</span>
                 {authUser ? (
                   <button role="menuitem" onClick={() => { setNavOpen(false); logout(); }}>Log out</button>
                 ) : accountsEnabled ? (
@@ -1089,7 +1094,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         <div className="dash">
           {/* COMPANY */}
           <div className={"col" + (mtab === "company" ? " mactive" : "")}>
-            <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" onClick={reset}>⚙</button></span></div>
+            <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" aria-label="Reset" onClick={reset}><Icon name="gear" size={15} /></button></span></div>
             <div className="col-body">
               <p className="company-desc">{profile?.description || profile?.positioning || "—"}</p>
               <div className="sect">
@@ -1300,7 +1305,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       <span className="pq-acts">
                         {!dr.approved && <button className="go2 go2-pri" onClick={() => approveDraft(dr.id)}>Approve</button>}
                         <button className="go2 go2-sec" onClick={() => openDraft(dr)}>View</button>
-                        {dr.approved && <button className="go2 go2-pri" onClick={() => markPublished(dr.id)}>Published ✓</button>}
+                        {dr.approved && <button className="go2 go2-pri" onClick={() => markPublished(dr.id)}>Published</button>}
                       </span>
                     </div>
                   ))}
@@ -1409,7 +1414,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <div className="doc-head">
               <span className="dt">{doc.title}</span>
               <button onClick={() => { navigator.clipboard?.writeText(doc.body).then(() => showToast("Copied")); }}>⧉ copy</button>
-              <button onClick={() => setDoc(null)}>✕</button>
+              <button aria-label="Close" onClick={() => setDoc(null)}><Icon name="close" size={15} /></button>
             </div>
             <div className="doc-body">{doc.body}</div>
           </div>
@@ -1428,7 +1433,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       {verifyPopup && (
         <div className="authwrap" onClick={(e) => { if (e.target === e.currentTarget) setVerifyPopup(false); }}>
           <div className="authcard">
-            <button className="xclose" onClick={() => setVerifyPopup(false)}>✕</button>
+            <button className="xclose" aria-label="Close" onClick={() => setVerifyPopup(false)}><Icon name="close" size={15} /></button>
             <h3>Your website isn&apos;t verified yet</h3>
             <div className="authsub">Google Search Console only shares data for sites you&apos;ve verified ownership of — and this Google account doesn&apos;t have any yet. So we&apos;re showing <strong>estimated</strong> numbers for now.</div>
             <a className="submit" href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>Verify my site in Search Console →</a>
@@ -1599,7 +1604,7 @@ function AuthModal({ onClose, forced }: { onClose: () => void; forced?: boolean 
   return (
     <div className="authwrap" onClick={(e) => { if (e.target === e.currentTarget && !forced) onClose(); }}>
       <div className="authcard">
-        {!forced && <button className="xclose" onClick={onClose}>✕</button>}
+        {!forced && <button className="xclose" aria-label="Close" onClick={onClose}><Icon name="close" size={15} /></button>}
         <h3>{mode === "signup" ? "Create your account" : "Welcome back"}</h3>
         <div className="authsub">{mode === "signup" ? "Save your workspace across devices." : "Sign in to your Populr workspace."}</div>
         {anySocial && (

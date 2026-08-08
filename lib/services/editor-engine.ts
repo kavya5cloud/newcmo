@@ -1,4 +1,5 @@
 import type { CmoContext } from "@/lib/services/cmo-context";
+import { HONESTY_RULES } from "@/lib/cmo/quality-rules";
 
 // Editor Engine — NEVER regenerates. It applies the requested change to the supplied
 // content and returns the edited version only. If no source content is available it says
@@ -13,6 +14,7 @@ Rules:
 - Edit — do NOT rewrite from scratch or change the core message unless asked.
 - Preserve format and length unless the instruction changes it.
 - Output ONLY the edited content. No commentary, no "here's the edit".
+${HONESTY_RULES}
 
 Change requested: ${instruction}
 

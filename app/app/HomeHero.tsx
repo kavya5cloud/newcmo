@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { workspaceId } from "@/lib/store";
 import { describeWhen } from "@/lib/assistant/status";
 import type { AssistantStatus } from "@/lib/assistant/types";
+import Icon from "@/app/components/Icon";
 
 // What you see when you open Populr.
 //
@@ -52,12 +53,12 @@ export default function HomeHero({ company }: { company?: string }) {
       {configured && !status!.paused && (
         <ul className="home-facts">
           <li>
-            <span aria-hidden="true">✓</span>
+            <Icon name="check" size={13} />
             {status!.plannedThisWeek} {status!.plannedThisWeek === 1 ? "post" : "posts"} this week
           </li>
           {status!.nextPublishAt && (
             <li>
-              <span aria-hidden="true">✓</span>
+              <Icon name="check" size={13} />
               Next post {describeWhen(status!.nextPublishAt).toLowerCase()}
             </li>
           )}

@@ -128,7 +128,7 @@ export async function sendWelcomeEmail(name: string | undefined, email: string):
   const firstName = (name || "").split(/\s+/)[0] || "there";
   const res = await sendEmail({
     to: email,
-    subject: "Welcome to Populr Early Access 🚀",
+    subject: "Welcome to Populr Early Access",
     text:
 `Hi ${firstName},
 

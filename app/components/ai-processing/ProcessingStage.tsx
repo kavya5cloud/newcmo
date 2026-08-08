@@ -1,4 +1,5 @@
 "use client";
+import Icon from "@/app/components/Icon";
 import type { Stage } from "./stages";
 
 export type StageState = "done" | "active" | "pending";
@@ -9,7 +10,9 @@ export default function ProcessingStage({ stage, state }: { stage: Stage; state:
   return (
     <div className={"aip-stage aip-stage-" + state}>
       <span className="aip-stage-mark" aria-hidden="true">
-        {state === "done" ? <span className="aip-check">✓</span> : <span className="aip-stage-ic">{stage.icon}</span>}
+        {state === "done"
+          ? <span className="aip-check"><Icon name="check" size={13} /></span>
+          : <span className="aip-stage-ic"><Icon name={stage.icon} size={15} /></span>}
       </span>
       <span className="aip-stage-text">
         <span className="aip-stage-title">{stage.title}</span>

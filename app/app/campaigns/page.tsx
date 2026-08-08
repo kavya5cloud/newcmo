@@ -5,6 +5,7 @@ import { loadState, workspaceId, type Profile } from "@/lib/store";
 import { CAMPAIGN_GOALS, type CampaignTask } from "@/lib/services/contracts";
 import type { AssetRow } from "@/lib/services/assets";
 import { extractJson } from "@/lib/llm-json";
+import Icon from "@/app/components/Icon";
 
 // Marketing Missions — the AI CMO assigns work, not tips.
 // Flow (decision-first, enforced): pick a mission → decision engine ranks channels
@@ -451,7 +452,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
                           const isDone = c.done_tasks.includes(i);
                           return (
                             <button key={i} className={"m-task" + (isDone ? " done" : "")} onClick={() => toggleTask(c, i)}>
-                              <span className="m-check">{isDone ? "✓" : "○"}</span>
+                              <span className="m-check"><Icon name={isDone ? "check" : "circle"} size={13} /></span>
                               <span className="m-tbody">
                                 <span className="m-ttitle">{t.title}</span>
                                 <span className="m-tmeta">{t.channel}{t.intent ? ` — ${t.intent}` : ""}</span>
@@ -482,7 +483,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
                           <button className="m-atitle" onClick={openEditor}>{ch.latest.title}</button>
                           <div className="m-aacts">
                             <button onClick={openEditor}>Edit</button>
-                            <button onClick={() => copyAsset(ch.rootId, ch.latest.body)}>{copied === ch.rootId ? "Copied ✓" : "Copy"}</button>
+                            <button onClick={() => copyAsset(ch.rootId, ch.latest.body)}>{copied === ch.rootId ? "Copied" : "Copy"}</button>
                             {ch.latest.status !== "approved" && <button onClick={() => assetEvent(ch.latest.id, "approved", c.id)}>Approve</button>}
                             {targets.length > 0 && (
                               <div className="m-txwrap">
@@ -568,7 +569,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
               <div className="m-ehead">
                 <span className="m-atype">{TYPE_LABEL[shown.asset_type] || shown.asset_type}{parent ? " · derived from blog" : ""}</span>
                 <span className="m-astatus" data-s={chain.latest.status}>{chain.latest.status}</span>
-                <button className="m-eclose" onClick={() => setEditor(null)}>✕</button>
+                <button className="m-eclose" aria-label="Close" onClick={() => setEditor(null)}><Icon name="close" size={15} /></button>
               </div>
               <div className="m-etitle">{shown.title}</div>
               <div className="m-eversions">
@@ -598,7 +599,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
                     setEditorBusy(null); setEditorVersion(null);
                   }}
                 >{editorBusy === "saving" ? "saving…" : "Save as new version"}</button>
-                <button onClick={() => copyAsset(chain.rootId, editorText)}>{copied === chain.rootId ? "Copied ✓" : "Copy"}</button>
+                <button onClick={() => copyAsset(chain.rootId, editorText)}>{copied === chain.rootId ? "Copied" : "Copy"}</button>
                 <button
                   disabled={!!editorBusy || chain.latest.status === "approved"}
                   onClick={() => assetEvent(chain.latest.id, "approved", editor.campaign.id)}

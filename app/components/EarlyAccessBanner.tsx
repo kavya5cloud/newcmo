@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
+import Icon from "@/app/components/Icon";
 
 // Early Access rotating banner + application modal.
 // Presentation only — it posts to /api/early-access (the single intake seam) and
@@ -163,7 +164,7 @@ function EarlyAccessModal({ onClose }: { onClose: () => void }) {
 
         {done ? (
           <div className="eam-done">
-            <div className="eam-done-badge">✓</div>
+            <div className="eam-done-badge"><Icon name="check" size={18} /></div>
             <h2>You&apos;re on the list</h2>
             <p>Thanks for applying to Populr Early Access. We&apos;ll reach out as spots open up — keep an eye on your inbox.</p>
             <button className="eam-submit" onClick={onClose}>Done</button>

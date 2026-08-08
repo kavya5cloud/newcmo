@@ -128,6 +128,6 @@ describe("the prompt forbids the failure modes seen in real answers", () => {
 
   it("still forbids the padding and category-verb failures", () => {
     expect(prompt).toMatch(/do not pad/i);
-    expect(prompt).toMatch(/are not actions/i);
+    expect(prompt).toMatch(/categories, not actions/i);
   });
 });

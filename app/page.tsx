@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SHOW_CONTENT_ENGINE } from "@/lib/flags";
 import { captureReferral } from "@/lib/referral-client";
+import Icon from "@/app/components/Icon";
 
 // The ways into the product. Derived rather than hand-numbered: the content engine is
 // behind a flag, and a hardcoded "01/02/03" under a hardcoded "Three ways in." would go
@@ -304,10 +305,10 @@ export default function Landing() {
               ["Marketing generalist", "$5,000/mo"], ["SEO agency", "$4,000/mo"], ["Content writer", "$1,500/mo"],
               ["Social media manager", "$1,500/mo"], ["Community & Reddit growth", "$1,000/mo"],
             ].map(([r, c]) => (
-              <div className="cmp-row" key={r}><span>{r}</span><span>{c}</span><span className="hi">✓</span></div>
+              <div className="cmp-row" key={r}><span>{r}</span><span>{c}</span><span className="hi"><Icon name="check" size={14} /></span></div>
             ))}
-            <div className="cmp-row"><span>AI-search visibility (GEO)</span><span className="na">not offered</span><span className="hi">✓</span></div>
-            <div className="cmp-row"><span>Saying no to busywork</span><span className="na">rare</span><span className="hi">✓</span></div>
+            <div className="cmp-row"><span>AI-search visibility (GEO)</span><span className="na">not offered</span><span className="hi"><Icon name="check" size={14} /></span></div>
+            <div className="cmp-row"><span>Saying no to busywork</span><span className="na">rare</span><span className="hi"><Icon name="check" size={14} /></span></div>
             <div className="cmp-row cmp-total"><span>Total per month</span><span className="strike">$13,000+</span><span className="hi">$15/mo</span></div>
           </div>
         </div>

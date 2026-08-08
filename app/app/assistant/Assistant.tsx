@@ -11,6 +11,7 @@ import {
 } from "@/lib/assistant/types";
 import { describeWhen, headline } from "@/lib/assistant/status";
 import type { SocialPlatform } from "@/lib/social/types";
+import Icon from "@/app/components/Icon";
 
 // The Marketing Assistant.
 //
@@ -101,7 +102,7 @@ export default function Assistant() {
         <section className="asst-status">
           <h1>Marketing Assistant</h1>
           <p className={"asst-state" + (status.paused ? " off" : "")}>
-            <span aria-hidden="true">{status.paused ? "❚❚" : "✓"}</span> {headline(status)}
+            <Icon name={status.paused ? "pause" : "check"} size={13} /> {headline(status)}
           </p>
 
           {err && <div className="cmp-err" role="alert">{err}</div>}

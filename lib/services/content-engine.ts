@@ -1,5 +1,6 @@
 import type { CmoContext } from "@/lib/services/cmo-context";
 import { ASSET_LABEL, type AssetKind } from "@/lib/services/intent-router";
+import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
 
 // Content Engine — when the user asks for content, produce ONLY the content.
 // No recommendation, no trade-offs, no confidence, no hypotheses. It still consumes the
@@ -50,8 +51,8 @@ Format: ${FORMAT[asset]}
 
 Hard rules:
 - Output ONLY the ${ASSET_LABEL[asset]}. No preamble, no explanation, no "here's", no strategy, no confidence notes, no options list unless the format itself is a list.
-- On-brand voice. Never invent statistics or fake testimonials.
-- Ready to paste.
+- On-brand voice. Ready to paste.
+${DELIVERABLE_RULES}
 
 Request: ${request}`;
 }

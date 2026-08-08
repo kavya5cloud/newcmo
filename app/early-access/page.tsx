@@ -1,5 +1,6 @@
 "use client";
 import { useState, type FormEvent, type ReactNode } from "react";
+import Icon from "@/app/components/Icon";
 
 // Early Access Program — premium application page, native to Populr's dark/mono
 // aesthetic (brand green/teal, not bolt-on blue). Progressive-enhancement form:
@@ -68,7 +69,7 @@ export default function EarlyAccess() {
       {!done ? (
         <>
           <header className="ea-hero">
-            <span className="ea-badge"><span className="ea-spark">✦</span> Early Access Program</span>
+            <span className="ea-badge"><span className="ea-spark"><Icon name="sparkle" size={13} /></span> Early Access Program</span>
             <h1>Get Early Access to Populr</h1>
             <p className="ea-sub">
               Join a select group of founders and marketers helping shape the future of AI-powered marketing.
