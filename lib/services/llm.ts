@@ -56,6 +56,18 @@ function dedupe(list: string[]) {
   return [...new Set(list.filter(Boolean))];
 }
 
+/**
+ * Models this key provably cannot use.
+ *
+ * A 404 "does not exist or you do not have access" is permanent for a given key, but it was
+ * being retried on every single request. In one cron run of ten slots that is twenty wasted
+ * round-trips — and worse, it sat between the caller and a model that would have worked.
+ *
+ * Process-lifetime only, deliberately: if access is granted later, a deploy clears it.
+ */
+const deadModels = new Set<string>();
+const deadKey = (provider: string, model: string) => `${provider}:${model}`;
+
 // Rough token estimate (~4 chars/token) — good enough for logging/quota accounting.
 function estTokens(chars: number) {
   return Math.ceil(chars / 4);
@@ -71,7 +83,7 @@ type LLMAttempt = {
   retried?: boolean;
 };
 
-const PROVIDERS: ProviderConfig[] = [
+export const PROVIDERS: ProviderConfig[] = [
   {
     // Primary when keyed: Google's free tier is generous and accurate, so it isn't
     // starved by Groq's tiny 70b daily cap. Real generateContent API (see callProvider).
@@ -80,6 +92,11 @@ const PROVIDERS: ProviderConfig[] = [
     env: "GEMINI_API_KEY",
     prefix: "",
     url: "https://generativelanguage.googleapis.com/v1beta/models",
+    // gemini-2.5-flash now answers 404 "no longer available to new users", and the free
+    // tier allocates gemini-2.0-flash a quota of literally 0 — so on a free key this whole
+    // provider is dead weight ahead of Groq. Both stay listed because a paid key can still
+    // use them; the dead-model memory above stops a dead one being retried all day.
+    // Set GEMINI_MODEL to a model your key can actually reach, or drop GEMINI_API_KEY.
     models: dedupe([
       process.env.GEMINI_MODEL || "gemini-2.5-flash",
       "gemini-2.0-flash",
@@ -92,14 +109,17 @@ const PROVIDERS: ProviderConfig[] = [
     env: "GROQ_API_KEY",
     prefix: "gsk_",
     url: "https://api.groq.com/openai/v1/chat/completions",
-    // Accuracy-first: the 70b model leads for the best answers, then falls back to the
-    // fast/cheap 8b-instant (and newer scout/compound-mini) on rate limits or quota so a
-    // request never dies — it just degrades. Override the lead model with GROQ_MODEL.
+    // Accuracy-first: the 70b model leads, falling back to the fast 8b-instant on rate
+    // limits so a request degrades rather than dying. Override the lead with GROQ_MODEL.
+    //
+    // Two models were removed after production logs showed they never worked:
+    // llama-4-scout returned 404 "does not exist or you do not have access" on every call,
+    // and compound-mini's own 429 named llama-3.3-70b — it routes to the same model and
+    // therefore shares the daily cap it was supposed to be a fallback for. Both cost a
+    // round-trip per request and could never have answered one.
     models: dedupe([
       process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
       "llama-3.1-8b-instant",
-      "meta-llama/llama-4-scout-17b-16e-instruct",
-      "groq/compound-mini",
     ]),
     authHeader: "Authorization",
     kind: "openai_compatible",
@@ -556,6 +576,7 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
     let lastAttempt: LLMAttempt | null = null;
     provider: for (const { provider, key } of configuredProviders) {
       model: for (const model of provider.models) {
+        if (deadModels.has(deadKey(provider.name, model))) continue model;
         let attempt = await callProvider(provider, model, key, prompt, requestId);
         if (attempt.ok) {
           if (sql) await putCachedAnalysis(sql, cacheKey, opts.url || null, attempt.text, provider.name, model);
@@ -564,7 +585,9 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
         let currentAttempt = attempt.attempt;
         lastAttempt = currentAttempt;
         if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
-          logEvent("llm_model_skip", { requestId, provider: provider.name, model, reason: "unsupported_model", status: currentAttempt.status });
+          // Permanent for this key — never ask again this process.
+          deadModels.add(deadKey(provider.name, model));
+          logEvent("llm_model_skip", { requestId, provider: provider.name, model, reason: "unsupported_model", status: currentAttempt.status, remembered: true });
           continue model;
         }
         if (!isTransientStatus(currentAttempt.status)) {
@@ -584,7 +607,10 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
           }
           currentAttempt = attempt.attempt;
           lastAttempt = currentAttempt;
-          if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) continue model;
+          if (isUnsupportedModelAttempt(currentAttempt.kind, currentAttempt.body)) {
+            deadModels.add(deadKey(provider.name, model));
+            continue model;
+          }
           if (currentAttempt.kind === "quota_exhausted") continue model;
           if (!isTransientStatus(currentAttempt.status)) continue provider;
         }

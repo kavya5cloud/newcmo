@@ -251,3 +251,59 @@ describe("store", () => {
     expect(stored.every((s) => s.state === "published")).toBe(true);
   });
 });
+
+describe("nothing is written for a slot that cannot publish", () => {
+  // The publish pass runs every ten minutes. It used to generate a slot's text with the
+  // model and *then* discover no account was connected, throwing the text away unread. For
+  // a tenant with a disconnected account that burned the day's token budget on posts nobody
+  // would ever see — and the visible symptom was the CMO chat degrading to the smallest
+  // model by mid-morning, because the good one was rate-limited.
+
+  const counting = () => {
+    let calls = 0;
+    return { calls: () => calls, content: async () => { calls++; return { text: "hello world", assetIds: [] }; } };
+  };
+
+  it("does not call the generator when no account is connected", async () => {
+    const gen = counting();
+    const { port } = fakeEngine({ accounts: [] });
+    const now = MON + 3_600_000;
+    const r = await runDue(dueQueue(now), "t", { now, engine: port, content: gen.content });
+
+    expect(gen.calls(), "generated content for a slot that could never publish").toBe(0);
+    expect(r.outcomes.length).toBeGreaterThan(0);
+    expect(r.outcomes.every((o) => !o.ok)).toBe(true);
+    expect(r.outcomes[0].message).toContain("No x account is connected");
+  });
+
+  it("does not call the generator when the account is disconnected", async () => {
+    const gen = counting();
+    const { port } = fakeEngine({ accounts: [account({ status: "disconnected" })] });
+    const now = MON + 3_600_000;
+    const r = await runDue(dueQueue(now), "t", { now, engine: port, content: gen.content });
+
+    expect(gen.calls()).toBe(0);
+    expect(r.outcomes[0].message).toContain("needs reconnecting");
+  });
+
+  it("does not call the generator when the token has expired", async () => {
+    const gen = counting();
+    const { port } = fakeEngine({ accounts: [account({ tokenExpiresAt: MON - 1 })] });
+    const now = MON + 3_600_000;
+    const r = await runDue(dueQueue(now), "t", { now, engine: port, content: gen.content });
+
+    expect(gen.calls()).toBe(0);
+    expect(r.outcomes[0].message).toContain("expired");
+  });
+
+  it("still generates and publishes when the account is healthy", async () => {
+    const gen = counting();
+    const { port, calls } = fakeEngine();
+    const now = MON + 3_600_000;
+    const r = await runDue(dueQueue(now), "t", { now, engine: port, content: gen.content });
+
+    expect(gen.calls()).toBeGreaterThan(0);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(r.outcomes.some((o) => o.ok)).toBe(true);
+  });
+});

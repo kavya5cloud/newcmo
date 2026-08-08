@@ -151,6 +151,25 @@ export async function runDue(
     if (!claim.ok) continue;
     working = claim.queue;
 
+    // Check the account *before* writing anything.
+    //
+    // This used to generate first and check second, which meant a tenant with no connected
+    // account paid for a model call on every due slot, every run — and then threw the text
+    // away unread. With the publish pass running every ten minutes that quietly consumed the
+    // day's whole token budget, so by the time a human asked the CMO a question the good
+    // model was rate-limited and the answer came from the smallest one in the chain. The
+    // symptom looked like "the AI got worse"; the cause was content nobody would ever see.
+    //
+    // hasMedia is passed as true here because the body does not exist yet; the media rule is
+    // re-checked below against the real assets, so nothing is skipped — only reordered.
+    const gate = preflight(slot, accounts, { hasMedia: true, now: opts.now });
+    if (!gate.ok) {
+      const r = setState(working, slot.id, "failed", gate.failure.message);
+      working = r.queue;
+      outcomes.push({ slotId: slot.id, ok: false, jobId: null, state: "failed", message: gate.failure.message });
+      continue;
+    }
+
     const body = await opts.content(slot).catch(() => null);
     const check = preflight(slot, accounts, { hasMedia: Boolean(body?.assetIds.length), now: opts.now });
 
