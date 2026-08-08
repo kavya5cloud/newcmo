@@ -1963,3 +1963,87 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .join-alt{padding:6px 0}
 }
 .refer-pending{margin:12px 0 0;font-size:12.5px;color:var(--faint);line-height:1.5}
+
+/* ── Icons ───────────────────────────────────────────────────────────────────
+   Emoji were replaced with the shared set (app/components/Icon.tsx). They need
+   the alignment emoji never had: an inline SVG sits on the text baseline by
+   default, which leaves it looking a pixel or two low next to a label. */
+.appui svg, .ea-spark svg, .cmp-row svg { vertical-align: middle; flex: 0 0 auto; }
+.appui .di { display: inline-flex; align-items: center; justify-content: center; width: 18px; }
+.appui .col-head .ca button { display: inline-flex; align-items: center; gap: 5px; }
+.cmp-row .hi { display: inline-flex; align-items: center; justify-content: center; }
+
+/* ── Foldable sections ────────────────────────────────────────────────────── */
+.appui .sect-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 0 0 8px; margin: 0; background: none; border: 0; cursor: pointer;
+  text-align: left; color: inherit; min-height: 32px;
+}
+.appui .sect-toggle .label { margin-bottom: 0; flex: 1 1 auto; }
+.appui .sect-meta {
+  font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--faint);
+  padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px;
+}
+.appui .sect-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 1px solid var(--line); color: var(--faint);
+  transition: color .14s ease, border-color .14s ease, background .14s ease;
+}
+.appui .sect-toggle:hover .sect-mark { color: var(--fg); border-color: var(--fg); }
+.appui .sect-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+/* Folded sections keep their heading but give up the surrounding space, which is the
+   whole point — otherwise folding four sections still leaves four gaps. */
+.appui .sect-folded { margin-top: 12px; }
+
+/* ── Generating: skeleton + step + clock ──────────────────────────────────── */
+.docskel { display: flex; flex-direction: column; gap: 16px; }
+.docskel-head { display: flex; align-items: center; gap: 10px; }
+.docskel-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--line); color: var(--accent);
+  animation: docskel-breathe 1.9s ease-in-out infinite;
+}
+.docskel-step { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.docskel-title { font-size: 13px; color: var(--fg); }
+.docskel-hint { font-size: 11.5px; color: var(--faint); }
+.docskel-time {
+  font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--faint);
+  font-variant-numeric: tabular-nums;   /* so the width doesn't jog every second */
+}
+.docskel-lines { display: flex; flex-direction: column; gap: 10px; }
+.docskel-line {
+  height: 11px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--line) 0%, rgba(255,255,255,.08) 50%, var(--line) 100%);
+  background-size: 220% 100%;
+  animation: docskel-sweep 1.5s linear infinite;
+}
+@keyframes docskel-sweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes docskel-breathe { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ── Button working state ─────────────────────────────────────────────────── */
+.appui .btn-spin {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+  border: 1.6px solid currentColor; border-right-color: transparent;
+  animation: btn-spin .6s linear infinite; vertical-align: -1px;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* Someone who has asked for less motion gets the state without the movement — the step
+   name and the clock already carry the information; the sweep was only ever decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .docskel-line, .docskel-ic, .appui .btn-spin { animation: none; }
+  .docskel-line { background: var(--line); }
+  .appui .btn-spin { border-right-color: currentColor; opacity: .5; }
+}
+
+/* Phones: the fold control needs a real touch target, and the panel needs room. */
+@media (max-width: 720px) {
+  .appui .sect-toggle { min-height: 44px; padding-bottom: 6px; }
+  .appui .sect-mark { width: 26px; height: 26px; }
+}
+
+/* The analytics heading variant inside a fold control. */
+.appui .sect-toggle .an-h { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
+.appui .sect-toggle + .an-s { margin: -2px 0 8px; }

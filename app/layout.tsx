@@ -45,11 +45,17 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  icons: {
-    icon: "/icon.svg?v=4",
-    shortcut: "/icon.svg?v=4",
-    apple: "/icon.svg?v=4",
-  },
+  // No `icons` block on purpose.
+  //
+  // It used to point every rel at "/icon.svg?v=4", which overrode Next's file conventions and
+  // left two gaps. Browsers request /favicon.ico regardless of what the page declares, and
+  // ours 404'd to an HTML error page — so they kept showing whatever was already cached,
+  // which is why /app appeared to have the old mark. And iOS ignores SVG for home-screen
+  // icons, so a bookmarked dashboard got a grey placeholder.
+  //
+  // app/favicon.ico, app/icon.svg and app/apple-icon.png are now picked up automatically,
+  // and Next appends its own content hash — so the next time the mark changes, the new one
+  // actually reaches people instead of needing a hand-bumped ?v=5.
 };
 
 export default function RootLayout({

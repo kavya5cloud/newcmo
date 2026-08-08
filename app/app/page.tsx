@@ -11,7 +11,9 @@ import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from
 import { AIProcessing } from "@/app/components/ai-processing";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { isContentEnginePath } from "@/lib/flags";
-import Icon from "@/app/components/Icon";
+import Icon, { type IconName } from "@/app/components/Icon";
+import Section from "@/app/components/Section";
+import DocSkeleton from "@/app/components/DocSkeleton";
 import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
 
 /* ---------- AI call (proxied through /api/generate) ---------- */
@@ -297,13 +299,13 @@ const AGENTS: AgentDef[] = [
   { id: "infl", name: "Influencer Campaigns", color: "#3ECF8E", sum: "Launch your first campaign", items: [["Build a scored creator shortlist for your niche", "Open list"]], icon: <path d="M20 4L7 8.5H4.5A2.5 2.5 0 0 0 2 11v2a2.5 2.5 0 0 0 2.5 2.5H6V19a1.5 1.5 0 0 0 1.5 1.5H9a1 1 0 0 0 1-1v-3.6l10 3.6V4z" /> },
 ];
 
-const DOCS = [
-  { id: "product", name: "Product Information", icon: "▤" },
-  { id: "compet", name: "Competitor Analysis", icon: "▥" },
-  { id: "voice", name: "Brand Voice", icon: "pen" as const },
-  { id: "strategy", name: "Marketing Strategy", icon: "◎" },
-  { id: "llms", name: "llms.txt", icon: "⌥", tag: "new" },
-  { id: "articles", name: "Articles", icon: "▸", count: "(39)" },
+const DOCS: { id: string; name: string; icon: IconName; tag?: string; count?: string }[] = [
+  { id: "product", name: "Product Information", icon: "doc" },
+  { id: "compet", name: "Competitor Analysis", icon: "search" },
+  { id: "voice", name: "Brand Voice", icon: "pen" },
+  { id: "strategy", name: "Marketing Strategy", icon: "target" },
+  { id: "llms", name: "llms.txt", icon: "queue", tag: "new" },
+  { id: "articles", name: "Articles", icon: "library", count: "(39)" },
 ];
 
 // The boot log is derived from the real workspace — brand, host, the channels that
@@ -413,7 +415,7 @@ export default function AppPage() {
   const [gscSite, setGscSite] = useState<string>("");
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
-  const [doc, setDoc] = useState<{ title: string; body: string } | null>(null);
+  const [doc, setDoc] = useState<{ title: string; body: string; loading?: boolean } | null>(null);
   const [toast, setToast] = useState("");
   const [termCollapsed, setTermCollapsed] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -761,6 +763,13 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   async function workItem(agentId: string, idx: number, item: string, agentName: string) {
     const key = agentId + ":" + idx;
     setBusyItem(key);
+    // Open the panel on the press.
+    //
+    // This used to wait for the whole generation, so a press changed one button caption to
+    // "…" and nothing else for ten or twenty seconds — long enough to read as a dead click
+    // and press again. The work takes as long as it takes; what was missing was any evidence
+    // it had started.
+    setDoc({ title: item, body: "", loading: true });
     let body: string;
     try {
       const brand = profile?.name || hostOf(url) || "the site";
@@ -784,6 +793,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     } catch (e) {
       showToast(`AI request failed: ${aiErrorText(e).slice(0, 160)}`);
       setBusyItem("");
+      setDoc(null);   // the panel opened optimistically; take it away rather than leave it spinning
       return;
     }
     setBusyItem("");
@@ -796,7 +806,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   async function openDoc(id: string, name: string) {
     if (docCache[id]) { setDoc({ title: name, body: docCache[id] }); return; }
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
-    setDoc({ title: name, body: "…generating…" });
+    setDoc({ title: name, body: "", loading: true });
     try {
       const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.\n\n${DELIVERABLE_RULES}`, url);
       setDocCache((c) => ({ ...c, [id]: body }));
@@ -1097,17 +1107,15 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" aria-label="Reset" onClick={reset}><Icon name="gear" size={15} /></button></span></div>
             <div className="col-body">
               <p className="company-desc">{profile?.description || profile?.positioning || "—"}</p>
-              <div className="sect">
-                <span className="label">Documents</span>
+              <Section id="documents" label="Documents">
                 {DOCS.map((doc) => (
                   <button className="docrow" key={doc.id} onClick={() => openDoc(doc.id, doc.name)}>
-                    <span className="di">{doc.icon}</span>{doc.name}
+                    <span className="di"><Icon name={doc.icon} size={15} /></span>{doc.name}
                     {doc.tag && <span className="new">NEW</span>}{doc.count && <span className="cnt">{doc.count}</span>}
                   </button>
                 ))}
-              </div>
-              <div className="sect">
-                <span className="label">Competitors</span>
+              </Section>
+              <Section id="competitors" label="Competitors" meta={competitors.length || null}>
                 <p className="company-desc" style={{ marginBottom: 10 }}>
                   These names drive comparison pages, objection handling, and positioning. Populr keeps them tied to the current website instead of reusing stale defaults.
                 </p>
@@ -1119,7 +1127,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                 )) : (
                   <div className="placeholder" style={{ marginTop: 0 }}>No competitor set yet. Re-run analysis to refresh the comparison set.</div>
                 )}
-              </div>
+              </Section>
             </div>
           </div>
 
@@ -1212,8 +1220,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                           : <><span>example data — not your traffic</span><span>connect Search Console for real numbers</span></>}
                     </div>
                   </div>
-                  <div className="sect">
-                    <div className="an-h">{gscData ? "Impressions & clicks" : "Traffic over time"}</div>
+                  <Section id="traffic" label={gscData ? "Impressions & clicks" : "Traffic over time"} variant="head">
                     <div className="chartbox">
                       <Chart
                         labels={gscData ? gscData.series.labels : d.labels}
@@ -1222,24 +1229,21 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       />
                     </div>
                     <div className="legend"><span><i />{gscData ? "Impressions" : "Visits"}</span><span className="l2"><i />{gscData ? "Clicks" : "Search clicks"}</span></div>
-                  </div>
+                  </Section>
                   {geoGaps.length > 0 && (
-                    <div className="sect">
-                      <div className="an-h">AI search visibility</div>
-                      <div className="an-s">Citation gaps from your GEO agent</div>
+                    <Section id="geo" label="AI search visibility" variant="head" sub="Citation gaps from your GEO agent">
                       {geoGaps.slice(0, 3).map(([t], i) => (
                         <div className="georow" key={i}><span className="geodot" />{t}</div>
                       ))}
-                    </div>
+                    </Section>
                   )}
-                  <div className="sect">
-                    <div className="an-h">Top queries</div>
+                  <Section id="queries" label="Top queries" variant="head">
                     <div style={{ marginTop: 8 }}>
                       {(gscData ? gscData.queries.slice(0, 5) : (rankings.length ? rankings : FALLBACK_RANKS).slice(0, 5)).map((r, i) => (
                         <div className="rankrow" key={i}><span className="rankpos">{r.pos}</span><span className="rq">{r.query}</span><span className="rt">{r.trend}</span></div>
                       ))}
                     </div>
-                  </div>
+                  </Section>
                 </>
               )}
 
@@ -1261,16 +1265,14 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                         ))}
                       </div>
                       {gscData.pages.length > 0 && (
-                        <div className="sect">
-                          <div className="an-h">Low CTR pages</div>
-                          <div className="an-s">High impressions but underperforming — quick wins</div>
+                        <Section id="ctr" label="Low CTR pages" variant="head" sub="High impressions but underperforming — quick wins">
                           {gscData.pages.map((p, i) => (
                             <div className="pagerow" key={i}>
                               <span className="pgpath">{p.page}</span>
                               <span className="pgmeta">{p.impressions} imp · {p.ctr} CTR · #{p.position}</span>
                             </div>
                           ))}
-                        </div>
+                        </Section>
                       )}
                     </>
                   )}
@@ -1334,7 +1336,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       {items.map(([t, act], i) => (
                         <div className="aitem" key={i}><span>{t}</span>
                           <button className="go2 go2-pri" disabled={busyItem === a.id + ":" + i} onClick={() => workItem(a.id, i, t, a.name)}>
-                            {busyItem === a.id + ":" + i ? "…" : act}
+                            {busyItem === a.id + ":" + i ? <span className="btn-spin" aria-label="Working" /> : act}
                           </button>
                         </div>
                       ))}
@@ -1413,10 +1415,14 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className="docpanel">
             <div className="doc-head">
               <span className="dt">{doc.title}</span>
-              <button onClick={() => { navigator.clipboard?.writeText(doc.body).then(() => showToast("Copied")); }}>⧉ copy</button>
+              {!doc.loading && (
+                <button onClick={() => { navigator.clipboard?.writeText(doc.body).then(() => showToast("Copied")); }}><Icon name="doc" size={13} /> copy</button>
+              )}
               <button aria-label="Close" onClick={() => setDoc(null)}><Icon name="close" size={15} /></button>
             </div>
-            <div className="doc-body">{doc.body}</div>
+            {doc.loading
+              ? <div className="doc-body"><DocSkeleton /></div>
+              : <div className="doc-body">{doc.body}</div>}
           </div>
         </div>
       )}
