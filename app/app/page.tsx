@@ -19,7 +19,7 @@ import { SOURCES, SOURCE_LABEL, canonicalSource, type SourceType } from "./_lib/
 import { logRecBatch, logRecEvent } from "./_lib/telemetry";
 import { trialSnapshot } from "./_lib/trial";
 import { buildFallbackFeed, normalizeFeed, withHonestSummaries } from "./_lib/feed";
-import { AGENTS, DOCS, buildTermLines } from "./_lib/catalog";
+import { AGENTS, DOCS, buildTermLines, normalizeProfile } from "./_lib/catalog";
 import { CHART, buildEstData } from "./_lib/chart-data";
 import { FALLBACK_RANKS, DOC_DEMO } from "./_lib/demo-data";
 import { Chart } from "./_components/Chart";
@@ -352,11 +352,22 @@ export default function AppPage() {
           const subject = source === "website" ? `the website ${u}` : `the ${SOURCE_LABEL[source]} ${display} (${u})`;
           const srcNote = source === "website" ? "" : " Social pages expose limited content — infer carefully from what's available, never invent specifics.";
           const descLine = sourceDesc.trim() ? `\nThe owner describes the business as: "${sourceDesc.trim().slice(0, 300)}". Treat this as the primary source of truth.` : "";
+          // `description` is asked for last and is allowed to go missing.
+          //
+          // It is a four-sentence field on the end of a seven-key object, so it is the part
+          // that gets cut when a response runs long — and a truncated JSON object is not a
+          // partial profile, it is a parse failure. One flaky generation therefore blanked
+          // the competitor list and the overview together, which is the symptom that got
+          // reported. normalizeProfile now drops a malformed field instead of losing the
+          // object, and a missing overview is repaired by its own call below.
+          //
+          // Newly worth guarding: the default model thinks before it answers, so part of the
+          // output budget is spent before the first character of JSON is written.
           const txt = await ai(
-            `Analyze ${subject} using the page content above.${srcNote}${descLine}\nRespond ONLY with JSON, no markdown fences, no preamble:\n{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`,
+            `Analyze ${subject} using the page content above.${srcNote}${descLine}\nRespond ONLY with JSON, no markdown fences, no preamble:\n{"name":"company name","oneLiner":"what it does in one sentence","audience":"who buys it","positioning":"2-sentence positioning summary","competitors":["3-4 real competitor company names"],"voice":"3 adjectives for brand voice","description":"a 4-sentence company overview for a dashboard sidebar"}`,
             source === "gbp" ? undefined : u
           );
-          p = extractJson<Profile>(txt);
+          p = normalizeProfile(extractJson<Profile>(txt));
         } catch (e) { lastErr = e; }
       }
       if (!p) throw lastErr || new Error("profile_failed");
@@ -364,6 +375,21 @@ export default function AppPage() {
       setProfile(p);
       const comps = (p.competitors || []).slice(0, 4).map((n, i) => ({ n, c: ["#E86A3A", "#5A8DE8", "#E8843A", "#9A6AE8"][i % 4] }));
       setCompetitors(comps);
+
+      // Repair the overview only if it did not survive. Usually it does, and this costs
+      // nothing; when it does not, one extra call beats a panel reading "—". Failing here
+      // costs the overview alone — profile, competitors and feed are already set above, and
+      // positioning stands in meanwhile.
+      if (!p.description) {
+        const brandForDesc = p.name;
+        ai(`Write a four-sentence company overview of ${brandForDesc} for a dashboard sidebar, grounded in the page content above. What they sell, who buys it, and what makes them different. Plain prose, no headings, no bullets, no preamble. Never invent statistics, funding, headcount or customer names.`,
+           source === "gbp" ? undefined : u)
+          .then((desc) => {
+            const clean = (desc || "").trim();
+            if (clean) setProfile((prev) => (prev ? { ...prev, description: clean } : prev));
+          })
+          .catch(() => {});   // positioning already covers this slot
+      }
       // Phase 2: generate a company-specific agents feed + rankings, and (separately) an
       // estimated-traffic figure. Kept as two calls so a failure in one can't break the other.
       let genFeed: Record<string, FeedEntry> | null = null;

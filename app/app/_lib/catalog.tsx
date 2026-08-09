@@ -53,3 +53,39 @@ export function buildTermLines(brand: string, host: string, channels: string[], 
   lines.push(["tl-ok", `AI CMO ready — ${agentCount} agent${agentCount === 1 ? "" : "s"} on ${host}`]);
   return lines;
 }
+
+/**
+ * Make a parsed profile safe to render.
+ *
+ * `extractJson` gives back whatever the model produced. If it omitted `competitors`, or
+ * returned a string where an array belonged, the Competitors panel rendered empty with no
+ * error anywhere — the analysis "succeeded" and the panel was simply blank, which is the
+ * hardest kind of failure to report because nothing looks broken.
+ *
+ * So: coerce the shape, drop entries that are obviously not company names, and cap the list.
+ * Anything genuinely missing stays missing — this fills in structure, never content.
+ */
+export function normalizeProfile<T extends Record<string, unknown>>(raw: T): T {
+  const out = { ...raw } as Record<string, unknown>;
+
+  const comps = out.competitors;
+  const list = Array.isArray(comps)
+    ? comps
+    // Models sometimes return "Stripe, Adyen, Braintree" instead of an array.
+    : typeof comps === "string"
+      ? comps.split(/[,;]/)
+      : [];
+
+  out.competitors = list
+    .map((c) => String(c ?? "").trim().replace(/^["'\s-]+|["'\s.]+$/g, ""))
+    .filter((c) => c.length > 1 && c.length <= 40)
+    // "3-4 names" and friends: the placeholder text coming back as the answer.
+    .filter((c) => !/^\d|^(names?|competitors?|none|n\/?a|unknown|tbd)$/i.test(c))
+    .slice(0, 4);
+
+  for (const k of ["name", "oneLiner", "audience", "positioning", "voice", "description"]) {
+    if (typeof out[k] !== "string") delete out[k];
+  }
+
+  return out as T;
+}
