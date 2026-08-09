@@ -2343,3 +2343,9 @@ html{scroll-padding-top:var(--eab-h,0px)}
 }
 /* And the caption above it stops being a whisper under three large numbers. */
 .appui .an-s { color: var(--dim); }
+
+/* AI-search visibility panel. */
+.appui .geo-run { margin-top: 10px; width: 100%; justify-content: center; }
+.appui .geo-note {
+  margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: var(--faint);
+}

@@ -70,6 +70,11 @@ export default function AppPage() {
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [doc, setDoc] = useState<{ title: string; body: string; loading?: boolean } | null>(null);
+  // Real AI-search visibility. Null means "never checked" — which the panel says out loud,
+  // because "not checked" and "checked, you were not named" are opposite facts and the old
+  // hardcoded version could express neither.
+  const [geo, setGeo] = useState<{ summary: string; items: [string, string][]; engine: string; checkedAt: number } | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [termCollapsed, setTermCollapsed] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -589,6 +594,41 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   const fresh = useMemo(() => feedIsFresh(feedAt), [feedAt, slot]);
   const contextualFeed = useMemo(() => buildFallbackFeed(profile, url), [profile, url, slot]);
   const geoGaps = feed.geo?.items?.length ? feed.geo.items : contextualFeed.geo?.items || [];
+
+  // Read-only: GET never triggers a check, so opening the dashboard costs nothing.
+  useEffect(() => {
+    fetch("/api/geo", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.ok && d.report) {
+          setGeo({ summary: d.summary, items: d.items, engine: d.report.engine, checkedAt: d.report.checkedAt });
+        }
+      })
+      .catch(() => {});   // an absent panel beats a broken one
+  }, []);
+
+  async function runGeoCheck() {
+    if (geoBusy || !profile) return;
+    setGeoBusy(true);
+    try {
+      const r = await fetch("/api/geo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: profile.name, host: hostOf(url),
+          category: profile.oneLiner, audience: profile.audience,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.report) { showToast(d.hint || "Couldn't run the check right now"); return; }
+      setGeo({ summary: d.summary, items: d.items, engine: d.report.engine, checkedAt: d.report.checkedAt });
+      showToast(d.summary);
+    } catch {
+      showToast("Couldn't reach the AI-search check");
+    } finally {
+      setGeoBusy(false);
+    }
+  }
   const suggestedQuestions = useMemo(() => {
     const brand = profile?.name || hostOf(url) || "this site";
     const oneLiner = profile?.oneLiner || "the product";
@@ -917,10 +957,26 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                     <div className="legend"><span><i />{gscData ? "Impressions" : "Visits"}</span><span className="l2"><i />{gscData ? "Clicks" : "Search clicks"}</span></div>
                   </Section>
                   {geoGaps.length > 0 && (
-                    <Section id="geo" label="AI search visibility" variant="head" sub="Citation gaps from your GEO agent">
-                      {geoGaps.slice(0, 3).map(([t], i) => (
+                    <Section
+                      id="geo"
+                      label="AI search visibility"
+                      variant="head"
+                      sub={geo
+                        ? `${geo.summary} · asked ${new Date(geo.checkedAt).toLocaleDateString()} via ${geo.engine}`
+                        : "Ask an AI assistant what a buyer would ask, and see whether you come up"}
+                    >
+                      {/* Measured results when they exist; suggestions when they do not. The
+                          two are never mixed, and neither is dressed as the other. */}
+                      {(geo ? geo.items : geoGaps).slice(0, 3).map(([t], i) => (
                         <div className="georow" key={i}><span className="geodot" />{t}</div>
                       ))}
+                      <button className="go2 geo-run" onClick={runGeoCheck} disabled={geoBusy || !profile}>
+                        {geoBusy ? <span className="btn-spin" aria-label="Checking" /> : geo ? "Check again" : "Run the check"}
+                      </button>
+                      {!geo && (
+                        <p className="geo-note">Nothing has been measured yet. This asks a model four buyer
+                        questions about your category — never naming you — and reports whether you came up.</p>
+                      )}
                     </Section>
                   )}
                   <Section id="queries" label="Top queries" variant="head">
