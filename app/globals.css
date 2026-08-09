@@ -2177,3 +2177,155 @@ html{scroll-padding-top:var(--eab-h,0px)}
   }
   .appui button:active:not(:disabled) { transform: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SURFACE REFINEMENT
+   ───────────────────────────────────────────────────────────────────────────
+   What separates a dark interface that looks expensive from one that looks
+   unfinished is almost never colour choice — it is edges.
+
+   A flat panel one shade lighter than the page reads as a rectangle someone
+   forgot to style. A real surface catches light on its top edge and drops a
+   shadow beneath, because that is what a raised thing does. Three properties
+   do all of it: a hairline border, an inset highlight on the top edge, and a
+   shadow with more spread than offset.
+
+   Nothing here changes a layout or a colour palette. It changes how surfaces
+   sit relative to the page.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Borders that read at a glance without drawing attention. The existing
+     --line (#27302a) is nearly invisible against --panel; these sit above it. */
+  --edge:        rgba(255, 255, 255, .075);
+  --edge-strong: rgba(255, 255, 255, .13);
+  /* The lit top edge. Subtle enough that you notice its absence, not its
+     presence. */
+  --lift: inset 0 1px 0 rgba(255, 255, 255, .045);
+  /* Spread well beyond offset: a tight shadow reads as a drop shadow from
+     2009, a wide soft one reads as depth. */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  --shadow-md: 0 2px 4px rgba(0,0,0,.45), 0 24px 60px -24px rgba(0,0,0,.85);
+}
+
+/* ── Cards and panels ─────────────────────────────────────────────────────── */
+.landing .cell,
+.landing .acell,
+.landing .plancard,
+.appui .gsc-card,
+.appui .plancard,
+.appui .authcard,
+.appui .docpanel,
+.appui .trial-lock-card {
+  border-color: var(--edge);
+  box-shadow: var(--lift), var(--shadow-sm);
+}
+.appui .docpanel, .appui .trial-lock-card, .appui .authcard {
+  box-shadow: var(--lift), var(--shadow-md);
+}
+
+/* Interactive cards earn a brighter edge on hover — the edge is the affordance,
+   so it should be the thing that responds. */
+.landing .cell:hover, .landing .acell:hover, .appui .gsc-card:hover { border-color: var(--edge-strong); }
+
+/* ── Column headers ───────────────────────────────────────────────────────
+   These were 11.5px mono in --faint sitting above 12.5px body text: nearly the
+   same weight as the content they label, so the eye had no anchor. A label
+   should be quiet but unmistakably a label — smaller, wider-tracked, and
+   separated by space rather than by shouting. */
+.appui .col-head { padding: 16px 16px 13px; }
+.appui .col-head .ct {
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ── The company description ──────────────────────────────────────────────
+   Nine unbroken lines of 12.5px prose was the single densest thing on the
+   dashboard, and it is the first thing under the heading. Two fixes: a measure
+   that stops lines running past comfortable reading length, and line-height
+   that gives the text room. Long paragraphs are clamped with a fade rather
+   than cut, so it is obvious there is more. */
+.appui .company-desc {
+  max-width: 62ch;
+  line-height: 1.72;
+  color: var(--dim);
+}
+/* No line clamp. The first attempt cut this at six lines, which ended the
+   paragraph on "With its focus on innovation and…" with nothing to click. That
+   is not tidier than a long paragraph — it is the same text with the end
+   hidden. The density problem is solved by the measure and leading above, and
+   by making it read as secondary context rather than as the headline it was
+   competing with. */
+.appui .company-desc { font-size: 12.5px; color: var(--faint); }
+
+/* ── Landing rhythm ───────────────────────────────────────────────────────
+   Section spacing was set per-section, so the gaps between them varied by up
+   to 40px with nothing meaningful behind the difference. One scale. */
+.landing section { padding-block: clamp(72px, 9vw, 128px); }
+/* No border-top here: sections already carry a border-bottom, so adding one
+   stacked two hairlines between every pair — which at 2x reads as one heavy,
+   slightly muddy rule rather than a crisp divider. */
+
+/* ── The nav's trial button ───────────────────────────────────────────────
+   "Try free" with a separate pale chip reading "1 mo" nested inside it looked
+   like two controls fused together — the chip had its own background, its own
+   radius, and sat on a lime button that already had both. One control, one
+   surface; the duration goes back to being part of the sentence. */
+.landing .nav-r .btn .kbd {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: 6px;
+  opacity: .62;
+  font-size: .92em;
+  font-weight: 500;
+}
+
+/* ── Headings ─────────────────────────────────────────────────────────────
+   Tighter tracking as size increases. Large type set at default letter-spacing
+   always looks slightly loose; this is the single cheapest thing that makes
+   headings look professionally set. */
+.landing h1 { letter-spacing: -.028em; }
+.landing h2 { letter-spacing: -.02em; }
+.appui .home-line, .appui h1, .appui h2 { letter-spacing: -.015em; }
+
+/* Numerals in metrics should not jog as they change. */
+.appui .sv, .appui .num, .refer-count, .appui .stat { font-variant-numeric: tabular-nums; }
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+   The default light scrollbar on a near-black panel is a bright stripe down
+   the side of the product. */
+.appui .col-body, .appui .doc-body, .landing {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.appui .col-body::-webkit-scrollbar, .appui .doc-body::-webkit-scrollbar { width: 10px; }
+.appui .col-body::-webkit-scrollbar-thumb, .appui .doc-body::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 99px; border: 3px solid transparent; background-clip: content-box;
+}
+.appui .col-body::-webkit-scrollbar-thumb:hover, .appui .doc-body::-webkit-scrollbar-thumb:hover {
+  background: var(--faint); background-clip: content-box;
+}
+.appui .col-body::-webkit-scrollbar-track, .appui .doc-body::-webkit-scrollbar-track { background: transparent; }
+
+/* Text selection in the brand colour rather than the browser's blue. */
+::selection { background: rgba(213, 255, 114, .26); color: var(--fg); }
+
+/* ── Announcement banner ──────────────────────────────────────────────────
+   .eab-text is `white-space:nowrap` with an ellipsis, so on anything narrower
+   than a laptop the message truncated mid-word: "Create complete product
+   launches, n…". A sentence cut at "n" does not read as a design decision, it
+   reads as a bug, and it is the first thing above the logo.
+
+   Below 900px the message is dropped entirely rather than shortened. The CTA is
+   the only part that does anything; a half-sentence next to it is worse than no
+   sentence. The full message is still there for anyone on a wide screen. */
+@media (max-width: 900px) {
+  .eab-msg { display: none; }
+  .eab { justify-content: center; gap: 12px; }
+  .eab-right { flex: 0 1 auto; }
+}
+/* On wide screens let it use the room it has instead of ellipsing early. */
+.eab-text { max-width: min(62ch, 52vw); }
