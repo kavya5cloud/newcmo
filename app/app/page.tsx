@@ -860,9 +860,15 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                         </>
                       ) : (
                         <>
-                          <div className="stat"><div className="sl">Saw you in Google</div><div className="sv">{d.saw}</div><div className="sd">↗ {d.sawD}</div></div>
-                          <div className="stat"><div className="sl">Clicked through</div><div className="sv">{d.clicked}</div><div className="sd">↗ {d.clickedD}</div></div>
-                          <div className="stat"><div className="sl">Visited your site</div><div className="sv">{d.visited}</div><div className="sd">↗ {d.visitedD}</div></div>
+                          {/* No growth arrows on sample figures.
+                              The numbers are labelled as samples, but "↗ +48.2%" is not a
+                              sample of anything — a shape can stand in for a real value, a
+                              trend cannot stand in for a real trend. Someone skimming reads
+                              the green arrow long before the caption above it, and leaves
+                              believing their clicks rose by half. */}
+                          <div className="stat"><div className="sl">Saw you in Google</div><div className="sv">{d.saw}</div><div className="sd sd-sample">sample</div></div>
+                          <div className="stat"><div className="sl">Clicked through</div><div className="sv">{d.clicked}</div><div className="sd sd-sample">sample</div></div>
+                          <div className="stat"><div className="sl">Visited your site</div><div className="sv">{d.visited}</div><div className="sd sd-sample">sample</div></div>
                         </>
                       )}
                     </div>

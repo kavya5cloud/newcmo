@@ -2329,3 +2329,17 @@ html{scroll-padding-top:var(--eab-h,0px)}
 }
 /* On wide screens let it use the room it has instead of ellipsing early. */
 .eab-text { max-width: min(62ch, 52vw); }
+
+/* Sample figures read as samples.
+   The delta slot previously held an invented "↗ +48.2%" in growth green. Now it holds the
+   word "sample" in the muted tone, so the row that would otherwise be the most confident
+   thing on the panel is the one that admits it is a placeholder. */
+.appui .sd-sample {
+  color: var(--faint);
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+/* And the caption above it stops being a whisper under three large numbers. */
+.appui .an-s { color: var(--dim); }

@@ -2,6 +2,20 @@
 //
 // Data, not behaviour. Everything here is static — the per-slot suggestions that actually
 // rotate live in lib/agent-feed.ts.
+//
+// These are the last-resort fallback: they render when there is no generated feed AND no
+// profile-derived one, which is precisely the state a first-time visitor sees.
+//
+// So every line here describes work the agent WILL do. None of them may report a finding.
+// Four used to: "12 pages missing meta descriptions", "Keyword gap: marketing copilot —
+// 2.1k/mo, low difficulty", "Perplexity cites 2 competitors for your core query", and "Not
+// cited for ai marketing automation in ChatGPT". Nothing counted those pages, looked up that
+// volume, or queried either engine — there is no citation check anywhere in the codebase.
+// They were the same number shown to every visitor regardless of their site, which on a
+// three-page site makes "12 pages" a lie with a decimal point in it.
+//
+// We spent this week teaching the model not to invent statistics. Shipping invented ones in
+// the chrome around it is worse, because the model can at least be told to stop.
 
 import Icon, { type IconName } from "@/app/components/Icon";
 
@@ -9,8 +23,8 @@ import Icon, { type IconName } from "@/app/components/Icon";
 export type AgentDef = { id: string; name: string; color: string; sum: string; items: [string, string][]; icon: React.ReactNode };
 export const AGENTS: AgentDef[] = [
   { id: "reddit", name: "Reddit Agent", color: "#FF4500", sum: "High-intent threads to reply to", items: [["Thread: \"tools for early-stage marketing?\" — high intent", "Draft reply"], ["Thread: \"is SEO dead in 2026?\" — share a practical perspective", "Draft reply"], ["Thread: \"AI CMO tools worth it?\" — direct match", "Draft reply"]], icon: <><ellipse cx="12" cy="14" rx="8" ry="5.6" /><circle cx="19.5" cy="9.5" r="1.6" /><path d="M12 8.4l1.2-4.2 4 1.1" strokeLinecap="round" /><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" /><path d="M9.3 16.3c1.7 1.1 3.7 1.1 5.4 0" strokeLinecap="round" /></> },
-  { id: "geo", name: "GEO Agent", color: "#5A8DE8", sum: "AI-search citation checks", items: [["Not cited for \"ai marketing automation\" in ChatGPT", "Fix gap"], ["Perplexity cites 2 competitors for your core query", "Fix gap"]], icon: <><circle cx="12" cy="12" r="8.4" /><ellipse cx="12" cy="12" rx="3.6" ry="8.4" /><path d="M3.8 12h16.4" /></> },
-  { id: "seo", name: "SEO Agent", color: "#CDA6F2", sum: "Search fixes & keyword plays", items: [["12 pages missing meta descriptions", "Review"], ["Keyword gap: \"marketing copilot\" — 2.1k/mo, low difficulty", "Draft post"]], icon: <><circle cx="11" cy="11" r="6.2" /><path d="M15.6 15.6L20 20" /><path d="M8.5 11h5M11 8.5v5" /></> },
+  { id: "geo", name: "GEO Agent", color: "#5A8DE8", sum: "AI-search citation checks", items: [["Check whether AI answers name you for your category", "Check"], ["See which competitors get cited instead of you", "Check"]], icon: <><circle cx="12" cy="12" r="8.4" /><ellipse cx="12" cy="12" rx="3.6" ry="8.4" /><path d="M3.8 12h16.4" /></> },
+  { id: "seo", name: "SEO Agent", color: "#CDA6F2", sum: "Search fixes & keyword plays", items: [["Find pages missing titles and descriptions", "Review"], ["Look for searches you could rank for and do not", "Review"]], icon: <><circle cx="11" cy="11" r="6.2" /><path d="M15.6 15.6L20 20" /><path d="M8.5 11h5M11 8.5v5" /></> },
   { id: "x", name: "X Agent", color: "#FAFAFA", sum: "Post & thread ideas", items: [["Thread idea: \"we skipped 80% of our marketing tasks\"", "Draft"], ["Post: launch-week metrics recap", "Draft"]], icon: <path d="M17.2 3h3l-6.6 7.6L21.5 21h-6.1l-4.8-6.2L5.1 21h-3l7.1-8.1L2.5 3h6.2l4.3 5.7L17.2 3zm-1 16.2h1.7L6.9 4.7H5.1l11.1 14.5z" fill="currentColor" stroke="none" /> },
   { id: "articles", name: "Articles Agent", color: "#9A6AE8", sum: "Long-form topics & outlines", items: [["\"AI CMO vs marketing agency: real math\" — outline ready", "Open"], ["\"how to get cited by ChatGPT\" — research done", "Open"]], icon: <><path d="M4 20l1.2-4.2L16.4 4.6a2.05 2.05 0 0 1 2.9 2.9L8.2 18.8 4 20z" /><path d="M14.5 6.5l3 3" /></> },
   { id: "hn", name: "Hacker News Agent", color: "#FF6600", sum: "Launch post prep", items: [["Show HN: a focused marketing operating system", "Review"]], icon: <><rect x="3" y="3" width="18" height="18" rx="3.5" /><path d="M8.3 7.5l3.7 5.2v4M15.7 7.5L12 12.7" strokeWidth="1.9" strokeLinecap="round" /></> },
