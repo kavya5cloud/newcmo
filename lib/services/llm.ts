@@ -92,14 +92,24 @@ export const PROVIDERS: ProviderConfig[] = [
     env: "GEMINI_API_KEY",
     prefix: "",
     url: "https://generativelanguage.googleapis.com/v1beta/models",
-    // gemini-2.5-flash now answers 404 "no longer available to new users", and the free
-    // tier allocates gemini-2.0-flash a quota of literally 0 — so on a free key this whole
-    // provider is dead weight ahead of Groq. Both stay listed because a paid key can still
-    // use them; the dead-model memory above stops a dead one being retried all day.
-    // Set GEMINI_MODEL to a model your key can actually reach, or drop GEMINI_API_KEY.
+    // Verified against a live key (Aug 2026): gemini-3.6-flash returns 200 on v1beta.
+    //
+    // The default used to be gemini-2.5-flash, which answered 404 "no longer available to
+    // new users" — so anyone who set GEMINI_API_KEY without also setting GEMINI_MODEL got a
+    // dead model at the front of the chain and never knew. The default is now a model that
+    // was actually tested rather than assumed.
+    //
+    // Deliberately NOT an alias like gemini-flash-latest: an alias silently swaps the model
+    // underneath you, and the prompt rules in lib/cmo/quality-rules.ts are tuned against
+    // observed behaviour. A model changing mid-week with nothing in the diff to explain it
+    // is how "the AI got worse again" happens.
+    //
+    // Note gemini-3.6-flash is a thinking model — it spent 76 thinking tokens answering
+    // "say ok". Good for strategy, pure overhead for short copy. If token spend becomes a
+    // problem again, cap it with generationConfig.thinkingConfig rather than downgrading.
     models: dedupe([
-      process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      "gemini-2.0-flash",
+      process.env.GEMINI_MODEL || "gemini-3.6-flash",
+      "gemini-2.5-flash",
     ]),
     authHeader: "x-goog-api-key",
     kind: "gemini",

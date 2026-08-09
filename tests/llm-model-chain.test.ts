@@ -35,6 +35,33 @@ describe("the model chain only lists models that can answer", () => {
     expect(groq.length).toBeGreaterThan(1);
   });
 
+  it("defaults Gemini to a model that was actually tested, not assumed", () => {
+    // The old default was gemini-2.5-flash, which answered 404 "no longer available to new
+    // users". Anyone setting GEMINI_API_KEY without also setting GEMINI_MODEL therefore put
+    // a dead model at the front of the chain. gemini-3.6-flash was verified returning 200
+    // against a live key before being made the default.
+    expect(modelsOf("gemini")[0]).toBe("gemini-3.6-flash");
+  });
+
+  it("pins a version rather than following an alias", () => {
+    // gemini-flash-latest silently swaps the underlying model. The prompt rules are tuned
+    // against observed behaviour, so a model changing with nothing in the diff is how
+    // "the AI got worse again" happens with no way to bisect it.
+    for (const m of modelsOf("gemini")) {
+      expect(m, `${m} is a moving alias`).not.toMatch(/-latest$/);
+    }
+  });
+
+  it("keeps non-text models out of the chain", () => {
+    // The key also lists image, tts, embedding and robotics models. Any of them in the
+    // chain fails or returns a shape the parser cannot read.
+    for (const p of PROVIDERS) {
+      for (const m of p.models) {
+        expect(m, `${m} is not a text model`).not.toMatch(/-image|-tts|embedding|robotics|computer-use/);
+      }
+    }
+  });
+
   it("never lists the same model twice", () => {
     for (const p of PROVIDERS) {
       expect(new Set(p.models).size, `${p.name} repeats a model`).toBe(p.models.length);
