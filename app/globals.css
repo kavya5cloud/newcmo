@@ -1992,8 +1992,9 @@ html{scroll-padding-top:var(--eab-h,0px)}
 }
 .appui .sect-toggle:hover .sect-mark { color: var(--fg); border-color: var(--fg); }
 .appui .sect-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-/* Folded sections keep their heading but give up the surrounding space, which is the
-   whole point — otherwise folding four sections still leaves four gaps. */
+/* Folded sections give up their surrounding space, which is the point — otherwise folding
+   four sections still leaves four gaps where they used to be. The fold is instant; see the
+   note in app/components/Section.tsx for why the animated versions were backed out. */
 .appui .sect-folded { margin-top: 12px; }
 
 /* ── Generating: skeleton + step + clock ──────────────────────────────────── */
@@ -2047,3 +2048,132 @@ html{scroll-padding-top:var(--eab-h,0px)}
 /* The analytics heading variant inside a fold control. */
 .appui .sect-toggle .an-h { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
 .appui .sect-toggle + .an-s { margin: -2px 0 8px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION
+   ───────────────────────────────────────────────────────────────────────────
+   One system, so the whole product feels like one hand made it.
+
+   Three durations and two curves, and everything uses them. Before this there
+   were sixty-odd transitions with ad-hoc timings — .14s here, .3s there, four
+   different curves — which is the difference between an interface that feels
+   considered and one that feels assembled. Nothing here is decoration: every
+   movement either shows where a thing came from, or confirms a press landed.
+
+   Rules followed throughout:
+     · Nothing over 260ms. Past that, motion stops being feedback and becomes
+       a queue you wait in.
+     · Only transform and opacity animate. Anything touching layout (height,
+       top, margin) drops frames on a mid-range phone.
+     · Every entrance has an exit. A thing that fades in and vanishes reads as
+       a glitch.
+     · prefers-reduced-motion removes movement, never information.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --dur-fast: .12s;   /* presses, hovers — must feel instant */
+  --dur-md:   .2s;    /* folds, reveals, state changes */
+  --dur-slow: .26s;   /* entrances, panels, anything travelling a distance */
+  --ease-out:  cubic-bezier(.22, .61, .36, 1);      /* things arriving */
+  --ease-spring: cubic-bezier(.34, 1.4, .5, 1);     /* things confirming — slight overshoot */
+}
+
+/* ── Press feedback ───────────────────────────────────────────────────────
+   A button that does not move when pressed feels broken on touch, where there
+   is no cursor and no hover to confirm you hit anything. */
+.appui button, .appui .docrow, .appui .go, .appui .go2, .landing button {
+  transition: transform var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              opacity var(--dur-fast) var(--ease-out);
+}
+.appui button:active:not(:disabled),
+.appui .docrow:active,
+.landing button:active:not(:disabled) { transform: scale(.97); }
+
+/* Primary actions lift toward the cursor; secondary ones only brighten. The
+   difference is what makes a primary action read as primary. */
+.appui .go:hover:not(:disabled), .landing .cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.appui .docrow:hover { transform: translateX(2px); }
+
+/* ── Focus ────────────────────────────────────────────────────────────────
+   :focus-visible, not :focus — so a mouse press never draws a ring, but a Tab
+   key always does. Keyboard users are otherwise navigating blind. */
+.appui *:focus-visible, .landing *:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Entrances ────────────────────────────────────────────────────────────
+   The agent board arrives in sequence rather than all at once. Staggering is
+   what makes a dashboard look composed instead of dumped — the eye is given an
+   order to read in. Capped at eight, because past that the last card is late
+   enough to feel like a bug. */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.appui .agent, .appui .sect, .appui .gsc-card, .appui .plancard, .appui .pq-item {
+  animation: riseIn var(--dur-slow) var(--ease-out) both;
+}
+.appui .agent:nth-child(1) { animation-delay: 0ms }
+.appui .agent:nth-child(2) { animation-delay: 40ms }
+.appui .agent:nth-child(3) { animation-delay: 80ms }
+.appui .agent:nth-child(4) { animation-delay: 120ms }
+.appui .agent:nth-child(5) { animation-delay: 160ms }
+.appui .agent:nth-child(6) { animation-delay: 200ms }
+.appui .agent:nth-child(7) { animation-delay: 240ms }
+.appui .agent:nth-child(n+8) { animation-delay: 280ms }
+
+/* ── Chat ─────────────────────────────────────────────────────────────────
+   A reply that appears fully formed reads as a page reload. Coming up from
+   below says it arrived. */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px) scale(.995); }
+  to   { opacity: 1; transform: none; }
+}
+.appui .msg { animation: msgIn var(--dur-slow) var(--ease-out) both; }
+
+/* ── Panels and modals ───────────────────────────────────────────────────── */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.appui .docpanel, .appui .trial-lock-card { animation: panelIn var(--dur-slow) var(--ease-spring) both; }
+@keyframes veilIn { from { opacity: 0 } to { opacity: 1 } }
+.appui .docwrap, .appui .trial-lock { animation: veilIn var(--dur-md) var(--ease-out) both; }
+
+/* ── Toast ────────────────────────────────────────────────────────────────
+   Slight overshoot on arrival: a confirmation should feel like it landed. */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+.appui .toast { animation: toastIn var(--dur-slow) var(--ease-spring) both; }
+
+/* ── Mobile column switching ──────────────────────────────────────────────
+   Tapping Analytics swapped the whole screen instantly, which loses the sense
+   that these are neighbouring places rather than separate pages. */
+@media (max-width: 720px) {
+  @keyframes colIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+  .appui .col.mactive { animation: colIn var(--dur-md) var(--ease-out) both; }
+  /* Touch has no hover, so the lift only reads as lag. */
+  .appui .docrow:hover, .appui .go:hover:not(:disabled) { transform: none; }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────
+   Movement goes; nothing else does. Every element still arrives, still shows
+   its state, still confirms a press through colour. Someone who gets motion
+   sick from a parallax should not also lose the interface. */
+@media (prefers-reduced-motion: reduce) {
+  .appui *, .landing * {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+  }
+  .appui button:active:not(:disabled) { transform: none; }
+}

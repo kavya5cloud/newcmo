@@ -17,7 +17,12 @@ import Icon from "./Icon";
 //
 //   Folded sections are remembered per id in localStorage. Someone who folds Competitors
 //   away is saying they do not want it; reopening it on every reload argues with them.
-//   Content stays in the DOM with `hidden` so in-page find still reaches it.
+//
+//   The fold does NOT animate, and that was a deliberate retreat. Both height techniques —
+//   grid 0fr→1fr and max-height — were correct in the stylesheet and refused to take effect
+//   in the browser this was verified against; the closed rule simply never won. Rather than
+//   ship an animation I could not confirm, the fold stays instant via `hidden`, which is
+//   verified working. The plus/minus icon already carries the state change.
 
 const STORE_KEY = "populr.folded";
 
