@@ -1,4 +1,5 @@
 import { generateText, configuredProviderNames } from "@/lib/services/llm";
+import { CRAFT_RULES, CRAFT_BANS, formFor, scoreDraft, rewriteNote } from "./craft";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { createAdapterRegistry } from "@/lib/social/registry";
 import type { SocialPlatform } from "@/lib/social/types";
@@ -59,6 +60,12 @@ function buildPrompt(input: ComposeInput, ctx: GenerationContext): string {
     ``,
     `CONTEXT YOU MUST USE:`,
     contextToPrompt(ctx),
+    ``,
+    CRAFT_RULES,
+    ``,
+    formFor(ctx.platforms.map((p) => p.platform)),
+    ``,
+    CRAFT_BANS,
     ``,
     `RULES`,
     `- Write for ${input.audience}. Specific beats clever.`,
@@ -163,9 +170,45 @@ export async function composeWithAi(
     return deterministicResult(input, `The model's response could not be parsed (${why}). This draft is from the built-in composer.`);
   }
 
-  const body = (parsed.body ?? "").trim();
+  let body = (parsed.body ?? "").trim();
   if (!body) {
     return deterministicResult(input, "The model returned no body text. This draft is from the built-in composer.");
+  }
+
+  // One rewrite, and only when the deterministic check finds enough wrong to justify it.
+  //
+  // A prompt is a request; this is the contract. The scorer catches the faults that can be
+  // caught without a model — the stock phrases, the unsourced claim, the opening that would
+  // fit any post about anything, the sentences that all run to the same length — and names
+  // them back rather than asking for something vaguer and better.
+  //
+  // Capped at one attempt on purpose. A rewrite loop is how a token budget disappears, and
+  // this codebase has already lost a day to exactly that.
+  const craft = scoreDraft(body);
+  if (craft.needsRewrite && !opts.signal?.aborted) {
+    const retry = await generateText({
+      prompt: [
+        `Rewrite this so it reads like a person wrote it. Keep the argument, the facts and the format identical — change only the writing.`,
+        ``,
+        rewriteNote(craft),
+        ``,
+        CRAFT_RULES,
+        ``,
+        `Return ONLY the rewritten text. No preamble, no explanation, no quotes around it.`,
+        ``,
+        `---`,
+        body,
+      ].join("\n"),
+    });
+    if (retry.ok && retry.text.trim()) {
+      const after = scoreDraft(retry.text.trim());
+      // Keep it only if it actually improved. A rewrite that scores worse is a worse post.
+      if (after.score > craft.score) body = retry.text.trim();
+      console.info(JSON.stringify({
+        event: "compose_rewrite", before: craft.score, after: after.score,
+        kept: after.score > craft.score, issues: craft.issues.map((i) => i.code),
+      }));
+    }
   }
 
   // The deterministic composer still owns scheduling: posting windows are an observed
