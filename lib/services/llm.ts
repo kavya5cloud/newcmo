@@ -36,7 +36,11 @@ type ProviderConfig = {
 
 // Cap on generated tokens. 1024 gives full deliverables (articles, docs, multi-part
 // analysis) room to finish without truncating mid-JSON; override via MAX_OUTPUT_TOKENS.
-const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 1024);
+// Thinking models spend part of this budget reasoning before the first character of the
+// answer is written — gemini-3.6-flash used 76 tokens to produce the word "ok". At 1024 a
+// real prompt could burn most of the allowance thinking and get cut off mid-sentence, which
+// is exactly what shipped: a LinkedIn post that ended on the word "When".
+const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 4096);
 
 // Sampling temperature. Low (0.4) keeps answers grounded and factual and makes the
 // JSON-shaped responses far more reliable than the provider default (1.0).
@@ -287,6 +291,18 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
     }
 
     const parsed = safeJson(body);
+
+    // Truncation is a failure, not a result.
+    //
+    // When Gemini stops because it hit the token ceiling it returns finishReason
+    // "MAX_TOKENS" alongside whatever it had written so far — and that partial text was
+    // being returned as a successful generation. The founder got half a sentence with no
+    // error anywhere, and the fallback chain never ran because nothing had reported a
+    // problem. Treating it as an error lets the next model in the chain try.
+    const finishReason: string | undefined =
+      provider.kind === "gemini" ? parsed?.candidates?.[0]?.finishReason : parsed?.choices?.[0]?.finish_reason;
+    const truncated = finishReason === "MAX_TOKENS" || finishReason === "length";
+
     const text =
       provider.kind === "gemini"
         ? (Array.isArray(parsed?.candidates?.[0]?.content?.parts)
@@ -295,6 +311,17 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
                 .join("")
             : null)
         : parsed?.choices?.[0]?.message?.content;
+    if (typeof text === "string" && text.trim() && truncated) {
+      logEvent("llm_generate_failure", {
+        requestId, provider: provider.name, model, status: 502, elapsedMs,
+        kind: "truncated", finishReason, chars: text.length, maxOutputTokens: MAX_OUTPUT_TOKENS, retried,
+      });
+      return {
+        ok: false,
+        attempt: { provider: provider.name, model, status: 502, elapsedMs, kind: "truncated", body, retried },
+      };
+    }
+
     if (typeof text !== "string" || !text.trim()) {
       const invalidKind = "invalid_json";
       logEvent("llm_generate_failure", {
@@ -598,6 +625,13 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
           // Permanent for this key — never ask again this process.
           deadModels.add(deadKey(provider.name, model));
           logEvent("llm_model_skip", { requestId, provider: provider.name, model, reason: "unsupported_model", status: currentAttempt.status, remembered: true });
+          continue model;
+        }
+        // A truncated answer is the model's ceiling, not the provider's. Try the next model
+        // in the same chain rather than abandoning the provider — the smaller sibling often
+        // spends less of the budget thinking and finishes the sentence.
+        if (currentAttempt.kind === "truncated") {
+          logEvent("llm_model_skip", { requestId, provider: provider.name, model, reason: "truncated", status: currentAttempt.status });
           continue model;
         }
         if (!isTransientStatus(currentAttempt.status)) {
