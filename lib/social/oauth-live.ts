@@ -15,8 +15,16 @@ import type { OAuthToken, SocialPlatform } from "./types";
 //   - LinkedIn identifies the member through OpenID `sub`; X uses its own users/me.
 
 /** Scopes actually needed to post. Asking for more gets apps rejected in review. */
+// LinkedIn organization posting needs LinkedIn's Community Management API, which is granted
+// per-app through their developer portal rather than by asking. Until that approval lands
+// the org scopes are simply not granted and the connect flow falls back to the personal
+// feed — which is why authorType is stored per account rather than assumed globally.
 const LIVE_SCOPES: Partial<Record<SocialPlatform, string[]>> = {
-  linkedin: ["openid", "profile", "w_member_social"],
+  linkedin: [
+    "openid", "profile", "w_member_social",
+    "r_organization_admin",     // list the Pages this member administers
+    "w_organization_social",    // post as one of them
+  ],
   x: ["tweet.read", "tweet.write", "users.read", "offline.access"],
 };
 

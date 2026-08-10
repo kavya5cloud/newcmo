@@ -76,8 +76,15 @@ export class LinkedInAdapter implements SocialAdapter {
     if (err) return failure(this.platform, at, err, false);
     if (!token.externalId) return failure(this.platform, at, "account is missing its LinkedIn member id — reconnect", false);
 
+    // Post as the Page when one was chosen at connect time, otherwise as the person.
+    // LinkedIn rejects an organization URN unless w_organization_social was granted, so an
+    // account that never got that scope simply never carries an organizationId.
+    const author = token.organizationId
+      ? `urn:li:organization:${token.organizationId}`
+      : `urn:li:person:${token.externalId}`;
+
     const body = {
-      author: `urn:li:person:${token.externalId}`,
+      author,
       commentary: req.content.text,
       visibility: "PUBLIC",
       distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },

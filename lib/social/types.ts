@@ -33,6 +33,17 @@ export type ConnectedAccount = {
   platform: SocialPlatform;
   handle: string;            // @name or page name
   externalId: string;        // provider account/page id
+  /**
+   * Who the post is published as.
+   *
+   * "person" is the individual's own feed; "organization" is a Company Page they administer.
+   * Stored rather than assumed, because the adapter used to hardcode person and there was no
+   * way for a founder to say otherwise — they connected LinkedIn for their business and the
+   * post appeared on their personal profile, which is a surprise nobody forgives twice.
+   */
+  authorType?: "person" | "organization";
+  /** The organization's numeric id when authorType is "organization". */
+  organizationId?: string;
   status: ConnectionStatus;
   scopes: string[];
   connectedAt: number;
@@ -57,6 +68,13 @@ export type OAuthToken = {
   scopes: string[];
   externalId: string;
   handle: string;
+  /**
+   * Post as this Company Page rather than as the member.
+   *
+   * Absent means the personal feed. Carried on the token because the adapter needs it at
+   * publish time and has no access to the account row.
+   */
+  organizationId?: string;
 };
 
 // ---- Content: drafts, requests, jobs, scheduled posts ----
