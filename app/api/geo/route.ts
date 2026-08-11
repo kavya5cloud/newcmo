@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isTrialActive } from "@/lib/trial";
 import { rateLimit, requestKey } from "@/lib/throttle";
-import { runCitationCheck, summarize, reportToItems } from "@/lib/geo/check";
+import { runCitationCheck, summarize, reportToItems, FAILURE_HINT } from "@/lib/geo/check";
 import { citationRepo } from "@/lib/geo/store";
 
 export const runtime = "nodejs";
@@ -76,13 +76,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const report = await runCitationCheck({ tenant: session.userId, brand, host, category, audience });
-  if (!report) {
+  const outcome = await runCitationCheck({ tenant: session.userId, brand, host, category, audience });
+  if (!outcome.ok) {
+    const { reason } = outcome.failure;
+    console.info(JSON.stringify({ event: "geo_check_failed", reason, tenant: session.userId }));
     return NextResponse.json(
-      { error: "check_unavailable", hint: "no AI provider is configured, so nothing was measured" },
-      { status: 503 },
+      { error: reason, hint: FAILURE_HINT[reason] },
+      { status: reason === "no_category" ? 400 : 503 },
     );
   }
+  const report = outcome.report;
 
   await citationRepo().save(report).catch(() => {});   // a failed write must not lose the result
 

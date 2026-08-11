@@ -63,6 +63,14 @@ export async function checkQuery(
   };
 }
 
+/** Why a check produced nothing. Each needs a different thing from the reader. */
+export type CheckFailure =
+  | { reason: "no_provider" }
+  | { reason: "no_category" }
+  | { reason: "all_failed" };
+
+export type CheckOutcome = { ok: true; report: CitationReport } | { ok: false; failure: CheckFailure };
+
 /**
  * Check every buyer question for a business.
  *
@@ -73,19 +81,25 @@ export async function checkQuery(
 export async function runCitationCheck(
   input: CheckInput,
   now: number = Date.now(),
-): Promise<CitationReport | null> {
-  if (configuredProviderNames().length === 0) return null;
+): Promise<CheckOutcome> {
+  // Three ways to produce nothing, and they need different things from the reader: set a
+  // key, analyze your site, or try again later. This returned a bare null and the route
+  // reported all three as "no AI provider is configured" — which was false in production,
+  // where a provider was configured and answering. An error message that names the wrong
+  // cause is worse than one that says nothing, because it sends someone to fix a setting
+  // that was never broken.
+  if (configuredProviderNames().length === 0) return { ok: false, failure: { reason: "no_provider" } };
 
   const queries = buyerQueries({ category: input.category, audience: input.audience })
     .filter((q) => queryIsFair(q, input.brand, input.host));
-  if (queries.length === 0) return null;
+  if (queries.length === 0) return { ok: false, failure: { reason: "no_category" } };
 
   const checks: CitationCheck[] = [];
   for (const q of queries) {
     const check = await checkQuery(q, input.brand, input.host, now);
     if (check) checks.push(check);
   }
-  if (checks.length === 0) return null;
+  if (checks.length === 0) return { ok: false, failure: { reason: "all_failed" } };
 
   console.info(JSON.stringify({
     event: "geo_check",
@@ -96,14 +110,24 @@ export async function runCitationCheck(
   }));
 
   return {
-    tenant: input.tenant,
-    brand: input.brand,
-    host: input.host,
-    checks,
-    engine: checks[0].engine,
-    checkedAt: now,
+    ok: true,
+    report: {
+      tenant: input.tenant,
+      brand: input.brand,
+      host: input.host,
+      checks,
+      engine: checks[0].engine,
+      checkedAt: now,
+    },
   };
 }
+
+/** What to tell the founder, per cause. Each says what would actually change the outcome. */
+export const FAILURE_HINT: Record<CheckFailure["reason"], string> = {
+  no_provider: "No AI provider is configured on the server, so nothing was measured.",
+  no_category: "We need to know your category before we can ask a buyer's question — analyze your website first.",
+  all_failed: "Every question failed to get an answer. The model may be rate limited — try again in a few minutes.",
+};
 
 /** How many questions named the brand, as a plain sentence for the dashboard. */
 export function summarize(report: CitationReport): string {

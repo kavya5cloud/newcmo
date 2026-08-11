@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buyerQueries, queryIsFair } from "@/lib/geo/queries";
 import { mentionsBrand, mentionContext, namedProducts, hostStem } from "@/lib/geo/detect";
-import { summarize, reportToItems } from "@/lib/geo/check";
+import { summarize, reportToItems, FAILURE_HINT } from "@/lib/geo/check";
 import { InMemoryCitationRepo } from "@/lib/geo/store";
 import type { CitationReport } from "@/lib/geo/types";
 
@@ -156,5 +156,28 @@ describe("history", () => {
     const repo = new InMemoryCitationRepo();
     await repo.save({ tenant: "a", brand: "A", host: "a.com", engine: "e", checkedAt: 1, checks: [] });
     expect(await repo.latest("b")).toBe(null);
+  });
+});
+
+describe("a failure names its own cause", () => {
+  // The panel reported "no AI provider is configured" against a production server where a
+  // provider was configured and answering. runCitationCheck returned a bare null for three
+  // different reasons and the route printed one message for all of them — sending someone to
+  // fix a setting that was never broken, which is worse than saying nothing.
+
+  it("has a distinct hint per cause", () => {
+    const hints = Object.values(FAILURE_HINT);
+    expect(new Set(hints).size).toBe(hints.length);
+  });
+
+  it("tells the founder what would actually change the outcome", () => {
+    expect(FAILURE_HINT.no_provider).toMatch(/provider/i);
+    expect(FAILURE_HINT.no_category).toMatch(/analyze your website/i);
+    expect(FAILURE_HINT.all_failed).toMatch(/try again/i);
+  });
+
+  it("never blames the provider for a missing category", () => {
+    expect(FAILURE_HINT.no_category).not.toMatch(/provider|api key/i);
+    expect(FAILURE_HINT.all_failed).not.toMatch(/not configured/i);
   });
 });

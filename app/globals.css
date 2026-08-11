@@ -2345,7 +2345,19 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .appui .an-s { color: var(--dim); }
 
 /* AI-search visibility panel. */
-.appui .geo-run { margin-top: 10px; width: 100%; justify-content: center; }
+/* Styled in full rather than leaning on .go2, which is only defined inside .aitem and
+   .pq-acts — this button lives in a .sect, inherited none of it, and rendered as a browser
+   default: a white bar with grey text. A class that styles nothing looks exactly like a
+   class that styles something until you look. */
+.appui .geo-run {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 12px; min-height: 34px; padding: 0 14px;
+  background: var(--panel2); color: var(--fg);
+  border: 1px solid var(--edge); border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 500; cursor: pointer;
+}
+.appui .geo-run:hover:not(:disabled) { border-color: var(--edge-strong); background: #1b211d; }
+.appui .geo-run:disabled { opacity: .5; cursor: default; }
 .appui .geo-note {
   margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: var(--faint);
 }
