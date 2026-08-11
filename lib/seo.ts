@@ -5,23 +5,32 @@
 // list is worse than having neither.
 
 /**
- * The canonical origin, no trailing slash. Non-www is the chosen host.
+ * The canonical origin, no trailing slash. **www is the chosen host.**
  *
- * www and non-www serving the same content is duplicate content, so one must redirect to
- * the other. That redirect lives in Vercel's domain settings, not in this app — see
- * WWW_HOST below. Everything that emits a URL — canonicals, sitemap, robots, structured
- * data, OG tags — reads this constant, so there is one place to change if the decision
- * reverses.
+ * This said non-www for weeks while Vercel served www and redirected non-www to it. It did
+ * no visible damage only because APP_URL is set in production and overrides it — so the
+ * fallback was wrong and silent, waiting for the day someone cleared that variable. On that
+ * day every canonical on the site would have pointed at a host that 308s away, which is the
+ * single most effective way to tell Google your pages are duplicates of somewhere else.
+ *
+ * A default that is only correct because something else overrides it is not a default.
+ * It now matches what the domain actually serves.
+ *
+ * www and non-www serving the same content is duplicate content, so one must redirect to the
+ * other. That redirect lives in Vercel's domain settings, not in this app — see
+ * NON_CANONICAL_HOST. Everything that emits a URL reads this constant.
  */
-export const CANONICAL_HOST = "https://trypopulr.in";
+export const CANONICAL_HOST = "https://www.trypopulr.in";
 
 /**
- * The www form. Kept for reference only — nothing in the app redirects on it.
+ * The non-canonical form. Reference only — nothing in the app redirects on it.
  *
- * Enforcing the canonical host is Vercel's job, in the project's domain settings. When this
- * was also enforced here the two pointed in opposite directions and every URL on the site
- * became a redirect loop.
+ * Enforcing the canonical host is Vercel's job. When it was also enforced here the two
+ * pointed in opposite directions and every URL on the site became a redirect loop.
  */
+export const NON_CANONICAL_HOST = "trypopulr.in";
+
+/** @deprecated Kept so existing imports keep compiling; prefer NON_CANONICAL_HOST. */
 export const WWW_HOST = "www.trypopulr.in";
 
 export const SITE_URL = (process.env.APP_URL || CANONICAL_HOST).replace(/\/+$/, "");
@@ -45,6 +54,7 @@ export const PUBLIC_ROUTES: { path: string; priority: number; changeFrequency: "
   { path: "/", priority: 1.0, changeFrequency: "weekly" },
   { path: "/early-access", priority: 0.8, changeFrequency: "weekly" },
   { path: "/worked", priority: 0.6, changeFrequency: "weekly" },
+  { path: "/guides", priority: 0.9, changeFrequency: "weekly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
 ];

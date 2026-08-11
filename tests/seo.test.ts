@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GUIDES } from "@/lib/guides";
 import { CANONICAL_HOST, DISALLOWED, PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_URL, url } from "@/lib/seo";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
@@ -29,9 +30,15 @@ describe("site identity", () => {
 describe("sitemap", () => {
   const entries = sitemap();
 
-  it("lists every public route once", () => {
-    expect(entries).toHaveLength(PUBLIC_ROUTES.length);
+  it("lists every public route and every guide, once each", () => {
+    expect(entries).toHaveLength(PUBLIC_ROUTES.length + GUIDES.length);
     expect(new Set(entries.map((e) => e.url)).size).toBe(entries.length);
+  });
+
+  it("lists each guide at its real url", () => {
+    for (const g of GUIDES) {
+      expect(entries.some((e) => e.url.endsWith(`/guides/${g.slug}`)), `${g.slug} missing`).toBe(true);
+    }
   });
 
   it("uses absolute urls on the canonical host", () => {
@@ -88,9 +95,13 @@ describe("per-page metadata", () => {
     ];
   }
 
-  it("covers every route in the sitemap", async () => {
+  it("covers every statically-declared public route", async () => {
+    // Guides are generated from lib/guides.ts by generateMetadata rather than declared in a
+    // page file, so they are asserted in tests/guides-seo.test.ts instead of collected here.
     const pages = await collect();
-    expect(pages.map((p) => p.path).sort()).toEqual(PUBLIC_ROUTES.map((r) => r.path).sort());
+    expect(pages.map((p) => p.path).sort()).toEqual(
+      PUBLIC_ROUTES.map((r) => r.path).filter((p) => p !== "/guides").sort(),
+    );
   });
 
   it("gives every page a unique title", async () => {
@@ -121,9 +132,14 @@ describe("per-page metadata", () => {
 });
 
 describe("canonical host", () => {
-  it("is non-www", () => {
-    expect(CANONICAL_HOST).toBe("https://trypopulr.in");
-    expect(CANONICAL_HOST).not.toContain("www.");
+  it("is www, matching what the domain actually serves", () => {
+    // This test previously asserted non-www, and was wrong for weeks — Vercel serves www and
+    // 308s non-www to it. Nothing broke only because APP_URL overrides CANONICAL_HOST in
+    // production, so the wrong value sat behind a variable that happened to be set.
+    //
+    // A green test guarding an incorrect default is worse than no test: it makes the bug
+    // look deliberate, and the next person to notice assumes it was considered.
+    expect(CANONICAL_HOST).toBe("https://www.trypopulr.in");
   });
 
   // Regression guard for a real outage. A www -> non-www redirect used to live in

@@ -2361,3 +2361,78 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .appui .geo-note {
   margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: var(--faint);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GUIDES
+   Long-form reading. The only place in the product where the job is to hold
+   someone for six minutes rather than to be scanned, so the type is bigger,
+   the measure is narrower, and nothing competes with the words.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.guide { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
+
+.g-crumbs { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--faint); margin-bottom: 28px; }
+.g-crumbs a { color: var(--faint); text-decoration: none; }
+.g-crumbs a:hover { color: var(--fg); }
+
+.guide h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.12; letter-spacing: -.028em; margin: 0 0 18px; }
+.g-standfirst { font-size: 18px; line-height: 1.6; color: var(--dim); margin: 0 0 14px; }
+.g-meta { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--faint); }
+
+/* 66-ish characters a line and 1.75 leading — the range long prose is comfortable in.
+   The body was set at the dashboard's 13.5px, which is right for scanning a panel and
+   punishing across a thousand words. */
+.g-body { margin-top: 40px; font-size: 16.5px; line-height: 1.75; color: #c8d0c7; }
+.g-body p { margin: 0 0 22px; }
+.g-body h2 { font-size: 24px; line-height: 1.25; letter-spacing: -.02em; color: var(--fg); margin: 44px 0 16px; }
+.g-body h3 { font-size: 17.5px; line-height: 1.35; color: var(--fg); margin: 32px 0 12px; }
+.g-body ul, .g-body ol { margin: 0 0 22px; padding-left: 22px; }
+.g-body li { margin-bottom: 10px; }
+.g-body strong { color: var(--fg); }
+
+/* A quote is the one place a guide raises its voice, so it gets the accent edge. */
+.g-body blockquote {
+  margin: 28px 0; padding: 4px 0 4px 20px;
+  border-left: 2px solid var(--acc);
+  font-size: 17.5px; line-height: 1.6; color: var(--fg);
+}
+
+.g-tablewrap { overflow-x: auto; margin: 0 0 26px; -webkit-overflow-scrolling: touch; }
+.g-body table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 440px; }
+.g-body th, .g-body td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.g-body th { font-family: 'Geist Mono', monospace; font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); }
+.g-body td:first-child { color: var(--fg); }
+
+.g-faq { margin-bottom: 22px; }
+.g-faq h3 { margin: 0 0 8px; }
+.g-faq p { margin: 0; }
+
+.g-next { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); }
+.g-next h2 { font-size: 13px; font-family: 'Geist Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 0 0 16px; }
+.g-next ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+.g-next a { color: var(--fg); text-decoration: none; font-size: 16px; }
+.g-next a:hover { color: var(--acc); }
+.g-next span { display: block; font-size: 13.5px; line-height: 1.55; color: var(--faint); margin-top: 4px; }
+
+.g-cta {
+  margin-top: 48px; padding: 26px; text-align: center;
+  border: 1px solid var(--edge); border-radius: var(--r-md);
+  background: var(--panel); box-shadow: var(--lift), var(--shadow-sm);
+}
+.g-cta p { margin: 0 0 16px; color: var(--dim); font-size: 15px; line-height: 1.6; }
+
+/* The index. */
+.g-list { list-style: none; padding: 0; margin: 40px 0 0; display: grid; gap: 8px; }
+.g-list a {
+  display: block; padding: 22px; text-decoration: none;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.g-list a:hover { border-color: var(--edge-strong); background: var(--panel); }
+.g-list h2 { font-size: 19px; line-height: 1.3; letter-spacing: -.015em; color: var(--fg); margin: 0 0 8px; }
+.g-list p { font-size: 14.5px; line-height: 1.6; color: var(--dim); margin: 0 0 10px; }
+
+@media (max-width: 640px) {
+  .guide { padding: 36px 18px 72px; }
+  .g-body { font-size: 16px; }
+}
