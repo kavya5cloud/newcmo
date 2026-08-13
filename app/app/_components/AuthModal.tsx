@@ -11,6 +11,9 @@ export const AUTH_ERR: Record<string, string> = {
   invalid_email: "Enter a valid email address.",
   weak_password: "Use at least 8 characters.",
   no_database: "Accounts aren't set up yet (no database connected).",
+  // Static fallback. The route sends a hint carrying the actual seconds, and that wins —
+  // see the precedence below.
+  rate_limited: "Too many attempts. Wait a moment and try again.",
 };
 
 export function AuthModal({ onClose, forced }: { onClose: () => void; forced?: boolean }) {
@@ -38,7 +41,17 @@ export function AuthModal({ onClose, forced }: { onClose: () => void; forced?: b
         body: JSON.stringify({ email, password: pw, ref: mode === "signup" ? readReferral() : undefined }),
       });
       const d = await r.json();
-      if (!r.ok || d.error) { setErr(AUTH_ERR[d.error] || d.hint || "Something went wrong."); setBusy(false); return; }
+      if (!r.ok || d.error) {
+        // A rate limit is the one case where the server knows more than this table does —
+        // it knows how many seconds are left. Its hint wins there; for everything else the
+        // local copy is better written than a generic server string.
+        const msg = d.error === "rate_limited"
+          ? (d.hint || AUTH_ERR.rate_limited)
+          : (AUTH_ERR[d.error] || d.hint || "Something went wrong.");
+        setErr(msg);
+        setBusy(false);
+        return;
+      }
       // On signup, carry the anonymous workspace over so the just-analyzed site isn't lost.
       if (mode === "signup") {
         clearReferral();

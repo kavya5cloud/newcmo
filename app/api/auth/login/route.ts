@@ -8,7 +8,13 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const limit = rateLimit(requestKey(req.headers), 10, 60_000);
   if (!limit.allowed) {
-    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+    // The seconds matter. "Too many attempts" with no number is indistinguishable from
+    // being blocked, and the person retries immediately, which extends the window.
+    return NextResponse.json(
+      { error: "rate_limited", retryAfter: limit.retryAfter,
+        hint: `Too many attempts. Try again in ${limit.retryAfter} second${limit.retryAfter === 1 ? "" : "s"}.` },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
   }
   const sql = db();
   if (!sql) return NextResponse.json({ error: "no_database", hint: "set DATABASE_URL to enable accounts" }, { status: 503 });
