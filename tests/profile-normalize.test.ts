@@ -40,11 +40,23 @@ describe("a profile is safe to render whatever the model returned", () => {
     expect((p.competitors as string[]).length).toBe(4);
   });
 
+  it("joins an array of adjectives instead of throwing it away", () => {
+    // Asked for "3 adjectives for brand voice", the model returns an array about half the
+    // time. That is the right answer in the wrong container — deleting it left voice
+    // undefined everywhere downstream, which is a silent downgrade of a working response.
+    const p = normalizeProfile({ voice: ["Precise", "Modern", "Sophisticated"] });
+    expect(p.voice).toBe("Precise, Modern, Sophisticated");
+  });
+
+  it("stringifies a number that should have been text", () => {
+    expect(normalizeProfile({ name: 2026 }).name).toBe("2026");
+  });
+
   it("removes text fields that came back as the wrong type", () => {
     // Rendering an object into a <p> is a blank panel or a crash, never useful.
-    const p = normalizeProfile({ name: "Acme", description: { text: "hi" }, oneLiner: 42 });
+    const p = normalizeProfile({ name: "Acme", description: { text: "hi" }, positioning: null });
     expect(p.description).toBeUndefined();
-    expect(p.oneLiner).toBeUndefined();
+    expect(p.positioning).toBeUndefined();
     expect(p.name).toBe("Acme");
   });
 

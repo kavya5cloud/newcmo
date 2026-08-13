@@ -83,8 +83,25 @@ export function normalizeProfile<T extends Record<string, unknown>>(raw: T): T {
     .filter((c) => !/^\d|^(names?|competitors?|none|n\/?a|unknown|tbd)$/i.test(c))
     .slice(0, 4);
 
+  // Coerce text fields rather than dropping them.
+  //
+  // The first version deleted anything that was not already a string, which threw away good
+  // data: asked for "3 adjectives for brand voice", the model returns
+  // ["Precise","Modern","Sophisticated"] about half the time. That is the right answer in the
+  // wrong container, and deleting it left voice undefined everywhere downstream.
+  //
+  // Only genuinely unusable shapes — objects, nulls — are dropped, because rendering one
+  // into a <p> is a blank panel at best.
   for (const k of ["name", "oneLiner", "audience", "positioning", "voice", "description"]) {
-    if (typeof out[k] !== "string") delete out[k];
+    const v = out[k];
+    if (typeof v === "string") continue;
+    if (Array.isArray(v)) {
+      const joined = v.map((x) => String(x ?? "").trim()).filter(Boolean).join(", ");
+      if (joined) out[k] = joined; else delete out[k];
+      continue;
+    }
+    if (typeof v === "number" || typeof v === "boolean") { out[k] = String(v); continue; }
+    delete out[k];
   }
 
   return out as T;

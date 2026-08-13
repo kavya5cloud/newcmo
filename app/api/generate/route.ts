@@ -24,18 +24,25 @@ export async function POST(req: NextRequest) {
   try {
     payload = await req.json();
   } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    return NextResponse.json({ error: "bad_request", hint: "The request was malformed — reload the page and try again." }, { status: 400 });
   }
 
   // Enforce the free trial server-side: a signed-in account past its trial is blocked
   // (anonymous/no-DB usage stays open as a demo).
   if (session && !(await isTrialActive(session.userId))) {
-    return NextResponse.json({ error: "trial_ended", hint: "your free month has ended — upgrade to continue" }, { status: 402 });
+    // "Upgrade to continue" pointed at a checkout that does not exist — there is no billing
+    // code in this product yet. Referrals do exist and do extend the trial, so that is what
+    // the message offers. Telling someone to upgrade when they cannot is how a dead end gets
+    // mistaken for a broken app.
+    return NextResponse.json(
+      { error: "trial_ended", hint: "Your free month has ended. Refer 3 people from Settings to add another 30 days." },
+      { status: 402 },
+    );
   }
 
   const rawPrompt = (payload.prompt || "").trim();
-  if (rawPrompt.length > 10_000) return NextResponse.json({ error: "prompt_too_large" }, { status: 413 });
-  if (!rawPrompt) return NextResponse.json({ error: "empty_prompt" }, { status: 400 });
+  if (rawPrompt.length > 10_000) return NextResponse.json({ error: "prompt_too_large", hint: "That request is too long — shorten it and try again." }, { status: 413 });
+  if (!rawPrompt) return NextResponse.json({ error: "empty_prompt", hint: "Nothing was sent to generate from." }, { status: 400 });
   if (payload.url && !isSafePublicUrl(payload.url)) {
     return NextResponse.json({ error: "unsafe_url", hint: "use a public http(s) website URL" }, { status: 400 });
   }
