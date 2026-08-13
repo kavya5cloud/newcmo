@@ -114,6 +114,9 @@ export function normalizeStatus(raw: string): SubscriptionStatus {
   if (s === "active" || s === "trialing") return "active";
   if (s === "canceled" || s === "cancelled") return "canceled";
   if (s === "past_due" || s === "unpaid" || s === "incomplete") return "past_due";
+  // Paused is not a lapse and not access. Treated as revoked so the local trial decides —
+  // which for a paused account almost always means no access, correctly.
+  if (s === "paused") return "revoked";
   // Unknown means unknown. Defaulting an unrecognised status to "active" is how a refunded
   // account keeps its access forever, and it is silent — nobody reports being over-served.
   return "revoked";

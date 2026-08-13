@@ -247,3 +247,40 @@ describe("granting access", () => {
     expect(hook).not.toMatch(/await req\.json\(\)/);
   });
 });
+
+describe("the events we subscribe to", () => {
+  it("includes past_due, or the grace period is unreachable code", async () => {
+    // accessFor gives a failed payment three days. That window is built on the past_due
+    // status, and nothing but this event sets it — the logic was correct and could never run.
+    const { isHandled } = await import("@/lib/billing/webhook");
+    expect(isHandled("subscription.past_due")).toBe(true);
+  });
+
+  it("includes cycled, or a renewed subscription's period never moves", async () => {
+    const { isHandled } = await import("@/lib/billing/webhook");
+    expect(isHandled("subscription.cycled")).toBe(true);
+  });
+
+  it("covers every subscription lifecycle event Polar sends", async () => {
+    const { isHandled } = await import("@/lib/billing/webhook");
+    for (const e of [
+      "created", "active", "updated", "cycled", "past_due",
+      "canceled", "uncanceled", "paused", "resumed", "revoked",
+    ]) {
+      expect(isHandled(`subscription.${e}`), `subscription.${e} unhandled`).toBe(true);
+    }
+  });
+
+  it("ignores events that do not change access", async () => {
+    // Subscribing to order.* and checkout.* would double-handle the same state change.
+    const { isHandled } = await import("@/lib/billing/webhook");
+    for (const e of ["checkout.created", "order.paid", "customer.updated", "benefit.created"]) {
+      expect(isHandled(e), `${e} should be ignored`).toBe(false);
+    }
+  });
+
+  it("treats a paused subscription as no access", async () => {
+    const { normalizeStatus } = await import("@/lib/billing/access");
+    expect(normalizeStatus("paused")).toBe("revoked");
+  });
+});

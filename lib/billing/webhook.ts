@@ -72,14 +72,34 @@ export function verifyWebhook(input: VerifyInput, now: number = Date.now()): Ver
   return { ok: false, reason: "bad_signature" };
 }
 
-/** Events that change access. Anything else is acknowledged and ignored. */
+/**
+ * Events that change access. Anything else is acknowledged and ignored.
+ *
+ * subscription.past_due and subscription.cycled were missing from the first version, and
+ * both matter:
+ *
+ *   past_due is the only event that sets the status the grace period is built on. Without
+ *   it, accessFor's three-day window for a failed payment could never fire — the code was
+ *   there, correct, and unreachable.
+ *
+ *   cycled is the renewal. Without it, current_period_end never moves forward, so a paying
+ *   customer's stored period silently expires while they keep paying. They would keep access
+ *   through the "active" status, but any date shown to them would be a lie.
+ *
+ * paused and resumed are included because a paused subscription should not keep access;
+ * normalizeStatus maps "paused" to revoked, and the resume arrives as its own event.
+ */
 export const HANDLED_EVENTS = [
   "subscription.created",
   "subscription.active",
   "subscription.updated",
+  "subscription.cycled",
+  "subscription.past_due",
   "subscription.canceled",
-  "subscription.revoked",
   "subscription.uncanceled",
+  "subscription.paused",
+  "subscription.resumed",
+  "subscription.revoked",
 ] as const;
 
 export function isHandled(eventType: string): boolean {
