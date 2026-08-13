@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { accessFor, ACCESS_MESSAGE, normalizeStatus, GRACE_DAYS, type Subscription } from "@/lib/billing/access";
 import { verifyWebhook, parseSubscriptionEvent, isHandled } from "@/lib/billing/webhook";
@@ -184,5 +185,65 @@ describe("storage", () => {
     await repo.upsert(sub());
     expect((await repo.byExternalId("sub_1"))?.userId).toBe("u1");
     expect(await repo.byExternalId("nope")).toBe(null);
+  });
+});
+
+describe("the checkout adapter", () => {
+  const env = { ...process.env };
+  afterEach(() => { process.env = { ...env }; });
+
+  it("treats half-configured billing as off", async () => {
+    // A token with no product is a Subscribe button that fails after the click, which is
+    // worse than no button.
+    const { billingConfig } = await import("@/lib/billing/polar");
+    process.env.POLAR_ACCESS_TOKEN = "tok";
+    delete process.env.POLAR_PRODUCT_ID;
+    expect(billingConfig().configured).toBe(false);
+  });
+
+  it("keeps sandbox and production apart", async () => {
+    const { polarBase } = await import("@/lib/billing/polar");
+    process.env.POLAR_ENV = "sandbox";
+    expect(polarBase()).toContain("sandbox");
+    process.env.POLAR_ENV = "production";
+    expect(polarBase()).not.toContain("sandbox");
+  });
+
+  it("defaults to sandbox, so a missing setting cannot charge a real card", async () => {
+    const { polarBase } = await import("@/lib/billing/polar");
+    delete process.env.POLAR_ENV;
+    expect(polarBase()).toContain("sandbox");
+  });
+
+  it("sends our user id on the checkout, since nothing else identifies the payer", async () => {
+    const src = readFileSync(new URL("../lib/billing/polar.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/metadata:\s*\{\s*user_id:\s*input\.userId\s*\}/);
+  });
+});
+
+describe("granting access", () => {
+  it("only the webhook writes a subscription — never the checkout route", () => {
+    // A returned checkout URL means someone clicked a button, not that they paid. Wiring
+    // access to the click gives the product away to anyone who opens devtools.
+    const route = readFileSync(new URL("../app/api/billing/route.ts", import.meta.url), "utf8");
+    expect(route).not.toMatch(/\.upsert\(/);
+  });
+
+  it("the webhook rejects unverified requests before parsing them", () => {
+    const hook = readFileSync(new URL("../app/api/webhooks/polar/route.ts", import.meta.url), "utf8");
+    const verify = hook.indexOf("verifyWebhook");
+    const parse = hook.indexOf("JSON.parse");
+    expect(verify).toBeGreaterThan(-1);
+    expect(verify).toBeLessThan(parse);
+  });
+
+  it("reads the body as text, because re-serialising breaks the signature", () => {
+    // Asserted on the call, not the string: the file's own comment explains why req.json()
+    // is wrong, and a test that cannot tell code from prose about code fails on the
+    // explanation. Third time that has caught me — strip comments first.
+    const hook = readFileSync(new URL("../app/api/webhooks/polar/route.ts", import.meta.url), "utf8")
+      .replace(/\/\/.*$/gm, "");
+    expect(hook).toMatch(/await req\.text\(\)/);
+    expect(hook).not.toMatch(/await req\.json\(\)/);
   });
 });

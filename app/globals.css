@@ -2436,3 +2436,25 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .guide { padding: 36px 18px 72px; }
   .g-body { font-size: 16px; }
 }
+
+/* ── Plan / billing ───────────────────────────────────────────────────────
+   The server owns the access decision; this only renders what it said. No
+   date arithmetic here — a client that computes "3 days left" will eventually
+   disagree with the gate that actually enforces it, and the visible one loses. */
+.bill { display: flex; flex-direction: column; gap: 8px; }
+.bill-state { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; color: var(--fg); }
+.bill-until { margin: 0; font-size: 12.5px; color: var(--faint); }
+.bill-err { margin: 0; font-size: 12.5px; color: var(--redd); }
+.bill-acts { margin-top: 6px; }
+.bill-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; padding: 0 16px;
+  background: var(--panel2); color: var(--fg);
+  border: 1px solid var(--edge); border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.bill-btn:hover:not(:disabled) { border-color: var(--edge-strong); background: #1b211d; }
+.bill-btn:disabled { opacity: .55; cursor: default; }
+/* The one action worth making obvious. */
+.bill-pri { background: var(--acc); color: #101408; border-color: var(--acc); font-weight: 600; }
+.bill-pri:hover:not(:disabled) { background: #e2ff8f; border-color: #e2ff8f; }

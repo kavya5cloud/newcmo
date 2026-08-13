@@ -4,6 +4,7 @@ import { useState } from "react";
 import AccountConnections from "@/app/components/AccountConnections";
 import ConnectorCockpit from "./ConnectorCockpit";
 import ReferAndEarn from "@/app/components/ReferAndEarn";
+import Billing from "@/app/components/Billing";
 
 // Settings.
 //
@@ -50,6 +51,11 @@ export default function SettingsPage() {
       <div className="set-block">
         <h2 className="set-h2">Accounts</h2>
         <AccountConnections variant="full" />
+      </div>
+
+      <div className="set-block">
+        <h2 className="set-h2">Plan</h2>
+        <Billing />
       </div>
 
       <div className="set-block">
