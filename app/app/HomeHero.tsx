@@ -15,6 +15,15 @@ import Icon from "@/app/components/Icon";
 //
 // The greeting and the assistant's status used to be two separate ideas in two places.
 // They are one screen because they are one thought.
+//
+// The setup prompt that used to sit here — "Four questions, about a minute" with a
+// Set up my marketing button — is gone. It was a banner across the top of the dashboard
+// selling a feature to someone already inside the product, and it pushed the actual work
+// below the fold. The Assistant is still reachable from the nav for anyone who wants it.
+//
+// What stays is the one prompt that is not promotion: posts waiting for approval, shown
+// only when there are some, because that is the product asking for something rather than
+// offering it.
 
 function greeting(now = new Date()): string {
   const h = now.getHours();
@@ -73,13 +82,6 @@ export default function HomeHero({ company }: { company?: string }) {
             {status!.awaitingApproval} {status!.awaitingApproval === 1 ? "post" : "posts"} waiting for approval
           </p>
           <a className="home-cta" href="/studio/social">Review</a>
-        </div>
-      )}
-
-      {!configured && (
-        <div className="home-needs">
-          <p>Four questions, about a minute. Then Populr takes it from there.</p>
-          <a className="home-cta" href="/app/assistant">Set up my marketing</a>
         </div>
       )}
 
