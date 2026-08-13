@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { isTrialActive } from "@/lib/trial";
+import { accessForUser, accessMessage } from "@/lib/billing/gate";
 import { isSafePublicUrl, rateLimit, requestKey } from "@/lib/throttle";
 import { generateText } from "@/lib/services/llm";
 
@@ -27,17 +27,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad_request", hint: "The request was malformed — reload the page and try again." }, { status: 400 });
   }
 
-  // Enforce the free trial server-side: a signed-in account past its trial is blocked
-  // (anonymous/no-DB usage stays open as a demo).
-  if (session && !(await isTrialActive(session.userId))) {
-    // "Upgrade to continue" pointed at a checkout that does not exist — there is no billing
-    // code in this product yet. Referrals do exist and do extend the trial, so that is what
-    // the message offers. Telling someone to upgrade when they cannot is how a dead end gets
-    // mistaken for a broken app.
-    return NextResponse.json(
-      { error: "trial_ended", hint: "Your free month has ended. Refer 3 people from Settings to add another 30 days." },
-      { status: 402 },
-    );
+  // Trial OR subscription — one question, asked in one place. This used to call
+  // isTrialActive directly, which meant a paying customer would have been told their trial
+  // had ended. Anonymous/no-DB usage stays open as a demo.
+  if (session) {
+    const access = await accessForUser(session.userId);
+    if (!access.allowed) {
+      return NextResponse.json(
+        { error: access.reason, hint: accessMessage(access) },
+        { status: 402 },
+      );
+    }
   }
 
   const rawPrompt = (payload.prompt || "").trim();

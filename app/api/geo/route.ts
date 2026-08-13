@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { isTrialActive } from "@/lib/trial";
+import { accessForUser, accessMessage } from "@/lib/billing/gate";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { runCitationCheck, summarize, reportToItems, FAILURE_HINT } from "@/lib/geo/check";
 import { citationRepo } from "@/lib/geo/store";
@@ -51,8 +51,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!(await isTrialActive(session.userId))) {
-    return NextResponse.json({ error: "trial_ended" }, { status: 402 });
+  const access = await accessForUser(session.userId);
+  if (!access.allowed) {
+    return NextResponse.json({ error: access.reason, hint: accessMessage(access) }, { status: 402 });
   }
 
   let body: { brand?: string; host?: string; category?: string; audience?: string };

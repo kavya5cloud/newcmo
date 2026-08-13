@@ -34,25 +34,31 @@ describe("the server's hint reaches the person", () => {
   });
 });
 
-describe("the trial message offers something that exists", () => {
-  // Asserted against the hint strings rather than the file. The first version grepped the
-  // whole source and failed on a comment that quoted the banned phrase while explaining why
-  // it was banned — a test that cannot tell code from prose about code.
-  const hints = () => {
-    const route = src("app/api/generate/route.ts");
-    return [...route.matchAll(/hint:\s*"([^"]+)"/g)].map((m) => m[1]);
+describe("a refusal offers something the person can actually do", () => {
+  // These messages moved out of the route and into lib/billing/access.ts when subscriptions
+  // arrived, because "why is this account blocked" is now a real decision rather than one
+  // date comparison. Asserted where they live.
+  const messages = () => {
+    const src2 = src("lib/billing/access.ts");
+    return [...src2.matchAll(/^\s+\w+:\s*"([^"]{10,})",?$/gm)].map((m) => m[1]);
   };
 
-  it("does not send anyone to a checkout that was never built", () => {
-    // There is no billing code in this product. A dead end is easily mistaken for a bug.
-    for (const h of hints()) expect(h).not.toMatch(/upgrade/i);
+  it("names a route out of every dead end", () => {
+    const all = messages().join(" ");
+    // Subscribing and referrals both exist now; either is a real way forward.
+    expect(all).toMatch(/subscribe/i);
+    expect(all).toMatch(/refer 3 people/i);
+    expect(all).toMatch(/card/i);
   });
 
-  it("points at referrals, which do extend the trial today", () => {
-    expect(hints().some((h) => /refer 3 people/i.test(h))).toBe(true);
+  it("writes them as sentences, not codes", () => {
+    for (const m of messages()) expect(m.length).toBeGreaterThan(20);
   });
 
-  it("writes hints as sentences, not codes", () => {
-    for (const h of hints()) expect(h.length).toBeGreaterThan(20);
+  it("still carries hints on the generate route's own failures", () => {
+    const route = src("app/api/generate/route.ts");
+    const hints = [...route.matchAll(/hint:\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect(hints.length).toBeGreaterThan(2);
+    for (const h of hints) expect(h.length).toBeGreaterThan(20);
   });
 });
