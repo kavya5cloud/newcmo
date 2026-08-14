@@ -570,6 +570,32 @@ export function configuredProviderNames(): string[] {
   return PROVIDERS.filter((p) => providerHasValidKey(p, envValue(p.env))).map((p) => p.name);
 }
 
+/** The system prompt, shared with the streaming path so both speak in one voice. */
+export const SYSTEM_PROMPT_FOR_STREAM = SYSTEM_PROMPT;
+
+/**
+ * What the streaming path needs from here.
+ *
+ * Exposed as one call rather than four exports so provider selection stays in this file —
+ * the streaming module should not be able to decide which keys count as configured, or the
+ * two paths will disagree about what is available the first time a prefix check changes.
+ */
+export function streamConfig() {
+  return {
+    providers: PROVIDERS
+      .map((provider) => ({ provider, key: envValue(provider.env) }))
+      .filter(({ provider, key }) => providerHasValidKey(provider, key))
+      // Dead models are dead for streaming too.
+      .map(({ provider, key }) => ({
+        provider: { ...provider, models: provider.models.filter((m) => !deadModels.has(deadKey(provider.name, m))) },
+        key,
+      }))
+      .filter(({ provider }) => provider.models.length > 0),
+    temperature: LLM_TEMPERATURE,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+  };
+}
+
 /**
  * Generate text for a finished prompt. Checks the analysis cache first, injects
  * scraped URL context when a url is given, walks the provider/model fallback chain,

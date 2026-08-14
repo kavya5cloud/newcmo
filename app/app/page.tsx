@@ -15,6 +15,7 @@ import Section from "@/app/components/Section";
 import DocSkeleton from "@/app/components/DocSkeleton";
 import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
 import { ai, hostOf } from "./_lib/ai";
+import { streamAi } from "./_lib/stream";
 import { SOURCES, SOURCE_LABEL, canonicalSource, type SourceType } from "./_lib/sources";
 import { logRecBatch, logRecEvent } from "./_lib/telemetry";
 import { trialSnapshot } from "./_lib/trial";
@@ -473,7 +474,20 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       // The same rules the server-side engines carry. Without them this path — the one that
       // writes the posts a customer actually publishes — was the only one with nothing
       // stopping it inventing a statistic.
-      body = await ai(`You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nGround the deliverable in the real page details above. Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.\n\n${DELIVERABLE_RULES}`, url);
+      const prompt = `You are the ${agentName} inside Populr.\n${context}\n${channelBrief[agentId] || ""}\nWork item: ${item}\nGround the deliverable in the real page details above. Produce the complete, ready-to-use deliverable. No preamble — just the deliverable.\n\n${DELIVERABLE_RULES}`;
+
+      // Streamed, because a person is reading this one. The skeleton showed that work had
+      // started; this shows the work. Text is appended to the open panel as it arrives, so
+      // the first sentence is readable while the last is still being written.
+      body = "";
+      await streamAi(prompt, {
+        onText: (chunk) => {
+          body += chunk;
+          setDoc((d) => (d && d.title === item ? { ...d, body: (d.body || "") + chunk, loading: false } : d));
+        },
+        onError: (msg) => showToast(msg),
+      }, { url });
+      if (!body.trim()) throw new Error("The model returned nothing. Try again.");
       setDemo(false);
     } catch (e) {
       showToast(`AI request failed: ${aiErrorText(e).slice(0, 160)}`);
@@ -493,7 +507,14 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     if (!profile || demo) { setDoc({ title: name, body: DOC_DEMO[id] || "—" }); return; }
     setDoc({ title: name, body: "", loading: true });
     try {
-      const body = await ai(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.\n\n${DELIVERABLE_RULES}`, url);
+      let body = "";
+      await streamAi(`You are Populr, the AI CMO for ${profile.name} (${profile.oneLiner}). Voice: ${profile.voice}. Audience: ${profile.audience}.\nWrite the document "${name}" for this company, grounded in the real page details above. Be specific and practical. Use plain text with short sections. No preamble.\n\n${DELIVERABLE_RULES}`, {
+        onText: (chunk) => {
+          body += chunk;
+          setDoc((d) => (d && d.title === name ? { ...d, body: (d.body || "") + chunk, loading: false } : d));
+        },
+      }, { url });
+      if (!body.trim()) throw new Error("The model returned nothing. Try again.");
       setDocCache((c) => ({ ...c, [id]: body }));
       setDoc({ title: name, body });
     } catch (e) {
