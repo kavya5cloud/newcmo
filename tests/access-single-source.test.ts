@@ -23,7 +23,21 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const routes = walk("app/api");
-const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+/**
+ * Source with comments removed.
+ *
+ * Every one of these checks reads code looking for a pattern, and comments explaining why
+ * that pattern is banned contain the pattern. Four separate tests this week failed on their
+ * own file's prose rather than its code. Reading through this helper is the fix; a test that
+ * cannot tell code from writing about code is not testing what it claims.
+ *
+ * JSX comments too — {/* ... *\/} — since that is how a React file explains itself.
+ */
+const strip = (s: string) =>
+  s.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+   .replace(/\/\*[\s\S]*?\*\//g, "")
+   .replace(/\/\/.*$/gm, "");
 
 describe("access is decided in exactly one place", () => {
   it("no API route computes a trial end from created_at", () => {
@@ -56,5 +70,41 @@ describe("access is decided in exactly one place", () => {
     const me = readFileSync("app/api/auth/me/route.ts", "utf8");
     expect(me).toMatch(/accessForUser/);
     expect(me).toMatch(/active:\s*access\.allowed/);
+  });
+});
+
+describe("there is one way to pay", () => {
+  const ui = walk("app").filter((f) => /\.tsx$/.test(f));
+
+  it("nothing offers to take money by email", () => {
+    // Three separate screens carried a mailto saying card payments were not self-serve —
+    // the account page, the trial lock, and the settings panel. True when written, and
+    // exactly the sentence nobody remembers to delete once it stops being true.
+    const offenders = ui.filter((f) => /mailto:[^"']*[Uu]pgrade/.test(strip(readFileSync(f, "utf8"))));
+    expect(offenders, `still emailing for payment: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("nothing claims payments are unavailable", () => {
+    const offenders = ui.filter((f) => /self-serve|self serve/i.test(strip(readFileSync(f, "utf8"))));
+    expect(offenders, `stale copy: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("every subscribe path goes through the checkout route", () => {
+    // Not to a Polar URL directly: the customer has to be decided server-side from the
+    // session, or anyone can attach a subscription to another account.
+    const subscribeUi = ui.filter((f) => /Subscribe — \$|Subscribe —/.test(strip(readFileSync(f, "utf8"))));
+    expect(subscribeUi.length).toBeGreaterThan(0);
+    for (const f of subscribeUi) {
+      const src = strip(readFileSync(f, "utf8"));
+      expect(src, `${f} must use /api/billing/checkout`).toMatch(/\/api\/billing\/checkout|go\("checkout"\)/);
+      expect(src, `${f} links straight to Polar`).not.toMatch(/polar\.sh\/[^"']*checkout/);
+    }
+  });
+
+  it("the trial countdown is not recomputed in the browser", () => {
+    // The account page used to work out days left itself, which is how a screen and a gate
+    // end up disagreeing.
+    const acct = readFileSync("app/account/page.tsx", "utf8");
+    expect(acct).toMatch(/<Billing \/>/);
   });
 });

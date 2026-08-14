@@ -1248,17 +1248,18 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <div className="trial-lock-card">
             <span className="app-wordmark app-wordmark-lg">Populr.</span>
             <h2>Your free month has ended</h2>
-            <p>Upgrade to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
+            <p>Subscribe to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
+            {/* A link, not a fetch: /api/billing/checkout reads the session, builds the
+                checkout server-side and redirects on to Polar. It used to be a mailto saying
+                card payments were not self-serve, which was true when it was written and is
+                the kind of sentence nobody remembers to delete. */}
             <a
               className="acct-btn pri"
               style={{ marginTop: 18, display: "inline-block", textDecoration: "none" }}
-              href="mailto:team@trypopulr.in?subject=Upgrade%20my%20Populr%20workspace&body=I%27d%20like%20to%20keep%20using%20Populr%20past%20the%20trial."
+              href="/api/billing/checkout"
             >
-              Upgrade — $15/mo
+              Subscribe — $15/mo
             </a>
-            <p className="acct-dim" style={{ marginTop: 10, fontSize: 12 }}>
-              Card payments aren&apos;t self-serve yet — we&apos;ll set you up by email, usually the same day.
-            </p>
             <div className="trial-lock-foot">
               <a href="/account">Account</a>
               <span> · </span>

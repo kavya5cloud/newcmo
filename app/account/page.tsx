@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Billing from "@/app/components/Billing";
 
 type Me = {
   user: { email: string } | null;
@@ -86,34 +87,19 @@ export default function Account() {
               <div className="acct-row"><span className="acct-k">Member since</span><span className="acct-v">{fmtDate(me.createdAt)}</span></div>
             </div>
 
+            {/* Plan.
+                This block used to compute the trial itself and, once it ended, offer a
+                mailto link saying card payments were not self-serve. Both are now false: the
+                Billing panel reads the same access decision every gate enforces, and Polar
+                takes the payment.
+
+                It also had no way to subscribe while the trial was still running — someone
+                who had decided had to wait to be locked out first. Subscribing early does
+                not cost them the rest of the trial; accessFor lets an active subscription
+                win without shortening anything. */}
             <div className="acct-card">
               <div className="acct-label">Plan</div>
-              {liveTrial ? (
-                liveTrial.active ? (
-                  <>
-                    <div className="acct-plan">Free trial <span className="acct-badge ok">active</span></div>
-                    <p className="acct-dim">{liveTrial.daysLeft} day{liveTrial.daysLeft === 1 ? "" : "s"} left — ends {fmtDate(liveTrial.endsAt)}. Then $15/mo.</p>
-                    <div className="acct-meter"><i style={{ width: `${Math.min(100, (liveTrial.daysLeft / 30) * 100)}%` }} /></div>
-                  </>
-                ) : (
-                  <>
-                    <div className="acct-plan">Free trial <span className="acct-badge end">ended</span></div>
-                    <p className="acct-dim">Your free month ended {fmtDate(liveTrial.endsAt)}. Upgrade to keep using Populr.</p>
-                    <a
-                      className="acct-btn pri"
-                      style={{ marginTop: 12, display: "inline-block", textDecoration: "none" }}
-                      href="mailto:team@trypopulr.in?subject=Upgrade%20my%20Populr%20workspace&body=I%27d%20like%20to%20keep%20using%20Populr%20past%20the%20trial."
-                    >
-                      Upgrade — $15/mo
-                    </a>
-                    <p className="acct-dim" style={{ marginTop: 8, fontSize: 12 }}>
-                      Card payments aren&apos;t self-serve yet — we&apos;ll set you up by email.
-                    </p>
-                  </>
-                )
-              ) : (
-                <p className="acct-dim">Free</p>
-              )}
+              <Billing />
             </div>
 
             <div className="acct-card">

@@ -11,6 +11,11 @@ import Icon from "./Icon";
 //   A client that computes "your trial has 3 days left" from a date will eventually disagree
 //   with the server that actually enforces the gate, and the visible one will be wrong.
 //
+//   Subscribing is offered during the trial, not only after it ends. Someone who has decided
+//   should not have to wait to be locked out before they can pay, and an account that
+//   subscribes on day three keeps the rest of its trial — see accessFor, where an active
+//   subscription wins over the trial without shortening it.
+//
 //   It does not assume a return from checkout means a live subscription. Polar's webhook
 //   arrives on its own schedule, usually seconds later but not always, so coming back with
 //   ?subscribed=1 starts a short poll rather than declaring success. Telling someone they are
@@ -23,7 +28,10 @@ type Status = {
   message: string;
   canSubscribe: boolean;
   subscribed: boolean;
+  /** Subscribed through Polar, so the hosted portal can actually open. */
+  manageable: boolean;
   status: string | null;
+  daysLeft: number | null;
 };
 
 const POLL_MS = 2000;
@@ -92,6 +100,7 @@ export default function Billing() {
       {until && s.allowed && (
         <p className="bill-until">
           {s.reason === "trial" ? "Trial ends" : s.reason === "grace" ? "Access pauses" : "Renews"} {until}
+          {s.daysLeft != null && ` · ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"} left`}
         </p>
       )}
 
@@ -100,7 +109,7 @@ export default function Billing() {
       {err && <p className="bill-err">{err}</p>}
 
       <div className="bill-acts">
-        {s.subscribed ? (
+        {s.manageable ? (
           <button className="bill-btn" onClick={() => go("portal")} disabled={busy !== null}>
             {busy === "portal" ? <span className="btn-spin" aria-label="Opening" /> : "Manage billing"}
           </button>

@@ -39,6 +39,11 @@ export async function GET(req: NextRequest) {
     // there is nothing behind the button, and a button that cannot work should not exist.
     canSubscribe: billingConfig().configured,
     subscribed: Boolean(sub && sub.status !== "revoked"),
+    // A comped subscription has no Polar customer behind it, so the portal would open on
+    // nothing. Offering "Manage billing" for a row we wrote by hand is a button that cannot
+    // work — the panel offers Subscribe instead.
+    manageable: Boolean(sub && sub.status !== "revoked" && !sub.externalId.startsWith("comp_")),
     status: sub?.status ?? null,
+    daysLeft: access.until ? Math.max(0, Math.ceil((access.until - Date.now()) / 86_400_000)) : null,
   });
 }
