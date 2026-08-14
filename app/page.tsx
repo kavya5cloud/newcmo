@@ -182,20 +182,27 @@ export default function Landing() {
           </div>
           <p className="under">no card · no setup · one URL</p>
 
-          {/* Product Hunt featured badge. Their asset, their domain — allow-listed in the
-              CSP's img-src. theme=dark to match this page; light glares on #0b0b0b. */}
+          {/* Supa Launch badge. Their asset on their CDN, so the host is allow-listed in
+              the CSP's img-src — without that the image is silently blocked and the page
+              shows a broken frame with nothing in the console to explain it.
+
+              width/height are set rather than left to `height: auto` so the space is
+              reserved before the SVG arrives. An unsized remote image directly under the
+              call to action shifts the buttons downward as it loads, which is the one place
+              on the page where a jump costs a click. */}
           <a
-            className="ph-badge"
-            href="https://www.producthunt.com/products/populr-your-cmo?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-populr-your-cmo"
+            className="launch-badge"
+            href="https://supalaun.ch/projects/populr"
             target="_blank"
             rel="noopener noreferrer"
+            title="Supa Launch Top 2 Daily Winner"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1207267&theme=dark&t=1785136310387"
-              alt="Populr — your CMO - Streamline your marketing, amplify your impact | Product Hunt"
-              width={250}
-              height={54}
+              src="https://r2.direasy-multi-tenant.focusapps.app/uploads/616d0b1a-3979-4b8c-94d1-b4f1fedd3ead/1783046775816/iwwixene3dh/top2-dark.svg"
+              alt="Supa Launch — Top 2 Daily Winner"
+              width={195}
+              height={44}
             />
           </a>
           <div className="term" role="img" aria-label="Terminal showing Populr skipping low-value tasks">

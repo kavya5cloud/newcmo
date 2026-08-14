@@ -15,8 +15,9 @@ const csp = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  // api.producthunt.com serves the Product Hunt featured badge on the landing page.
-  "img-src 'self' data: blob: https://api.producthunt.com",
+  // The Supa Launch badge is served from their R2 bucket. A badge host has to be named
+  // here or the image is blocked with no visible cause — the page just renders a gap.
+  "img-src 'self' data: blob: https://r2.direasy-multi-tenant.focusapps.app",
   "font-src 'self' https://fonts.gstatic.com data:",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,

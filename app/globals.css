@@ -1305,11 +1305,13 @@ html{scroll-padding-top:var(--eab-h,0px)}
 @media(max-width:720px){.lwa-feed-row{grid-template-columns:auto 1fr}.lwa-feed-row .job-state{grid-row:1}}
 
 /* ---- Product Hunt badge ---- */
-.landing .ph-badge{display:inline-block;margin-top:20px;line-height:0;border-radius:10px;
+.landing .launch-badge{display:inline-block;margin-top:20px;line-height:0;border-radius:10px;
   transition:transform .15s ease,opacity .15s ease}
-.landing .ph-badge:hover{transform:translateY(-1px);opacity:.9}
-.landing .ph-badge img{width:250px;height:54px;max-width:100%}
-.landing .ph-badge:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
+.landing .launch-badge:hover{transform:translateY(-1px);opacity:.9}
+/* height:auto keeps the aspect ratio if their asset changes shape; the width/height
+   attributes on the tag still reserve the box before it loads. */
+.landing .launch-badge img{width:195px;height:auto;max-width:100%}
+.landing .launch-badge:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
 
 /* ---- AI Team panel (Milestone 15) ---- */
 .lwa-h2-note{font-size:12.5px;font-weight:400;margin-left:12px;letter-spacing:0}
