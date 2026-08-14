@@ -1,24 +1,23 @@
-import { db, ensureSchema } from "@/lib/db";
-import { bonusDaysFor } from "@/lib/referrals-store";
+// The trial used to live here, and deciding access here is what caused the bug this file
+// now exists to prevent.
+//
+// isTrialActive(userId) answered "is this account inside its first 30 days", and three
+// separate places called it as though that meant "may this account use the product". The
+// moment a subscription existed those stopped being the same question — a paying account was
+// let through by /api/generate and locked out by the screen in front of it, because the two
+// asked different code.
+//
+// There is one answer now, in lib/billing/gate.ts:
+//
+//   import { accessForUser } from "@/lib/billing/gate";
+//   const access = await accessForUser(userId);
+//   if (!access.allowed) { ... }
+//
+// accessForUser understands subscriptions, cancelled-but-paid periods, and the grace window
+// after a failed payment, none of which a date comparison can. The pure decision it wraps is
+// in lib/billing/access.ts and is testable without a database.
+//
+// This file is deliberately left empty rather than deleted, so anyone who goes looking for
+// the old function finds this note instead of writing it again.
 
-const TRIAL_DAYS = Number(process.env.TRIAL_DAYS || 30);
-const DAY = 86_400_000;
-
-// Server-side trial check. Returns true when the account may still use paid features.
-// No database, no account, or unknown user → not gated (anonymous demo stays open).
-export async function isTrialActive(userId: string): Promise<boolean> {
-  const sql = db();
-  if (!sql) return true;
-  try {
-    await ensureSchema(sql);
-    const rows = (await sql`SELECT created_at FROM users WHERE id = ${userId}`) as { created_at: string }[];
-    if (!rows[0]) return true;
-    // Referred months are added here rather than written back to the account, so the length
-    // of a trial is always a function of the referral rows — it cannot drift from them.
-    const bonus = await bonusDaysFor(userId).catch(() => 0);
-    const end = new Date(rows[0].created_at).getTime() + (TRIAL_DAYS + bonus) * DAY;
-    return Date.now() < end;
-  } catch {
-    return true;
-  }
-}
+export {};
