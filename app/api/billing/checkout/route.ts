@@ -74,8 +74,17 @@ export async function GET(req: NextRequest) {
     // a file instead of a page.
     if (!res.headers.get("location")) {
       const detail = await res.clone().text().catch(() => "");
+      // Logged with the environment and product alongside the error, because the two most
+      // common causes are invisible in Polar's message: a production token pointed at the
+      // sandbox API (or the reverse), and a product id from the other environment. Polar
+      // answers both with a flat "not found", which is true and unhelpful on its own.
       console.error(JSON.stringify({
-        event: "checkout_no_redirect", status: res.status, detail: detail.slice(0, 300),
+        event: "checkout_no_redirect",
+        status: res.status,
+        server: cfg.server,
+        productId: cfg.productId,
+        tokenPrefix: cfg.token.slice(0, 12),
+        detail: detail.slice(0, 400),
       }));
       return back("checkout_failed");
     }
@@ -85,7 +94,9 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     // The SDK throws on network trouble and on some API rejections. An uncaught throw here
     // is a 500, which the browser also declines to render.
-    console.error(JSON.stringify({ event: "checkout_threw", detail: String(e).slice(0, 300) }));
+    console.error(JSON.stringify({
+      event: "checkout_threw", server: cfg.server, productId: cfg.productId, detail: String(e).slice(0, 400),
+    }));
     return back("checkout_failed");
   }
 }

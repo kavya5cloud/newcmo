@@ -38,6 +38,17 @@ export async function GET(req: NextRequest) {
     // The UI needs to know whether to offer subscribing at all. With no billing configured
     // there is nothing behind the button, and a button that cannot work should not exist.
     canSubscribe: billingConfig().configured,
+    // Enough to spot a misconfiguration without exposing anything. The environment and the
+    // product id are not secrets; the token is never included, only whether one exists.
+    config: (() => {
+      const c = billingConfig();
+      return {
+        server: c.server,
+        productId: c.productId ? `${c.productId.slice(0, 8)}…` : null,
+        hasToken: Boolean(c.token),
+        hasWebhookSecret: Boolean(c.webhookSecret),
+      };
+    })(),
     subscribed: Boolean(sub && sub.status !== "revoked"),
     // A comped subscription has no Polar customer behind it, so the portal would open on
     // nothing. Offering "Manage billing" for a row we wrote by hand is a button that cannot
