@@ -313,3 +313,49 @@ describe("the events we subscribe to", () => {
     expect(normalizeStatus("paused")).toBe("revoked");
   });
 });
+
+describe("a browser navigating to billing always gets a page", () => {
+  const code = (p: string) =>
+    readFileSync(new URL(`../${p}`, import.meta.url), "utf8")
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  // Clicking Subscribe downloaded an empty file called "checkout" and left the page where it
+  // was. The route answered a failure with JSON, and a navigation that receives
+  // application/json shows no error — the browser saves it. Nothing on screen changed, so
+  // the button looked dead.
+
+  for (const route of ["app/api/billing/checkout/route.ts", "app/api/billing/portal/route.ts"]) {
+    it(`${route} never answers a navigation with JSON`, () => {
+      expect(code(route), `${route} still returns JSON`).not.toMatch(/NextResponse\.json/);
+    });
+
+    it(`${route} redirects on every failure`, () => {
+      const src = code(route);
+      expect(src).toMatch(/function back\(reason: string\)/);
+      expect(src).toMatch(/NextResponse\.redirect/);
+    });
+
+    it(`${route} catches a throw from the adapter`, () => {
+      // An uncaught throw is a 500, which the browser also declines to render.
+      expect(code(route)).toMatch(/catch \(e\)/);
+    });
+
+    it(`${route} treats a non-redirect from the adapter as a failure`, () => {
+      // The adapter answers with JSON when Polar refuses — bad token, missing product,
+      // wrong environment. That has to become a redirect too.
+      expect(code(route)).toMatch(/headers\.get\("location"\)/);
+    });
+  }
+
+  it("the panel can explain every reason the routes send", () => {
+    const ui = readFileSync(new URL("../app/components/Billing.tsx", import.meta.url), "utf8");
+    const sent = new Set<string>();
+    for (const route of ["app/api/billing/checkout/route.ts", "app/api/billing/portal/route.ts"]) {
+      for (const m of code(route).matchAll(/back\("([a-z_]+)"\)/g)) sent.add(m[1]);
+    }
+    expect(sent.size).toBeGreaterThan(2);
+    for (const reason of sent) {
+      expect(ui, `no message for ${reason}`).toMatch(new RegExp(`${reason}:`));
+    }
+  });
+});

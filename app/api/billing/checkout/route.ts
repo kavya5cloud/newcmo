@@ -9,52 +9,52 @@ export const runtime = "nodejs";
 
 // Starting a subscription.
 //
-// Polar's adapter is wrapped rather than exported directly, and the reason is the whole
-// point of this file.
+// Two things this route has to get right, and the second one was got wrong first.
 //
-// `Checkout()` reads `products` and `customerExternalId` from the query string. Mounted as
-// the quickstart shows it — `export const GET = Checkout({...})` — anyone can call
+// 1. The customer is decided here, not by the caller.
 //
-//     /api/billing/checkout?products=<any>&customerExternalId=<anyone's id>
+// Polar's `Checkout()` reads `products` and `customerExternalId` from the query string.
+// Mounted the way the quickstart shows — `export const GET = Checkout({...})` — anyone can
+// call ?customerExternalId=<someone else's id> and attach a subscription to another
+// person's account. So the query string is rebuilt from the session and everything the
+// client sent is discarded.
 //
-// and open a checkout that attaches to another person's account, or to a product that is not
-// the one being sold. The identity would be whatever the caller typed.
+// 2. A browser is navigating here, so every outcome must be a redirect.
 //
-// So the request is rebuilt server-side: the session decides who the customer is, the
-// environment decides which product, and anything the client sent for either is discarded.
-// The only query parameter that survives is nothing.
+// This used to answer failures with JSON. A navigation that receives application/json does
+// not show an error — depending on the browser it renders raw JSON or, as happened here,
+// silently downloads a file named "checkout" and leaves the page exactly where it was. The
+// person clicked Subscribe and nothing happened.
+//
+// Every path now ends in a redirect carrying a reason the Settings page can explain. Nothing
+// returns a body.
+
+/** Back to the plan panel with something it can say out loud. */
+function back(reason: string) {
+  const url = new URL("/studio/integrations", SITE_URL);
+  url.searchParams.set("billing", reason);
+  return NextResponse.redirect(url);
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session) {
-    // Send them to sign in rather than returning JSON — this is a navigation, not a fetch.
-    return NextResponse.redirect(new URL("/app?signin=1", SITE_URL));
-  }
+  if (!session) return NextResponse.redirect(new URL("/app?signin=1", SITE_URL));
 
   const limit = rateLimit(`checkout:${requestKey(req.headers, session.userId)}`, 10, 60_000);
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "rate_limited", hint: "Too many attempts — wait a minute." }, { status: 429 });
-  }
+  if (!limit.allowed) return back("rate_limited");
 
   const cfg = billingConfig();
-  if (!cfg.configured) {
-    return NextResponse.json(
-      { error: "billing_not_configured", hint: "Subscriptions aren't switched on yet." },
-      { status: 503 },
-    );
-  }
+  if (!cfg.configured) return back("not_configured");
 
   // Rebuilt from scratch. Whatever arrived in the query string is dropped.
   const url = new URL(req.url);
   url.search = "";
   url.searchParams.set("products", cfg.productId);
   // externalCustomerId is Polar's own field for "your id for this person". Using it rather
-  // than metadata means Polar links its customer to our user natively — which is also what
+  // than metadata alone means Polar links its customer to our user natively, which is what
   // makes the billing portal resolvable later without storing a second id.
   url.searchParams.set("customerExternalId", session.userId);
   if (session.email) url.searchParams.set("customerEmail", session.email);
-  // Kept as well as externalCustomerId: the webhook reads metadata.user_id, and belt-and-
-  // braces on the one field the entire integration hangs on is cheap.
   url.searchParams.set("metadata", JSON.stringify({ user_id: session.userId }));
 
   const handler = Checkout({
@@ -62,10 +62,30 @@ export async function GET(req: NextRequest) {
     server: cfg.server,
     theme: "dark",
     // Access is not live the moment they land — the webhook arrives on its own schedule —
-    // so the dashboard polls rather than assuming. See app/components/Billing.tsx.
+    // so the panel polls rather than assuming. See app/components/Billing.tsx.
     successUrl: `${SITE_URL}/app?subscribed=1`,
   });
 
-  console.info(JSON.stringify({ event: "checkout_started", userId: session.userId }));
-  return handler(new NextRequest(url, req));
+  try {
+    const res = await handler(new NextRequest(url, req));
+
+    // The adapter answers with JSON when Polar refuses — a bad token, a product that does
+    // not exist, the wrong environment. Turn that into a redirect too, or the browser gets
+    // a file instead of a page.
+    if (!res.headers.get("location")) {
+      const detail = await res.clone().text().catch(() => "");
+      console.error(JSON.stringify({
+        event: "checkout_no_redirect", status: res.status, detail: detail.slice(0, 300),
+      }));
+      return back("checkout_failed");
+    }
+
+    console.info(JSON.stringify({ event: "checkout_started", userId: session.userId }));
+    return res;
+  } catch (e) {
+    // The SDK throws on network trouble and on some API rejections. An uncaught throw here
+    // is a 500, which the browser also declines to render.
+    console.error(JSON.stringify({ event: "checkout_threw", detail: String(e).slice(0, 300) }));
+    return back("checkout_failed");
+  }
 }

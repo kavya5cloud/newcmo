@@ -34,6 +34,21 @@ type Status = {
   daysLeft: number | null;
 };
 
+/**
+ * What a bounced-back checkout or portal means, in words.
+ *
+ * These routes redirect here with ?billing=<reason> rather than answering with JSON, because
+ * a navigation that receives JSON shows no error at all — the browser downloads a file and
+ * leaves the page where it was. Which is exactly what happened: Subscribe was clicked, a
+ * file named "checkout" appeared in Downloads, and nothing on screen changed.
+ */
+const BILLING_ERROR: Record<string, string> = {
+  not_configured: "Subscriptions aren't switched on yet. Nothing was charged.",
+  rate_limited: "Too many attempts in a row. Wait a minute and try again.",
+  checkout_failed: "We couldn't open checkout. Nothing was charged — try again shortly.",
+  portal_unavailable: "The billing portal isn't available for this account yet.",
+};
+
 const POLL_MS = 2000;
 const POLL_ATTEMPTS = 8;   // ~16s, past which a webhook is late rather than in flight
 
@@ -55,6 +70,18 @@ export default function Billing() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // A failed checkout or portal sends us back with a reason. Read it, say it, then clear it
+  // so a refresh does not show a stale complaint.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reason = new URLSearchParams(window.location.search).get("billing");
+    if (!reason) return;
+    setErr(BILLING_ERROR[reason] ?? "Something went wrong with billing. Try again shortly.");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("billing");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
 
   // Returning from a successful checkout: wait for the webhook rather than trusting the URL.
   useEffect(() => {
