@@ -70,22 +70,12 @@ export default function Billing() {
     return () => clearInterval(id);
   }, [load]);
 
-  const go = useCallback(async (action: "checkout" | "portal") => {
+  // Both are plain navigations into server routes that redirect on to Polar. No fetch, no
+  // URL handed to the browser to act on — the identity of the customer is decided on the
+  // server and never travels through the client.
+  const go = useCallback((action: "checkout" | "portal") => {
     setBusy(action); setErr(null);
-    try {
-      const r = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const d = await r.json();
-      if (!r.ok || !d.url) { setErr(d.hint || "Something went wrong. Try again shortly."); return; }
-      window.location.href = d.url;
-    } catch {
-      setErr("Couldn't reach billing. Check your connection and try again.");
-    } finally {
-      setBusy(null);
-    }
+    window.location.href = `/api/billing/${action}`;
   }, []);
 
   if (!s) return null;

@@ -188,7 +188,7 @@ describe("storage", () => {
   });
 });
 
-describe("the checkout adapter", () => {
+describe("configuration", () => {
   const env = { ...process.env };
   afterEach(() => { process.env = { ...env }; });
 
@@ -202,49 +202,78 @@ describe("the checkout adapter", () => {
   });
 
   it("keeps sandbox and production apart", async () => {
-    const { polarBase } = await import("@/lib/billing/polar");
-    process.env.POLAR_ENV = "sandbox";
-    expect(polarBase()).toContain("sandbox");
+    const { billingConfig } = await import("@/lib/billing/polar");
     process.env.POLAR_ENV = "production";
-    expect(polarBase()).not.toContain("sandbox");
+    expect(billingConfig().server).toBe("production");
+    process.env.POLAR_ENV = "sandbox";
+    expect(billingConfig().server).toBe("sandbox");
   });
 
   it("defaults to sandbox, so a missing setting cannot charge a real card", async () => {
-    const { polarBase } = await import("@/lib/billing/polar");
+    const { billingConfig } = await import("@/lib/billing/polar");
     delete process.env.POLAR_ENV;
-    expect(polarBase()).toContain("sandbox");
+    expect(billingConfig().server).toBe("sandbox");
+  });
+});
+
+describe("the customer is decided by the server, never the caller", () => {
+  const code = (p: string) =>
+    readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\/\/.*$/gm, "");
+
+  it("checkout discards whatever the query string asked for", () => {
+    // Polar's Checkout() reads products and customerExternalId from the query. Mounted the
+    // way the quickstart shows — `export const GET = Checkout({...})` — anyone could call
+    // ?customerExternalId=<someone else> and attach a subscription to another account.
+    // The route rebuilds the search string from the session instead.
+    const src = code("app/api/billing/checkout/route.ts");
+    expect(src).toMatch(/url\.search = ""/);
+    expect(src).toMatch(/customerExternalId", session\.userId/);
+    expect(src).toMatch(/products", cfg\.productId/);
   });
 
-  it("sends our user id on the checkout, since nothing else identifies the payer", async () => {
-    const src = readFileSync(new URL("../lib/billing/polar.ts", import.meta.url), "utf8");
-    expect(src).toMatch(/metadata:\s*\{\s*user_id:\s*input\.userId\s*\}/);
+  it("the portal takes its customer from the session, not the request", () => {
+    // Same hole, worse consequence: the portal shows payment history.
+    const src = code("app/api/billing/portal/route.ts");
+    expect(src).toMatch(/getExternalCustomerId: async \(\) => session\.userId/);
+  });
+
+  it("both routes refuse anonymous callers", () => {
+    for (const p of ["app/api/billing/checkout/route.ts", "app/api/billing/portal/route.ts"]) {
+      expect(code(p), p).toMatch(/if \(!session\)/);
+    }
   });
 });
 
 describe("granting access", () => {
-  it("only the webhook writes a subscription — never the checkout route", () => {
-    // A returned checkout URL means someone clicked a button, not that they paid. Wiring
-    // access to the click gives the product away to anyone who opens devtools.
-    const route = readFileSync(new URL("../app/api/billing/route.ts", import.meta.url), "utf8");
-    expect(route).not.toMatch(/\.upsert\(/);
+  const code = (p: string) =>
+    readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\/\/.*$/gm, "");
+
+  it("only the webhook writes a subscription", () => {
+    // A checkout URL means somebody clicked a button, not that they paid.
+    for (const p of [
+      "app/api/billing/route.ts",
+      "app/api/billing/checkout/route.ts",
+      "app/api/billing/portal/route.ts",
+    ]) {
+      expect(code(p), `${p} writes a subscription`).not.toMatch(/\.upsert\(/);
+    }
+    expect(code("app/api/webhooks/polar/route.ts")).toMatch(/\.upsert\(/);
   });
 
-  it("the webhook rejects unverified requests before parsing them", () => {
-    const hook = readFileSync(new URL("../app/api/webhooks/polar/route.ts", import.meta.url), "utf8");
-    const verify = hook.indexOf("verifyWebhook");
-    const parse = hook.indexOf("JSON.parse");
-    expect(verify).toBeGreaterThan(-1);
-    expect(verify).toBeLessThan(parse);
+  it("verification is the adapter's, so there is no hand-rolled signature check", () => {
+    // The previous implementation coded Standard Webhooks from the spec and had never been
+    // checked against a live event. A signature check that is subtly wrong either rejects
+    // every real payment or accepts forged ones.
+    const src = code("app/api/webhooks/polar/route.ts");
+    expect(src).toMatch(/Webhooks\(\{/);
+    expect(src).toMatch(/webhookSecret: billingConfig\(\)\.webhookSecret/);
+    expect(src).not.toMatch(/createHmac/);
   });
 
-  it("reads the body as text, because re-serialising breaks the signature", () => {
-    // Asserted on the call, not the string: the file's own comment explains why req.json()
-    // is wrong, and a test that cannot tell code from prose about code fails on the
-    // explanation. Third time that has caught me — strip comments first.
-    const hook = readFileSync(new URL("../app/api/webhooks/polar/route.ts", import.meta.url), "utf8")
-      .replace(/\/\/.*$/gm, "");
-    expect(hook).toMatch(/await req\.text\(\)/);
-    expect(hook).not.toMatch(/await req\.json\(\)/);
+  it("identifies the payer by the id we attached, never by email", () => {
+    const src = code("app/api/webhooks/polar/route.ts");
+    expect(src).toMatch(/customer\?\.externalId/);
+    expect(src).not.toMatch(/customerEmail|customer\?\.email/);
   });
 });
 
