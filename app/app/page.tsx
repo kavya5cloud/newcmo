@@ -166,6 +166,32 @@ export default function AppPage() {
   }, []);
 
   /* ---- auth status ---- */
+  // Arriving from the home page hero, which submits ?url=.
+  //
+  // Fill the field and start in one go, so the handoff does not ask anyone to type the same
+  // address twice. Runs once: the ref guards against a re-render restarting it, and the
+  // parameter is stripped from the address bar so a refresh cannot re-run a generation
+  // nobody asked for a second time.
+  //
+  // An existing session wins. Somebody who already has a site analyzed should not have it
+  // replaced by a stale link.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || entered || progress >= 0) return;
+    const incoming = new URLSearchParams(window.location.search).get("url");
+    if (!incoming) return;
+
+    autoStarted.current = true;
+    setInputUrl(incoming);
+
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("url");
+    window.history.replaceState({}, "", clean.toString());
+
+    void analyze(incoming);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entered, progress]);
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -341,9 +367,14 @@ export default function AppPage() {
   useEffect(() => { chatBodyRef.current?.scrollTo(0, chatBodyRef.current.scrollHeight); }, [chat, typing]);
 
   /* ---- analyze ---- */
-  const analyze = useCallback(async () => {
-    if (!inputUrl.trim()) return;
-    const { url: u, display } = canonicalSource(source, inputUrl);
+  // `override` exists for the home page handoff. Reading only state meant the caller had to
+  // set it first and then wait a render for the closure to catch up — two effects and a ref
+  // to sequence something that is really one action. Passing the value removes the ordering
+  // problem rather than timing around it.
+  const analyze = useCallback(async (override?: string) => {
+    const raw = (override ?? inputUrl).trim();
+    if (!raw) return;
+    const { url: u, display } = canonicalSource(source, raw);
     setUrl(u); setProgress(0); setGscError(null); setGscSite(""); setRecIds({});
     const steps = 5;
     const bump = (n: number) => setProgress(n);
@@ -700,7 +731,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                 autoComplete="off"
                 spellCheck={false}
               />
-              <button className="go" onClick={analyze} disabled={progress >= 0}>Analyze →</button>
+              <button className="go" onClick={() => analyze()} disabled={progress >= 0}>Analyze →</button>
             </div>
             {source !== "website" && (
               <div className="urlbox src-desc">

@@ -69,18 +69,21 @@ const AGENT_DETAILS: Record<string, string> = {
   "Link Broker Agent": "Will identify relevant backlink opportunities and prepare outreach once the feature is available.",
 };
 
-const TERM_LINES = [
-  { t: "$ populr run --daily", cls: "p", d: 24 },
-  { t: "scanning: site, ga4, search-console … done", cls: "c", d: 10 },
-  { t: 'skip  write 4 articles for "best crm"   # won\'t rank', cls: "skip", d: 10 },
-  { t: "skip  daily linkedin posts              # buyers aren't there", cls: "skip", d: 10 },
-  { t: "skip  reply to 14 reddit threads        # 11 low-intent", cls: "skip", d: 10 },
-  { t: "do →  fix pricing page. 61% bounce in 9s. draft attached.", cls: "do", d: 16 },
+// What a daily run decides, shown as the product shows it.
+//
+// This replaced a fake terminal that typed itself out character by character. The terminal
+// was a costume: Populr has no command line, so the one thing the hero demonstrated was
+// something the product does not do. Worse, the format put the interesting part — the
+// reason a task was skipped — in a trailing `# comment`, which is where the eye goes last.
+//
+// The frame below shows the same decisions as rows, which is the shape the dashboard
+// actually uses. `verdict` drives the styling; nothing here is styled by hand.
+const PLAN_ROWS: { verdict: "skip" | "do"; task: string; why: string }[] = [
+  { verdict: "skip", task: 'Write 4 articles for "best crm"', why: "Won't rank — three incumbents own the page one" },
+  { verdict: "skip", task: "Daily LinkedIn posts", why: "Your buyers aren't reading LinkedIn this week" },
+  { verdict: "skip", task: "Reply to 14 Reddit threads", why: "11 are low-intent — 3 are queued instead" },
+  { verdict: "do", task: "Fix the pricing page", why: "61% bounce within 9 seconds. Draft attached." },
 ];
-
-function esc(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-}
 
 export default function Landing() {
   // A referral link lands here. Store the code straight away — the account may not be
@@ -88,38 +91,14 @@ export default function Landing() {
   useEffect(() => { captureReferral(window.location.search); }, []);
 
   const dotsRef = useRef<HTMLCanvasElement>(null);
-  const termRef = useRef<HTMLDivElement>(null);
   const [flippedAgent, setFlippedAgent] = useState<string | null>(null);
   useEffect(() => {
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const body = termRef.current;
-    if (body) {
-      body.innerHTML = "";
-      if (reduce) {
-        body.innerHTML = TERM_LINES.map((l) => `<div class="ln ${l.cls}">${esc(l.t)}</div>`).join("");
-      } else {
-        let li = 0;
-        const next = () => {
-          if (!termRef.current) return;
-          if (li >= TERM_LINES.length) {
-            body.insertAdjacentHTML("beforeend", '<div class="ln"><span class="cursor"></span></div>');
-            return;
-          }
-          const l = TERM_LINES[li++];
-          const div = document.createElement("div");
-          div.className = "ln " + l.cls;
-          body.appendChild(div);
-          let i = 0;
-          const type = () => {
-            div.textContent = l.t.slice(0, ++i);
-            if (i < l.t.length) setTimeout(type, l.d);
-            else setTimeout(next, 260);
-          };
-          type();
-        };
-        setTimeout(next, 500);
-      }
-    }
+
+    // The typewriter that used to run here is gone with the terminal. It wrote through
+    // innerHTML with a hand-rolled escaper, held a timeout chain no cleanup ever cancelled,
+    // and delayed the hero's most concrete content by four seconds. The frame renders as
+    // markup now, so React owns it and there is nothing to tear down.
 
     const dcv = dotsRef.current;
     if (!dcv) return;
@@ -162,7 +141,56 @@ export default function Landing() {
         <div className="nav-in">
           <a href="/" className="logo" aria-label="Populr home">Populr.</a>
           <div className="nav-r">
-            <a href="#how">How it works</a>
+            {/* The mega menu.
+                Open on hover and on keyboard focus, closed otherwise — :focus-within does
+                the second half, which is why there is no React state here. A menu driven by
+                useState needs its own outside-click handler, its own Escape handler, and its
+                own focus management, and gets at least one of the three wrong. CSS already
+                knows when something inside is focused.
+
+                Every entry points at a page that exists. A menu advertising surfaces we have
+                not built is a promise the next click breaks. */}
+            <div className="nav-menu">
+              <button type="button" className="nav-trigger" aria-haspopup="true">
+                Product
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div className="nav-panel">
+                <div className="nav-col">
+                  <p className="label">The product</p>
+                  {[
+                    ["#how", "How it works", "One URL in, today's plan out."],
+                    ["#agents", "The agents", "Every role a marketing team would hire."],
+                    ["#integrations", "Connects to", "Your site, your analytics, your accounts."],
+                    ["#pricing", "Pricing", "One plan. First month free."],
+                  ].map(([href, t, d]) => (
+                    <a key={href} href={href} className="nav-item">
+                      <span className="nav-item-t">{t}</span>
+                      <span className="nav-item-d">{d}</span>
+                    </a>
+                  ))}
+                </div>
+                <div className="nav-col nav-col-alt">
+                  <p className="label">Go to</p>
+                  {[
+                    ["/app", "Dashboard", "Your daily run and the CMO chat."],
+                    ["/studio/launch", "Launch workspace", "Plan and ship a launch end to end."],
+                    ["/studio/integrations", "Integrations", "Connect accounts and manage billing."],
+                  ].map(([href, t, d]) => (
+                    <a key={href} href={href} className="nav-item">
+                      <span className="nav-item-t">{t}</span>
+                      <span className="nav-item-d">{d}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* The menu's stand-in below its breakpoint. A hover panel needs a pointer and
+                needs room; neither is true on a phone. Rather than dropping the destination
+                entirely, the narrow layout keeps the one link the menu led with. */}
+            <a href="#how" className="nav-compact">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="/early-access" className="btn btn-ghost btn-sm">Early access</a>
             <a href="/app" className="btn">Try free <span className="kbd">1 mo</span></a>
@@ -171,16 +199,41 @@ export default function Landing() {
       </nav>
 
       <header>
+        {/* Behind the dots: the drifting light. Both are decoration and neither is
+            announced to a screen reader. */}
+        <div className="hero-mesh" aria-hidden="true"><i /><i /><i /><i /></div>
+        <div className="hero-grain" aria-hidden="true" />
         <canvas className="dots" ref={dotsRef} aria-hidden="true" />
         <div className="wrap" style={{ position: "relative", zIndex: 2 }}>
           <span className="pill"><i />now in early access</span>
           <h1>Meet <span className="name">Populr.</span><br /><span className="headline-tail">Your AI CMO.</span></h1>
-          <p className="sub">Paste your URL. Populr learns your product, runs SEO, AI search, Reddit and content daily — and only pings you for what actually moves your numbers.</p>
-          <div className="cta-row">
-            <a href="/app" className="btn btn-lg">Try free for a month</a>
-            <a href="#how" className="btn btn-lg btn-ghost">See how it works</a>
-          </div>
-          <p className="under">no card · no setup · one URL</p>
+          <p className="sub">Paste your website. Populr reads it, works out your positioning, and builds today&apos;s plan.</p>
+
+          {/* The input is the hero.
+              It used to be two buttons here and the real thing a page away, which asks
+              somebody to commit before they have seen anything. The product's whole promise
+              is that one URL is enough — so the page should ask for one URL, and the fastest
+              way to believe a claim is to watch it happen.
+
+              A plain GET form: no JavaScript needed to submit, and /app reads ?url= and
+              starts on arrival. */}
+          <form className="hero-form" action="/app" method="get">
+            <input
+              type="url"
+              name="url"
+              placeholder="https://yourcompany.com"
+              aria-label="Your website"
+              autoComplete="url"
+              spellCheck={false}
+              required
+            />
+            <button type="submit" aria-label="Analyze my website">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 12h13M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          </form>
+          <p className="under">free for a month · no card · nothing publishes without you</p>
 
           {/* Supa Launch badge. Their asset on their CDN, so the host is allow-listed in
               the CSP's img-src — without that the image is silently blocked and the page
@@ -205,10 +258,41 @@ export default function Landing() {
               height={44}
             />
           </a>
-          <div className="term" role="img" aria-label="Terminal showing Populr skipping low-value tasks">
-            <div className="term-bar"><b /><b /><b /><span>populr · daily run</span></div>
-            <div className="term-body" ref={termRef} />
-          </div>
+          {/* The product frame.
+              Arcade's hero ends on a framed screenshot of the app. The frame is the whole
+              trick: the same content in a bare div reads as a picture of software, and
+              inside a bordered container with its own title bar it reads as software.
+
+              Labelled as an example rather than left to imply real account data — the
+              numbers below are illustrative and there is no honest way to present them
+              as anything else. */}
+          <figure className="frame">
+            <div className="frame-bar">
+              <span className="frame-live" aria-hidden="true" />
+              <span className="frame-title">Today&apos;s plan</span>
+              <span className="frame-tag">example</span>
+            </div>
+            <div className="frame-body">
+              <p className="frame-lede">
+                Populr checked your site, GA4 and Search Console. Here is what it decided —
+                and what it refused to do.
+              </p>
+              <ul className="plan">
+                {PLAN_ROWS.map((r) => (
+                  <li key={r.task} className={"plan-row plan-" + r.verdict}>
+                    <span className="plan-verdict">{r.verdict === "do" ? "Do today" : "Skipped"}</span>
+                    <span className="plan-main">
+                      <span className="plan-task">{r.task}</span>
+                      <span className="plan-why">{r.why}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <figcaption className="frame-foot">
+              Three things skipped, one worth your morning. The reason is always attached.
+            </figcaption>
+          </figure>
         </div>
       </header>
 
@@ -302,6 +386,53 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* What Populr plugs into.
+          Two columns because they are two different kinds of access and conflating them
+          would overstate what we do. Reading a site or an analytics property is one-way and
+          needs nothing from you beyond a URL. Publishing goes through an account you connect
+          yourself, and it is the half people are right to be careful about — so the note
+          under it says plainly that nothing leaves without approval.
+
+          The publish list is SOCIAL_PLATFORMS from lib/social/types.ts, in the same order.
+          Whether a given platform reaches the real provider depends on app credentials being
+          configured, which is an environment fact and not something a static page can claim,
+          so the copy says "through your own account" rather than "live". */}
+      <section id="integrations" className="integrations">
+        <div className="wrap">
+          <div style={{ textAlign: "center" }}>
+            <p className="label">Connects to</p>
+            <h2 style={{ marginTop: 14 }}>Works with the accounts<br />you already have.</h2>
+            <p className="sub">No new tool to migrate into. Populr reads what exists and writes back through it.</p>
+          </div>
+
+          <div className="int-grid">
+            <div className="int-card">
+              <p className="label">Reads</p>
+              <p className="int-lede">Enough to know what your business is and where revenue comes from.</p>
+              <div className="int-chips">
+                {["Your website", "Google Analytics 4", "Search Console", "Instagram", "LinkedIn", "X", "YouTube", "Google Business Profile"].map((s) => (
+                  <span className="int-chip" key={s}>{s}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="int-card">
+              <p className="label">Publishes through</p>
+              <p className="int-lede">Your own connected account — Populr never posts from a Populr page.</p>
+              <div className="int-chips">
+                {["LinkedIn", "Instagram", "Facebook Pages", "X", "Threads", "Pinterest"].map((s) => (
+                  <span className="int-chip" key={s}>{s}</span>
+                ))}
+              </div>
+              <p className="int-note">
+                Every post waits for your approval. Disconnect an account and Populr stops
+                reaching it immediately.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="compare">
         <div className="wrap">
           <p className="label">The math</p>
@@ -321,7 +452,10 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="pricing" style={{ borderBottom: 0 }}>
+      {/* borderBottom:0 used to live here to stop the last section drawing a divider above
+          the footer. Sections are cards now — that inline style only knocked the bottom out
+          of this one. */}
+      <section id="pricing">
         <div className="wrap">
           <p className="label">Pricing</p>
           <h2 style={{ marginTop: 14 }}>One plan. First month free.</h2>
