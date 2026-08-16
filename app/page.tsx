@@ -176,6 +176,7 @@ export default function Landing() {
                   <p className="label">Go to</p>
                   {[
                     ["/app", "Dashboard", "Your daily run and the CMO chat."],
+                    ["/guides", "Guides", "How GEO works, and why AI tools invent statistics."],
                     ["/studio/launch", "Launch workspace", "Plan and ship a launch end to end."],
                     ["/studio/integrations", "Integrations", "Connect accounts and manage billing."],
                   ].map(([href, t, d]) => (
@@ -478,6 +479,12 @@ export default function Landing() {
           <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <a href="#how" style={{ color: "var(--faint)", textDecoration: "none" }}>how it works</a>
             <a href="#pricing" style={{ color: "var(--faint)", textDecoration: "none" }}>pricing</a>
+            {/* Both of these were reachable only from the sitemap. Search Console reported
+                them as crawled-but-not-indexed, which is what an orphan page earns: the
+                crawler has no signal that anything on the site considers them worth linking
+                to. Footer links are the cheapest way to say otherwise. */}
+            <a href="/guides" style={{ color: "var(--faint)", textDecoration: "none" }}>guides</a>
+            <a href="/worked" style={{ color: "var(--faint)", textDecoration: "none" }}>what worked</a>
             <a href="/early-access" style={{ color: "var(--faint)", textDecoration: "none" }}>early access</a>
             <a href="mailto:team@trypopulr.in" style={{ color: "var(--faint)", textDecoration: "none" }}>contact</a>
             <a href="/privacy" className="foot-btn">Privacy Policy</a>
