@@ -89,16 +89,30 @@ export function verifyWebhook(input: VerifyInput, now: number = Date.now()): Ver
  * paused and resumed are included because a paused subscription should not keep access;
  * normalizeStatus maps "paused" to revoked, and the resume arrives as its own event.
  */
+/**
+ * The events this endpoint accepts — and the exact set to tick in Polar's dashboard.
+ *
+ * Every entry is one `validateEvent` in @polar-sh/sdk can parse. That is a hard limit, not a
+ * preference: the SDK validates the whole payload against a schema keyed by event type and
+ * throws on a type it does not know, before any handler runs. The throw becomes a 500, and
+ * Polar retries a 500 — so an event the SDK cannot parse is not "ignored", it is a failing
+ * delivery that repeats.
+ *
+ * `subscription.cycled`, `subscription.paused` and `subscription.resumed` used to be listed
+ * here and were removed for exactly that reason: this SDK version has no schema for them,
+ * and subscribing to them in the dashboard produces permanent 500s. Renewals and
+ * pause/resume still reach us — Polar sends `subscription.updated` alongside those state
+ * changes, and the status it carries is what record() writes.
+ *
+ * Before adding a type here, confirm the SDK knows it.
+ */
 export const HANDLED_EVENTS = [
   "subscription.created",
   "subscription.active",
   "subscription.updated",
-  "subscription.cycled",
   "subscription.past_due",
   "subscription.canceled",
   "subscription.uncanceled",
-  "subscription.paused",
-  "subscription.resumed",
   "subscription.revoked",
 ] as const;
 

@@ -285,17 +285,28 @@ describe("the events we subscribe to", () => {
     expect(isHandled("subscription.past_due")).toBe(true);
   });
 
-  it("includes cycled, or a renewed subscription's period never moves", async () => {
-    const { isHandled } = await import("@/lib/billing/webhook");
-    expect(isHandled("subscription.cycled")).toBe(true);
+  it("lists only events the SDK can actually parse", async () => {
+    // This replaces a test that required cycled/paused/resumed. That test encoded what we
+    // wanted rather than what works: @polar-sh/sdk validates each payload against a schema
+    // keyed by event type and throws on a type it does not know, before any handler runs.
+    // Subscribing to one of those three produced a 500 on every delivery — and Polar retries
+    // a 500, so the failure repeats rather than passing quietly.
+    const { HANDLED_EVENTS } = await import("@/lib/billing/webhook");
+    const PARSEABLE = new Set([
+      "subscription.created", "subscription.active", "subscription.updated",
+      "subscription.past_due", "subscription.canceled", "subscription.uncanceled",
+      "subscription.revoked",
+    ]);
+    for (const e of HANDLED_EVENTS) {
+      expect(PARSEABLE.has(e), `${e} is not parseable by the SDK — it would 500 on delivery`).toBe(true);
+    }
   });
 
-  it("covers every subscription lifecycle event Polar sends", async () => {
+  it("covers the lifecycle events that change access", async () => {
+    // Renewals and pause/resume still reach us: Polar sends subscription.updated alongside
+    // those transitions, carrying the status that record() writes.
     const { isHandled } = await import("@/lib/billing/webhook");
-    for (const e of [
-      "created", "active", "updated", "cycled", "past_due",
-      "canceled", "uncanceled", "paused", "resumed", "revoked",
-    ]) {
+    for (const e of ["created", "active", "updated", "past_due", "canceled", "uncanceled", "revoked"]) {
       expect(isHandled(`subscription.${e}`), `subscription.${e} unhandled`).toBe(true);
     }
   });

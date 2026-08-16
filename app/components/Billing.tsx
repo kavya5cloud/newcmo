@@ -117,8 +117,40 @@ export default function Billing() {
 
   const until = s.until ? new Date(s.until).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : null;
 
+  // The badge states the relationship in one word. `reason` already carries it — deriving a
+  // second parallel notion of "what is going on" is how a panel starts contradicting itself.
+  const badge =
+    s.reason === "subscription" ? { text: "Active", tone: "ok" as const }
+    : s.reason === "trial" ? { text: "Free month", tone: "ok" as const }
+    : s.reason === "grace" ? { text: "Grace period", tone: "warn" as const }
+    : s.reason === "period_remaining" ? { text: "Ending", tone: "warn" as const }
+    : s.reason === "payment_failed" ? { text: "Payment failed", tone: "bad" as const }
+    : { text: "Ended", tone: "bad" as const };
+
+  // What the countdown is counting down to. The date alone is ambiguous — "12 September"
+  // means opposite things for a renewal and an expiry.
+  const untilLabel =
+    s.reason === "trial" ? "Free month ends"
+    : s.reason === "grace" ? "Access pauses"
+    : s.reason === "period_remaining" ? "Access ends"
+    : "Renews";
+
   return (
     <div className="bill">
+      {/* The price is the headline. The old panel opened with a sentence and left the amount
+          buried in the button label, so the one number anyone came here for was the last
+          thing they read — and it disappeared entirely once they subscribed. */}
+      <div className="bill-head">
+        <div className="bill-plan">
+          <span className="bill-amt">$15</span>
+          <span className="bill-per">/month</span>
+        </div>
+        <span className={"bill-badge bill-" + badge.tone}>
+          <i aria-hidden="true" />
+          {badge.text}
+        </span>
+      </div>
+
       <p className="bill-state">
         <Icon name={s.allowed ? "check-circle" : "clock"} size={14} />
         <span>{s.message}</span>
@@ -126,20 +158,49 @@ export default function Billing() {
 
       {until && s.allowed && (
         <p className="bill-until">
-          {s.reason === "trial" ? "Trial ends" : s.reason === "grace" ? "Access pauses" : "Renews"} {until}
-          {s.daysLeft != null && ` · ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"} left`}
+          <span className="bill-until-k">{untilLabel}</span>
+          <span className="bill-until-v">
+            {until}
+            {s.daysLeft != null && ` · ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"} left`}
+          </span>
         </p>
       )}
 
-      {waiting && <p className="bill-until">Confirming your payment…</p>}
+      {waiting && (
+        <p className="bill-wait">
+          <span className="btn-spin" aria-hidden="true" />
+          Confirming your payment…
+        </p>
+      )}
 
-      {err && <p className="bill-err">{err}</p>}
+      {err && (
+        <p className="bill-err" role="status">{err}</p>
+      )}
 
       <div className="bill-acts">
         {s.manageable ? (
           <button className="bill-btn" onClick={() => go("portal")} disabled={busy !== null}>
             {busy === "portal" ? <span className="btn-spin" aria-label="Opening" /> : "Manage billing"}
           </button>
+        ) : s.subscribed && s.canSubscribe ? (
+          // Access granted directly rather than bought — a comped row, which has no Polar
+          // customer behind it, so "Manage billing" would open on nothing.
+          //
+          // This used to fall straight through to the Subscribe branch, which put a green
+          // "Subscribe — $15/month" directly under "Your subscription is active". Two
+          // statements that contradict each other, and the loud one is the wrong one: this
+          // person is not being asked to buy anything today. The offer stays, because their
+          // access does end and they will need it — but as a quiet action with a sentence
+          // saying why it is there.
+          <>
+            <button className="bill-btn" onClick={() => go("checkout")} disabled={busy !== null}>
+              {busy === "checkout" ? <span className="btn-spin" aria-label="Starting" /> : "Set up billing"}
+            </button>
+            <p className="bill-until">
+              Your access was granted directly, so there is no card on file. Set up billing
+              whenever you want it to continue past the date above.
+            </p>
+          </>
         ) : s.canSubscribe ? (
           <button className="bill-btn bill-pri" onClick={() => go("checkout")} disabled={busy !== null}>
             {busy === "checkout" ? <span className="btn-spin" aria-label="Starting" /> : "Subscribe — $15/month"}
