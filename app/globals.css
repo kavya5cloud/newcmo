@@ -2964,3 +2964,139 @@ html{scroll-padding-top:var(--eab-h,0px)}
   font-size: 13px; line-height: 1.55; color: var(--faint);
 }
 @media (max-width: 820px) { .landing .int-grid { grid-template-columns: 1fr } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD — same structure, brought onto the brand
+   ───────────────────────────────────────────────────────────────────────────
+   The four columns stay exactly where they are. What changes is that the
+   dashboard stops looking like a different product from the page that sold it.
+
+   The root cause was one line: .appui set --green to #3ECF8E, a mint, while the
+   brand and the whole landing page run on lime #d5ff72. Every accent in here —
+   every "done", every delta, every badge — was rendering in a colour the brand
+   does not use. That is fixed at the variable, so it fixes everywhere at once.
+
+   The rest is depth. Columns divided by hairlines read as regions of one flat
+   surface; the same columns as raised panels with air between them read as
+   parts of an application. Same layout, same information, different substance.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.appui {
+  /* Lime is the brand. Mint was never in it. */
+  --green: #d5ff72;
+  /* Kept separate so "this succeeded" does not have to borrow the accent —
+     a board where every good thing is the accent colour ranks nothing. */
+  --ok: #7fd99a;
+}
+
+/* The canvas the panels sit on, so their edges have something to sit against. */
+.appui .dash {
+  gap: 10px;
+  padding: 10px;
+  background:
+    radial-gradient(ellipse 70% 50% at 12% -10%, rgba(213,255,114,.05), transparent 60%),
+    var(--bg);
+}
+.appui .col {
+  border-right: 0;                      /* the divider becomes the panel edge */
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.004));
+  box-shadow: var(--lift);
+  overflow: hidden;
+}
+.appui .col-head {
+  padding: 13px 16px;
+  background: rgba(255,255,255,.022);
+  border-bottom: 1px solid var(--edge);
+}
+.appui .col-head .ct { color: var(--dim); letter-spacing: .09em; }
+
+/* Stat tiles. Same three numbers; the value now outranks its label instead of
+   sharing weight with it, and the vertical rules go — whitespace already
+   separates three items. */
+.appui .statgrid {
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.026), rgba(255,255,255,0));
+  padding: 18px 4px 14px;
+}
+.appui .stat { border-right: 0; }
+.appui .stat .sl { font-size: 11px; letter-spacing: .02em; }
+.appui .stat .sv { font-size: 26px; letter-spacing: -.035em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.appui .stat .sd { margin-top: 5px; }
+/* "sample" is a disclaimer, not a delta. It was rendering in the accent colour,
+   which reads as a positive metric — the opposite of what it says. */
+.appui .stat .sd-sample {
+  display: inline-block; color: var(--faint);
+  border: 1px solid var(--edge); border-radius: 999px;
+  padding: 1px 8px; font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+}
+.appui .statfoot { border-top-color: var(--edge); }
+
+/* Chat: the assistant's replies were mid-grey on near-black at 12.5px, which is
+   the least readable thing on the screen and also the most read. */
+.appui .msg { font-size: 13px; line-height: 1.6; padding: 10px 13px; }
+.appui .msg.ai { background: rgba(255,255,255,.03); border-color: var(--edge); color: var(--dim); }
+
+/* Quick actions read as buttons rather than as bordered text. */
+.appui .qa { border-color: var(--edge); border-radius: 11px; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
+.appui .qa:hover { background: rgba(213,255,114,.05); }
+
+/* The activity strip: one lit edge instead of a black box with a border. */
+.appui .termstrip {
+  background: linear-gradient(180deg, #070908, #0b0e0c);
+  border-bottom: 1px solid var(--edge);
+}
+.appui .topbar { background: #070908; border-bottom: 1px solid var(--edge); }
+
+@media (max-width: 1100px) {
+  .appui .dash { gap: 0; padding: 0; background: var(--bg) }
+  .appui .col { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none }
+}
+
+/* ── Column grips ─────────────────────────────────────────────────────────
+   The draggable seam between dashboard columns.
+
+   The hit area is 11px wide and invisible; the line you see inside it is 2px.
+   A grip you can only grab when you land on the visible line is a grip people
+   miss and stop trying — the target has to be bigger than the mark.
+
+   Nothing appears until the pointer is near it. A permanent handle on every
+   seam is three pieces of furniture competing with the content for attention,
+   for an action most people take once and never again. */
+.appui .colgrip {
+  position: absolute; top: 10px; bottom: 10px;
+  width: 11px; margin-left: -5.5px;
+  z-index: 5; cursor: col-resize;
+  background: none; border: 0; padding: 0;
+  /* The row is a grid; the grips are placed by measured offset and must not
+     take part in the track layout. */
+  grid-area: 1 / 1;
+  touch-action: none;              /* or a touch-drag scrolls the page instead */
+}
+.appui .colgrip::before {
+  content: ""; position: absolute; inset: 0 auto; left: 50%;
+  width: 2px; margin-left: -1px; border-radius: 2px;
+  background: var(--acc);
+  opacity: 0; transform: scaleY(.7);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.appui .colgrip:hover::before,
+.appui .colgrip:focus-visible::before,
+.appui .colgrip:active::before { opacity: .75; transform: scaleY(1); }
+.appui .colgrip:active::before { opacity: 1; }
+/* The default focus ring is drawn on the element, which here is an invisible
+   11px strip — it would frame empty space. The bar itself is the focus mark. */
+.appui .colgrip:focus-visible { outline: none; }
+
+/* Dragging must not leave a column mid-scroll or select text inside one. */
+.appui .dash:has(.colgrip:active) .col-body { overflow: hidden; }
+
+/* Stacked layout: the columns become tabs and there are no seams to drag. */
+@media (max-width: 1100px) {
+  .appui .colgrip { display: none; }
+  /* The inline grid-template-columns from the component is desktop sizing and
+     must not survive into the stacked layout. */
+  .appui .dash { grid-template-columns: 1fr !important; }
+}

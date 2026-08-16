@@ -11,6 +11,7 @@ import { AIProcessing } from "@/app/components/ai-processing";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { isContentEnginePath } from "@/lib/flags";
 import Icon from "@/app/components/Icon";
+import ResizableDash from "./_components/ResizableDash";
 import Section from "@/app/components/Section";
 import DocSkeleton from "@/app/components/DocSkeleton";
 import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
@@ -873,7 +874,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
             anything need me. The columns below are for anyone who wants to dig. */}
         <HomeHero company={profile?.name} />
 
-        <div className="dash">
+        <ResizableDash>
           {/* COMPANY */}
           <div className={"col" + (mtab === "company" ? " mactive" : "")}>
             <div className="col-head"><span className="ct">Company</span><span className="ca"><button title="Reset" aria-label="Reset" onClick={reset}><Icon name="gear" size={15} /></button></span></div>
@@ -1188,7 +1189,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
               </div>
             </div>
           </div>
-        </div>
+        </ResizableDash>
 
         <div className="mobilenav">
           {([
