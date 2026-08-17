@@ -3100,3 +3100,26 @@ html{scroll-padding-top:var(--eab-h,0px)}
      must not survive into the stacked layout. */
   .appui .dash { grid-template-columns: 1fr !important; }
 }
+
+/* ── Dismissing the status line ───────────────────────────────────────────
+   "Your marketing is running · 14 posts this week · next post 2:30pm" is
+   reassuring the first time and furniture the twentieth. Someone who already
+   knows it is running came for the work, and this sits above all of it.
+
+   The control is quiet until the block is hovered — a permanent X invites the
+   question "what does this delete?", when the answer is only "hide a line I
+   already read". */
+.home-dismiss-wrap { margin-top: 2px; }
+.home-dismiss {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  background: none; border: 1px solid transparent; border-radius: 8px;
+  color: var(--faint); cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.home-facts:hover .home-dismiss,
+.home-dismiss:focus-visible { opacity: 1; }
+.home-dismiss:hover { color: var(--fg); background: rgba(255,255,255,.06); }
+/* Touch has no hover, so on a phone the control is simply always there. */
+@media (hover: none) { .home-dismiss { opacity: 1 } }

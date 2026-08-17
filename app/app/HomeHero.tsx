@@ -32,8 +32,27 @@ function greeting(now = new Date()): string {
   return "Good evening";
 }
 
+const DISMISS_KEY = "populr:hero:dismissed";
+
 export default function HomeHero({ company }: { company?: string }) {
   const [status, setStatus] = useState<AssistantStatus | null>(null);
+
+  // Dismissible, because "your marketing is running · 14 posts this week · next post 2:30pm"
+  // is reassuring the first time and furniture the twentieth. Someone who already knows it is
+  // running wants the work, not the reassurance, and it sits above everything else.
+  //
+  // Read in an effect rather than the initialiser: localStorage during render disagrees with
+  // the server on first paint. Dismissing hides the status, never the greeting and never the
+  // approval prompt — that one is the product asking for something, and it comes back on its
+  // own when there is something to approve.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    try { setDismissed(window.localStorage.getItem(DISMISS_KEY) === "1"); } catch { /* private mode */ }
+  }, []);
+  const dismiss = () => {
+    setDismissed(true);
+    try { window.localStorage.setItem(DISMISS_KEY, "1"); } catch { /* nothing to do */ }
+  };
 
   useEffect(() => {
     fetch(`/api/assistant?wsid=${encodeURIComponent(workspaceId())}`, { cache: "no-store" })
@@ -59,7 +78,7 @@ export default function HomeHero({ company }: { company?: string }) {
             : "Your marketing is running."}
       </h1>
 
-      {configured && !status!.paused && (
+      {configured && !status!.paused && !dismissed && (
         <ul className="home-facts">
           <li>
             <Icon name="check" size={13} />
@@ -71,6 +90,17 @@ export default function HomeHero({ company }: { company?: string }) {
               Next post {describeWhen(status!.nextPublishAt).toLowerCase()}
             </li>
           )}
+          <li className="home-dismiss-wrap">
+            <button
+              type="button"
+              className="home-dismiss"
+              onClick={dismiss}
+              aria-label="Hide the status line"
+              title="Hide this"
+            >
+              <Icon name="close" size={13} />
+            </button>
+          </li>
         </ul>
       )}
 
