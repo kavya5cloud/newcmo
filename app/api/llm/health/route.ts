@@ -25,8 +25,16 @@ export const maxDuration = 60;
 //
 //   Never the account's data. Every probe sends the same fixed two-word prompt.
 
-/** A live call per model, so the answer is what the provider does — not what we assume. */
-async function probe(providerName: string, model: string, timeoutMs: number) {
+/**
+ * A live call per model, so the answer is what the provider does — not what we assume.
+ *
+ * `mode` exists because the two paths are different endpoints with different failure modes,
+ * and the first version of this file only checked one of them. It reported Gemini healthy
+ * while the chat panel was quietly falling through to Groq, because chat streams and the
+ * probe did not: Gemini streams from :streamGenerateContent, a separate method that can fail
+ * on its own. A health check that passes while the product is degraded is worse than none.
+ */
+async function probe(providerName: string, model: string, timeoutMs: number, mode: "once" | "stream") {
   const provider = PROVIDERS.find((p) => p.name === providerName)!;
   const key = (process.env[provider.env] || "").trim();
   const started = Date.now();
@@ -35,7 +43,10 @@ async function probe(providerName: string, model: string, timeoutMs: number) {
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const gemini = provider.kind === "gemini";
-    const url = gemini ? `${provider.url}/${model}:generateContent` : provider.url;
+    const streaming = mode === "stream";
+    const url = gemini
+      ? `${provider.url}/${encodeURIComponent(model)}:${streaming ? "streamGenerateContent?alt=sse" : "generateContent"}`
+      : provider.url;
     const res = await fetch(url, {
       method: "POST",
       signal: ctl.signal,
@@ -46,20 +57,37 @@ async function probe(providerName: string, model: string, timeoutMs: number) {
       body: JSON.stringify(
         gemini
           ? { contents: [{ parts: [{ text: "say ok" }] }], generationConfig: { maxOutputTokens: 2048 } }
-          : { model, messages: [{ role: "user", content: "say ok" }], max_tokens: 2048 },
+          : { model, messages: [{ role: "user", content: "say ok" }], max_tokens: 2048, ...(streaming ? { stream: true } : {}) },
       ),
     });
 
     const raw = await res.text();
     let text = "";
-    try {
-      const j = JSON.parse(raw);
-      text = gemini
-        ? (j?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
-        : (j?.choices?.[0]?.message?.content ?? "");
-    } catch { /* keep the body below instead */ }
+    if (streaming) {
+      // SSE: many small frames, each a JSON object after "data:". Concatenating the deltas is
+      // the only way to know text actually arrived rather than just a 200 and an open socket.
+      for (const line of raw.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload);
+          text += gemini
+            ? (j?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+            : (j?.choices?.[0]?.delta?.content ?? "");
+        } catch { /* a partial frame at the end is normal */ }
+      }
+    } else {
+      try {
+        const j = JSON.parse(raw);
+        text = gemini
+          ? (j?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+          : (j?.choices?.[0]?.message?.content ?? "");
+      } catch { /* keep the body below instead */ }
+    }
 
     return {
+      mode,
       model,
       status: res.status,
       ms: Date.now() - started,
@@ -71,6 +99,7 @@ async function probe(providerName: string, model: string, timeoutMs: number) {
     };
   } catch (e) {
     return {
+      mode,
       model,
       status: 0,
       ms: Date.now() - started,
@@ -120,11 +149,18 @@ export async function GET(req: NextRequest) {
       };
       if (!deep || !key) return row;
       // 12s each, run together: a provider that is merely slow should not stop the report.
-      return { ...row, probes: await Promise.all(p.models.map((m) => probe(p.name, m, 12_000))) };
+      const probes = await Promise.all(
+        p.models.flatMap((m) => [probe(p.name, m, 12_000, "once"), probe(p.name, m, 12_000, "stream")]),
+      );
+      return { ...row, probes };
     }),
   );
 
-  const anyAnswered = providers.some((p) => "probes" in p && p.probes?.some((x) => x.answered));
+  // Both paths have to work. "healthy" going true while chat is broken is the exact failure
+  // this endpoint existed to prevent, and the first version of it had that bug.
+  const answeredIn = (mode: "once" | "stream") =>
+    providers.some((p) => "probes" in p && p.probes?.some((x) => x.mode === mode && x.answered));
+  const anyAnswered = answeredIn("once") && answeredIn("stream");
 
   return NextResponse.json({
     ok: true,
