@@ -93,6 +93,68 @@ Second person, plain verbs, contractions where they fall naturally.
 Concrete beats clever. One real detail from the context above is worth more than any
 turn of phrase.`;
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Shape.
+
+   Everything above is about sentences. Nothing was about structure, so every
+   post came out as the same thing: three paragraphs of good prose. Good prose
+   in an identical container reads as a feed of one post repeated, which is the
+   real reason generated content feels lifeless — not the words, the sameness.
+
+   The shapes below are structures, not templates. Observed evidence for caring:
+   on a competitor's timeline the best-written insight took 32 likes across 3.2K
+   views, and a post whose entire body was ASCII art took 112 across 7.9K. The
+   drawing was not smarter. It was shaped differently from everything around it.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export const POST_SHAPES = `PICK A SHAPE
+
+Do not default to paragraphs. Choose the shape that fits what you have to say,
+and do not use the same one twice in a row.
+
+The claim. One flat line nobody can read neutrally, then the case for it in three
+short lines. Strongest when you are disagreeing with something the reader already
+believes.
+
+The list. A line of setup, then dashes. Three items, not five — five reads as
+padding. Each item under twelve words. The list does the arguing; no summary
+after it.
+
+The walkthrough. Numbered or arrowed steps of something real you can actually do.
+"> paste your url  > it reads the page  > you approve" beats any description of a
+feature. Works when the product genuinely is the answer.
+
+The receipt. A decision and its reason, stated flatly: what was skipped, and why.
+No adjectives. This is the shape nobody else in the category can use, because it
+requires having actually decided something.
+
+The comparison. Two things in two columns of plain text, or two lines with the
+same grammar. Let the gap between them make the point.
+
+The picture. A tiny diagram, a bit of ASCII, a shape made of characters. Rare, so
+it stops a scroll — and worth it only when it carries the idea rather than
+decorating it. Never more than once a week.`;
+
+export const INTERACTION = `LEAVE THE DOOR OPEN
+
+A post that closes completely gets read and forgotten. One that leaves something
+unresolved gets answered.
+
+End on a real question when you have one — something you genuinely do not know
+the answer to, that the reader plausibly does. "What did you try before this?"
+"Which of these does your team actually do?"
+
+This is the opposite of the rhetorical question banned below. The test is simple:
+if you answer it yourself in the next line, delete it. If a stranger could answer
+it better than you, keep it.
+
+Other ways to leave the door open: state the version you disagree with and invite
+the correction; give three options and ask which; admit the part you have not
+worked out.
+
+Never "thoughts?", never "agree?", never "let me know in the comments". Those are
+requests for engagement. A real question is a request for an answer.`;
+
 export const CRAFT_BANS = `NEVER WRITE
 
 - These phrases, in any form: ${AI_TELLS.slice(0, 24).join("; ")}.
@@ -133,7 +195,7 @@ export function formFor(platforms: string[]): string {
    ──────────────────────────────────────────────────────────────────────────── */
 
 export type CraftIssue = {
-  code: "ai_tell" | "vague_claim" | "flat_rhythm" | "summary_ending" | "hashtag_stack" | "emoji_spam" | "weak_opening";
+  code: "ai_tell" | "vague_claim" | "flat_rhythm" | "summary_ending" | "hashtag_stack" | "emoji_spam" | "weak_opening" | "monotone_shape";
   detail: string;
 };
 
@@ -212,6 +274,26 @@ export function scoreDraft(text: string): CraftScore {
     if (sd < 3.6) issues.push({ code: "flat_rhythm", detail: `sd ${sd.toFixed(1)} over ${lens.length} sentences` });
   }
 
+  // Shape, not sentences.
+  //
+  // flat_rhythm above catches prose that runs at one length. This catches prose that has no
+  // structure at all: a wall with no line breaks, no list, and no short line anywhere. Every
+  // post came out this way, because the rules only ever described sentences — and a feed of
+  // well-written identical blocks reads as one post repeated, which is the actual reason
+  // generated content feels lifeless.
+  //
+  // Any one of three things clears it, so this never argues with a post that had a good
+  // reason to be prose: a blank line between thoughts, a dash/number/arrow list, or a line
+  // under six words doing the work a paragraph cannot.
+  const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
+  const hasBreak = /\n\s*\n/.test(t);
+  const hasList = lines.filter((l) => /^([-*•>]|\d+[.)])\s+/.test(l)).length >= 2;
+  const hasPunchLine = lines.some((l) => l.split(/\s+/).length <= 5 && !/[:?]$/.test(l));
+  const longEnough = t.split(/\s+/).length >= 40;
+  if (longEnough && !hasBreak && !hasList && !hasPunchLine) {
+    issues.push({ code: "monotone_shape", detail: `${lines.length} line(s), no break, no list, no short line` });
+  }
+
   // Closing summary.
   const tail = sents.slice(-2).join(" ").toLowerCase();
   if (/^(so|in short|to recap|overall|ultimately|in summary)\b/.test(tail) || /\b(in conclusion|to sum up|the takeaway)\b/.test(tail)) {
@@ -245,6 +327,7 @@ export function rewriteNote(s: CraftScore): string {
   if (vague) parts.push(`Remove unsourced claims (${vague.join(", ")}) — make the argument without them.`);
   if (byCode.has("weak_opening")) parts.push(`The opening line is generic. Start on a concrete specific instead.`);
   if (byCode.has("flat_rhythm")) parts.push(`Every sentence is the same length. Break it up — put a short one after a long one.`);
+  if (byCode.has("monotone_shape")) parts.push(`This is a wall of prose. Give it a shape: break the thoughts onto their own lines, turn the middle into three dashed items, or land it on a line of four words. Pick one.`);
   if (byCode.has("summary_ending")) parts.push(`Cut the closing summary. End on the sharpest line.`);
   if (byCode.has("hashtag_stack")) parts.push(`Two hashtags at most.`);
   if (byCode.has("emoji_spam")) parts.push(`One emoji at most.`);

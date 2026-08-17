@@ -163,3 +163,53 @@ describe("the opening check judges the hook, not the whole post", () => {
     expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(false);
   });
 });
+
+describe("shape, not just sentences", () => {
+  // flat_rhythm catches prose running at one sentence length. Nothing caught prose with no
+  // structure at all, so every post came out as three paragraphs of good writing — and a feed
+  // of well-written identical blocks reads as one post repeated. That sameness, not the
+  // wording, is what makes generated content feel lifeless.
+  const wall = "Most founders treat every channel as equally viable when they start out and that assumption quietly costs them a quarter. The honest answer is that your buyers already gather somewhere specific and everything else is a rounding error on your attention. Finding that place takes a week of asking rather than a quarter of posting everywhere and hoping.";
+
+  it("flags a wall of prose", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    expect(scoreDraft(wall).issues.some((i) => i.code === "monotone_shape")).toBe(true);
+  });
+
+  it("clears the same argument once it has a shape", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const shaped = "Most founders treat every channel as equally viable.\n\nThat assumption costs a quarter.\n\nYour buyers already gather somewhere specific. Everything else is a rounding error.\n\nAsk for a week instead of posting for a quarter.";
+    expect(scoreDraft(shaped).issues.some((i) => i.code === "monotone_shape")).toBe(false);
+  });
+
+  it("accepts a list as a shape", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const list = "there are no bad marketing channels\n\nit's either\n- your icp isn't there\n- your timing is wrong\n- your offer is wrong\n\nthe channel is rarely the problem";
+    expect(scoreDraft(list).issues.some((i) => i.code === "monotone_shape")).toBe(false);
+  });
+
+  it("leaves short posts alone", async () => {
+    // Under ~40 words a single block is a deliberate choice, not a wall.
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const short = "Nobody reads your case studies. They skim the logo wall and leave.";
+    expect(scoreDraft(short).issues.some((i) => i.code === "monotone_shape")).toBe(false);
+  });
+
+  it("tells the model what to do about it", async () => {
+    const { scoreDraft, rewriteNote } = await import("@/lib/content/craft");
+    expect(rewriteNote(scoreDraft(wall))).toMatch(/wall of prose/i);
+  });
+
+  it("offers shapes and a real question, and still bans engagement bait", async () => {
+    const { POST_SHAPES, INTERACTION, CRAFT_BANS } = await import("@/lib/content/craft");
+    // Six shapes so paragraphs stop being the default.
+    for (const shape of ["The claim", "The list", "The walkthrough", "The receipt", "The comparison", "The picture"]) {
+      expect(POST_SHAPES, `${shape} missing`).toContain(shape);
+    }
+    // The interaction rule has to survive alongside the rhetorical-question ban without
+    // contradicting it: a question you answer yourself is bait, one a stranger answers is not.
+    expect(INTERACTION).toMatch(/real question/i);
+    expect(INTERACTION).toMatch(/never "thoughts\?"/i);
+    expect(CRAFT_BANS).toMatch(/Rhetorical questions/i);
+  });
+});

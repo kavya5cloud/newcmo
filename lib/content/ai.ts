@@ -1,5 +1,5 @@
 import { generateText, configuredProviderNames } from "@/lib/services/llm";
-import { CRAFT_RULES, CRAFT_BANS, formFor, scoreDraft, rewriteNote } from "./craft";
+import { CRAFT_RULES, CRAFT_BANS, POST_SHAPES, INTERACTION, formFor, scoreDraft, rewriteNote } from "./craft";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { createAdapterRegistry } from "@/lib/social/registry";
 import type { SocialPlatform } from "@/lib/social/types";
@@ -62,6 +62,12 @@ function buildPrompt(input: ComposeInput, ctx: GenerationContext): string {
     contextToPrompt(ctx),
     ``,
     CRAFT_RULES,
+    ``,
+    // Shape sits between the sentence rules and the platform rules on purpose: what shape to
+    // use is decided before the words, and constrained by where it is going.
+    POST_SHAPES,
+    ``,
+    INTERACTION,
     ``,
     formFor(ctx.platforms.map((p) => p.platform)),
     ``,
