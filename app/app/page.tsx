@@ -3,7 +3,7 @@ import HomeHero from "./HomeHero";
 import { FEED_SLOT_MS, feedIsFresh } from "@/lib/agent-feed";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry, type Ranking } from "@/lib/store";
+import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
 import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
@@ -23,7 +23,7 @@ import { trialSnapshot } from "./_lib/trial";
 import { buildFallbackFeed, normalizeFeed, withHonestSummaries } from "./_lib/feed";
 import { AGENTS, DOCS, buildTermLines, normalizeProfile } from "./_lib/catalog";
 import { CHART, buildEstData } from "./_lib/chart-data";
-import { FALLBACK_RANKS, DOC_DEMO } from "./_lib/demo-data";
+import { DOC_DEMO } from "./_lib/demo-data";
 import { Chart } from "./_components/Chart";
 import { AuthModal } from "./_components/AuthModal";
 import { esc } from "./_lib/html";
@@ -62,7 +62,6 @@ export default function AppPage() {
    *  stale and the rotating board takes over — which is the correct result for the saved
    *  feeds that were freezing the dashboard. */
   const [feedAt, setFeedAt] = useState<number | undefined>(undefined);
-  const [rankings, setRankings] = useState<Ranking[]>([]);
   const [estTraffic, setEstTraffic] = useState<{ impressions: number; clicks: number; visits: number } | null>(null);
   const [docCache, setDocCache] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -156,7 +155,7 @@ export default function AppPage() {
         setUrl(saved.url); setProfile(saved.profile);
         setCompetitors(saved.competitors || []); setChat(saved.chat || []);
         setDrafts(saved.drafts || []); setFeed(saved.feed || {}); setFeedAt(saved.feedAt);
-        setRankings(saved.rankings || []); setDocCache(saved.docs || {});
+        setDocCache(saved.docs || {});
         setEstTraffic(saved.estTraffic || null);
         setGscSite(saved.gscSite || "");
         setRecIds(saved.recIds || {});
@@ -306,9 +305,9 @@ export default function AppPage() {
   /* ---- persist whenever meaningful state changes ---- */
   useEffect(() => {
     if (!hydrated.current || !entered || !profile || demo) return;
-    const s: Saved = { url, profile, competitors, chat, drafts, feed, feedAt, rankings, docs: docCache, estTraffic, gscSite, recIds };
+    const s: Saved = { url, profile, competitors, chat, drafts, feed, feedAt, docs: docCache, estTraffic, gscSite, recIds };
     saveState(s);
-  }, [url, profile, competitors, chat, drafts, feed, feedAt, rankings, docCache, estTraffic, entered, demo, gscSite, recIds]);
+  }, [url, profile, competitors, chat, drafts, feed, feedAt, docCache, estTraffic, entered, demo, gscSite, recIds]);
 
   /* ---- onboarding dot canvas ---- */
   useEffect(() => {
@@ -428,22 +427,29 @@ export default function AppPage() {
           })
           .catch(() => {});   // positioning already covers this slot
       }
-      // Phase 2: generate a company-specific agents feed + rankings, and (separately) an
+      // Phase 2: generate a company-specific agents feed, and (separately) an
       // estimated-traffic figure. Kept as two calls so a failure in one can't break the other.
       let genFeed: Record<string, FeedEntry> | null = null;
+      // This call used to also ask for "rankings" — {"pos":"#3","query":"…","trend":"↑2"} — and
+      // the Top queries panel rendered them with no caveat. A model was guessing Google
+      // positions and the dashboard presented them as measurements. Anyone reading "#3 ↑2"
+      // concluded they ranked third and had moved up two places.
+      //
+      // It cannot be fixed with a label. The panel's honest content is either Search Console
+      // data or an invitation to connect it, so the field is gone from the prompt and the
+      // parse rather than dimmed in the UI. Nothing generated is worth a number nobody
+      // measured — and we publish a guide about tools that do exactly this.
       const insP = ai(
         `You are Populr, an AI CMO for ${p.name} — ${p.oneLiner}. Audience: ${p.audience}. Competitors: ${(p.competitors || []).join(", ")}.
 Output ONLY compact valid JSON (no markdown, no prose). Each item's first string is a specific, descriptive opportunity in 6-12 words. Do not mention Populr unless the analyzed site is Populr. Never invent counts or statistics anywhere. Exactly this shape:
-{"feed":{"reddit":{"summary":"short channel note, no numbers","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"short channel note, no numbers","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"short channel note, no numbers","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"short channel note, no numbers","items":[["short post idea","Draft"]]},"linkedin":{"summary":"short channel note, no numbers","items":[["short post idea","Review"]]},"articles":{"summary":"short channel note, no numbers","items":[["short article title","Open"]]}},"rankings":[{"pos":"#3","query":"short query","trend":"↑2"}]}
-Give exactly 2 items per channel and 4 rankings, all specific to ${p.name}. Keep it short so the JSON is complete.`
+{"feed":{"reddit":{"summary":"short channel note, no numbers","items":[["short thread angle","Draft reply"]]},"seo":{"summary":"short channel note, no numbers","items":[["short keyword or fix","Draft post"]]},"geo":{"summary":"short channel note, no numbers","items":[["short AI-search gap","Fix gap"]]},"x":{"summary":"short channel note, no numbers","items":[["short post idea","Draft"]]},"linkedin":{"summary":"short channel note, no numbers","items":[["short post idea","Review"]]},"articles":{"summary":"short channel note, no numbers","items":[["short article title","Open"]]}}}
+Give exactly 2 items per channel, all specific to ${p.name}. Keep it short so the JSON is complete.`
       ).then((t) => {
         try {
-          const ins = extractJson<{ feed?: Record<string, FeedEntry>; rankings?: Ranking[] }>(t);
+          const ins = extractJson<{ feed?: Record<string, FeedEntry> }>(t);
           if (ins.feed) genFeed = ins.feed;
-          if (Array.isArray(ins.rankings)) setRankings(ins.rankings);
-        }
-        catch { setRankings([]); }
-      }).catch(() => { setRankings([]); });
+        } catch { /* the feed has its own deterministic fallback below */ }
+      }).catch(() => { /* same */ });
 
       const trafP = ai(
         `Estimate realistic MONTHLY Google Search numbers for the website ${u} (${p.name} — ${p.oneLiner}). Consider how well-known and large the site is.
@@ -584,7 +590,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   function reset() {
     if (!confirm("Analyze a different website? Current session will be cleared.")) return;
     setEntered(false); setProfile(null); setInputUrl(""); setUrl(""); setProgress(-1);
-    setChat([]); setDrafts([]); setCompetitors([]); setGscSite(""); setGscError(null); setFeed({}); setRankings([]); setDocCache({}); setEstTraffic(null); setRecIds({});
+    setChat([]); setDrafts([]); setCompetitors([]); setGscSite(""); setGscError(null); setFeed({}); setDocCache({}); setEstTraffic(null); setRecIds({});
     try { localStorage.removeItem("cosmos.state"); } catch {}
   }
 
@@ -1032,12 +1038,22 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       )}
                     </Section>
                   )}
+                  {/* Real positions or none. There is no third option that is not a lie:
+                      a search ranking is a measurement, and the only thing that can supply
+                      one is Search Console. */}
                   <Section id="queries" label="Top queries" variant="head">
-                    <div style={{ marginTop: 8 }}>
-                      {(gscData ? gscData.queries.slice(0, 5) : (rankings.length ? rankings : FALLBACK_RANKS).slice(0, 5)).map((r, i) => (
-                        <div className="rankrow" key={i}><span className="rankpos">{r.pos}</span><span className="rq">{r.query}</span><span className="rt">{r.trend}</span></div>
-                      ))}
-                    </div>
+                    {gscData ? (
+                      <div style={{ marginTop: 8 }}>
+                        {gscData.queries.slice(0, 5).map((r, i) => (
+                          <div className="rankrow" key={i}><span className="rankpos">{r.pos}</span><span className="rq">{r.query}</span><span className="rt">{r.trend}</span></div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="geo-note">
+                        Nothing measured yet. Connect Search Console and this shows the queries
+                        you actually rank for, with real positions. Populr will not guess them.
+                      </p>
+                    )}
                   </Section>
                 </>
               )}

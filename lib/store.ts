@@ -25,7 +25,9 @@ export type Draft = {
 };
 export type ChatMsg = { who: "ai" | "me"; text: string; intent?: string };
 export type FeedEntry = { summary: string; items: [string, string][] };
-export type Ranking = { pos: string; query: string; trend: string };
+// Removed: Ranking. It typed a shape only the dashboard's Top queries panel used, and that
+// panel now shows Search Console data or nothing. The type's last job was carrying guessed
+// Google positions between a prompt and a UI, so it goes with them.
 
 export type Saved = {
   url: string;
@@ -37,7 +39,6 @@ export type Saved = {
   /** When `feed` was generated. Without it a saved feed is treated as stale, because it
    *  predates the rotation and would otherwise freeze the board forever. */
   feedAt?: number;
-  rankings?: Ranking[];
   docs?: Record<string, string>;
   estTraffic?: { impressions: number; clicks: number; visits: number } | null;
   gscSite?: string | null;
