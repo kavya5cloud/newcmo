@@ -123,17 +123,35 @@ export const PROVIDERS: ProviderConfig[] = [
     env: "GROQ_API_KEY",
     prefix: "gsk_",
     url: "https://api.groq.com/openai/v1/chat/completions",
-    // Accuracy-first: the 70b model leads, falling back to the fast 8b-instant on rate
-    // limits so a request degrades rather than dying. Override the lead with GROQ_MODEL.
+    // Every model here was called with a live key and answered before being listed. That is
+    // not ceremony — this provider has now taken production down twice for the same reason.
     //
-    // Two models were removed after production logs showed they never worked:
-    // llama-4-scout returned 404 "does not exist or you do not have access" on every call,
-    // and compound-mini's own 429 named llama-3.3-70b — it routes to the same model and
-    // therefore shares the daily cap it was supposed to be a fallback for. Both cost a
-    // round-trip per request and could never have answered one.
+    // The chain used to lead with llama-3.3-70b-versatile and fall back to
+    // llama-3.1-8b-instant. Groq retired both. The failure is silent and total: each model
+    // 404s with "does not exist or you do not have access to it", the loop exhausts every
+    // provider, and the only thing a user sees is "Every provider failed to respond."
+    // Nothing in the codebase was wrong — the vendor's catalogue moved underneath it.
+    //
+    // Verified against /v1/models and a real completion:
+    //   openai/gpt-oss-120b   200, clean stop      — the lead, largest available
+    //   openai/gpt-oss-20b    200, clean stop      — smaller, for rate limits
+    //
+    // groq/compound-mini also answered 200 and is still left out. It is a router, not a
+    // model, and the last time it was in this chain its own 429 named the lead model it was
+    // supposed to be a fallback for — it shares the quota it is meant to survive. What it
+    // routes to today is undocumented, so the same trap is possible and unobservable until
+    // it fires. tests/llm-model-chain.test.ts holds that line.
+    //
+    // qwen/qwen3.6-27b is available and deliberately excluded: it returned 200 with nothing
+    // parseable in message.content, which is the shape of a reasoning model that spends its
+    // budget before writing an answer. A model that returns 200 and no text is worse than one
+    // that 404s, because the retry logic cannot see it fail.
+    //
+    // When this breaks a third time, list the catalogue first:
+    //   curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
     models: dedupe([
-      process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant",
+      process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
     ]),
     authHeader: "Authorization",
     kind: "openai_compatible",

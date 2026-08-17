@@ -94,8 +94,22 @@ describe("platform form", () => {
 });
 
 describe("the rules the model is given", () => {
-  it("tells it to open on a specific, not a thesis", () => {
-    expect(CRAFT_RULES).toMatch(/never open on a thesis/i);
+  // Was: expect(CRAFT_RULES).toMatch(/never open on a thesis/i).
+  //
+  // That rule was wrong, so the test was wrong with it. "There are no bad marketing
+  // channels" is a thesis, and on a short-form timeline it is the strongest opening there
+  // is — a claim the reader wants to argue with. Banning theses outright banned that too.
+  //
+  // What still has to hold is the distinction: a flat claim earns attention, a definition or
+  // a question the writer immediately answers does not. Asserting the shapes rather than the
+  // sentence, so rewording the guidance does not fail the suite.
+  it("permits a contrarian claim as an opening", () => {
+    expect(CRAFT_RULES).toMatch(/contrarian claim/i);
+  });
+
+  it("still forbids the openings that promise nothing", () => {
+    expect(CRAFT_RULES).toMatch(/definition/i);
+    expect(CRAFT_RULES).toMatch(/question you are about to answer yourself/i);
   });
 
   it("bans the phrases the scorer checks for, so prompt and contract agree", () => {
@@ -103,5 +117,49 @@ describe("the rules the model is given", () => {
     for (const tell of ["in today's", "let's dive in", "game changer"]) {
       expect(AI_TELLS).toContain(tell);
     }
+  });
+});
+
+describe("the opening check judges the hook, not the whole post", () => {
+  // A competitor's post scored badly here and the score was wrong, not the post:
+  //
+  //   there are no bad marketing channels
+  //   it's either / - your icp doesn't hang out there / ...
+  //   the channel is rarely a problem
+  //
+  // WEAK_OPENINGS matches "there are", so a flat contrarian claim — the strongest opening
+  // available on a short-form timeline — was being filed alongside "there are many ways to".
+  // The exception is deliberately narrow: negated, and short enough to read as an assertion.
+  it("passes a short contrarian claim", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const post = "there are no bad marketing channels\n\nit's either\n- your icp doesn't hang out on that channel\n- you're using it at the wrong time\n\nthe channel is rarely a problem";
+    expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(false);
+  });
+
+  it("passes other negated openers", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const post = "nobody reads your case studies\n\nthey skim the logo wall and leave\n\nput the company size in the headline";
+    expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(false);
+  });
+
+  it("still flags the affirmative version, which is filler", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const post = "there are many ways to improve your marketing this year.\nEach takes effort. Let us look at a few.";
+    expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(true);
+  });
+
+  it("still flags a long hedged opener wearing the same clothes", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const post = "There is no doubt whatsoever that in the current landscape of modern digital marketing every business must consider how it approaches its audience.\nThis is something we all know.";
+    expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(true);
+  });
+
+  // The bug behind the bug: these posts carry no terminal punctuation, so the sentence
+  // splitter returned the entire post as sentence one. Any length test on it was measuring
+  // the whole post, and the hook was being judged by the words of every line beneath it.
+  it("reads the first line as the opener when the post has no full stops", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const post = "there are no bad marketing channels\n\n" + "a much longer line that would blow any word cap ".repeat(6);
+    expect(scoreDraft(post).issues.some((i) => i.code === "weak_opening")).toBe(false);
   });
 });

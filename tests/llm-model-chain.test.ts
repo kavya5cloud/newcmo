@@ -29,11 +29,37 @@ describe("the model chain only lists models that can answer", () => {
     expect(modelsOf("groq")).not.toContain("groq/compound-mini");
   });
 
+  // Every model Groq has retired under us. Growing this list is the point: it is the only
+  // artefact that survives the next outage, and it turns a repeat into a failing test rather
+  // than a production incident nobody can explain.
+  //
+  // 2026-08-08: llama-4-scout 404, compound-mini 429 naming the lead model.
+  // 2026-08-17: llama-3.3-70b-versatile and llama-3.1-8b-instant both 404 —
+  //             "does not exist or you do not have access to it". They were the entire Groq
+  //             chain, so every request walked to the end and answered
+  //             "Every provider failed to respond." Nothing in this repo had changed.
+  const RETIRED = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+  ];
+
+  it("ships no model that has already been retired", () => {
+    for (const p of PROVIDERS) {
+      for (const m of p.models) {
+        expect(RETIRED, `${p.name} still lists retired model ${m}`).not.toContain(m);
+      }
+    }
+  });
+
+  // Was: expect(groq[0]).toBe("llama-3.3-70b-versatile"). That pinned the exact model, so the
+  // test passed happily for the entire period the model was dead — it was asserting the
+  // configuration matched itself, not that the configuration worked. A name cannot be checked
+  // offline; what can is that a lead exists and something follows it.
   it("still degrades rather than dying when the lead model is rate limited", () => {
     const groq = modelsOf("groq");
-    expect(groq[0]).toBe("llama-3.3-70b-versatile");
-    expect(groq).toContain("llama-3.1-8b-instant");
-    expect(groq.length).toBeGreaterThan(1);
+    expect(groq[0], "no lead model").toBeTruthy();
+    expect(groq.length, "nothing to fall back to").toBeGreaterThan(1);
   });
 
   it("defaults Gemini to a model that was actually tested, not assumed", () => {

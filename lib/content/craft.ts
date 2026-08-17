@@ -59,11 +59,19 @@ export const VAGUE_CLAIMS: string[] = [
 
 export const CRAFT_RULES = `HOW TO WRITE IT
 
-The first line decides whether the rest is read. Open on something concrete: a specific
-moment, an actual number from the context, a thing that broke, a sentence someone really
-said. Never open on a thesis, a definition, or a question you are about to answer yourself.
-If your first sentence would work as the summary of the post, delete it and start at the
-second.
+The first line decides whether the rest is read. Two openings earn attention, and nothing
+else does.
+
+One: something concrete — a specific moment, an actual number from the context, a thing that
+broke, a sentence someone really said.
+
+Two: a flat contrarian claim the reader will want to argue with. "There are no bad marketing
+channels." "Nobody reads your case studies." State it and stop; do not soften it, do not
+hedge it, do not explain it in the same sentence. Then earn it in the lines below.
+
+Never open on a definition, on a question you are about to answer yourself, or on a thesis
+you immediately restate. If your first sentence would work as the summary of the post,
+delete it and start at the second.
 
 Have one point. A post that makes three arguments makes none — pick the sharpest and cut
 the others, however true they are.
@@ -143,6 +151,23 @@ const sentences = (t: string) =>
 /** Openers that promise the reader nothing. */
 const WEAK_OPENINGS = /^(in|as|with|when|if|the|there (is|are)|it (is|was)|we (all|know)|have you ever|did you know|are you (tired|looking|struggling))\b/i;
 
+/**
+ * The exception that keeps the rule honest: a flat denial is not throat-clearing.
+ *
+ * "there are no bad marketing channels" was being flagged as a weak opening because the
+ * pattern above matches "there are". But that sentence is the strongest move available on a
+ * short-form timeline — a claim stated without hedging that a reader will immediately want
+ * to argue with. "there are many ways to improve your marketing" is the weak one, and the
+ * two are identical to the regex.
+ *
+ * The distinguishing feature is negation. "There is no", "there are no", "nobody", "none of"
+ * commit to a position; the affirmative versions announce that a list is coming.
+ *
+ * Deliberately narrow: only the negated forms of the openers already listed, and only when
+ * the sentence is short enough to read as an assertion rather than a preamble.
+ */
+const CONTRARIAN_OPENING = /^(there (is|are) (no|nothing|not)\b|no ?one\b|nobody\b|none of\b|it (is|was) never\b)/i;
+
 export function scoreDraft(text: string): CraftScore {
   const t = (text || "").trim();
   const issues: CraftIssue[] = [];
@@ -161,8 +186,20 @@ export function scoreDraft(text: string): CraftScore {
 
   // A first line that opens on a preposition or a "did you know" is a first line that could
   // belong to any post about anything.
-  if (sents[0] && WEAK_OPENINGS.test(sents[0])) {
-    issues.push({ code: "weak_opening", detail: sents[0].slice(0, 60) });
+  // Judge the opening on the first *line*, not the first sentence.
+  //
+  // Short-form posts are broken by newlines and frequently carry no terminal punctuation at
+  // all — the sentence splitter then returns the whole post as one "sentence". That made the
+  // length test below meaningless and, worse, judged a one-line hook by the words of every
+  // line under it. What the reader sees first is the first line; that is what has to work.
+  const firstLine = t.split("\n").map((l) => l.trim()).find(Boolean) || "";
+  const opener = firstLine || sents[0] || "";
+
+  // The length cap matters: "there is no silver bullet" is an assertion, while a 30-word
+  // line starting "there is no doubt that…" is preamble wearing the same clothes.
+  const contrarian = CONTRARIAN_OPENING.test(opener) && opener.split(/\s+/).length <= 14;
+  if (opener && WEAK_OPENINGS.test(opener) && !contrarian) {
+    issues.push({ code: "weak_opening", detail: opener.slice(0, 60) });
   }
 
   // Uniform sentence length is the most reliable signal of machine prose. Real writing
