@@ -200,6 +200,18 @@ export async function GET(req: NextRequest) {
   if (configured.length === 0) {
     warnings.push("No provider has a key. Every generation will fail.");
   }
+  // The two-variables-one-word-apart trap, called by name.
+  //
+  // GROQ_API_KEY was deleted twice while trying to remove GROQ_MODEL. Both times the report
+  // showed hasKey false beside an override that was still set, and both times that had to be
+  // read off a table and interpreted. A model pin without a key is never a state anyone wants;
+  // it is the signature of deleting the wrong one.
+  for (const p of withServes) {
+    if (!p.hasKey && p.modelOverride) {
+      warnings.push(`${p.name}: ${p.envVar} is missing but a model override is still set to "${p.modelOverride}". These are two different variables one word apart — the credential is the one that ends in _API_KEY, and it is the one that was deleted. Restore ${p.envVar}.`);
+    }
+  }
+
   for (const p of withServes) {
     if (!("probes" in p) || !p.probes) continue;
     // An override pinning a model that does not answer is invisible in a code diff and cost
