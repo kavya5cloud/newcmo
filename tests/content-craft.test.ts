@@ -213,3 +213,25 @@ describe("shape, not just sentences", () => {
     expect(CRAFT_BANS).toMatch(/Rhetorical questions/i);
   });
 });
+
+describe("a fatal fault actually triggers a rewrite", () => {
+  // A real generation came back as 54 words in one unbroken line. monotone_shape flagged it,
+  // the score was 0.90, and needsRewrite was false — the check fired and nothing acted on it,
+  // because needsRewrite was only ever a penalty total. Accumulating small blemishes is not
+  // the only way to be unpublishable; one structural fault is enough.
+  const wall = "Founders often pour a whole quarter into posting across every social, email, and ad platform, only to learn that their ideal buyers gather in a single unexpected channel. The cost is missed revenue and wasted budget. Reframe your messaging and stop the scattershot approach.";
+
+  it("sends a single-paragraph wall back even when nothing else is wrong", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const s = scoreDraft(wall);
+    expect(s.issues.some((i) => i.code === "monotone_shape")).toBe(true);
+    expect(s.score).toBeGreaterThan(0.5);   // otherwise clean — the point of the case
+    expect(s.needsRewrite).toBe(true);
+  });
+
+  it("still leaves genuinely good writing alone", async () => {
+    const { scoreDraft } = await import("@/lib/content/craft");
+    const good = "You waste a quarter posting everywhere, only to learn your buyers live in one spot.\n\n- flat metrics on three platforms\n- your buyer reads one forum\n- double down there\n\nWhich one actually drives your sales?";
+    expect(scoreDraft(good).needsRewrite).toBe(false);
+  });
+});

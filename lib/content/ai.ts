@@ -194,11 +194,24 @@ export async function composeWithAi(
   if (craft.needsRewrite && !opts.signal?.aborted) {
     const retry = await generateText({
       prompt: [
-        `Rewrite this so it reads like a person wrote it. Keep the argument, the facts and the format identical — change only the writing.`,
+        // The instruction has to match the fault. "Keep the format identical — change only the
+        // writing" is right for a stock phrase or a flat rhythm, and is a flat contradiction
+        // when the fault IS the format: it asks the model to fix the shape while forbidding it
+        // from changing the shape. A real generation went round this loop and came back as the
+        // same wall, scored identically, and was discarded — the rewrite ran and could not
+        // possibly have helped.
+        craft.issues.some((i) => i.code === "monotone_shape")
+          ? `Rewrite this so it reads like a person wrote it. Keep the argument and the facts; change the SHAPE. Break it onto separate lines, or turn the middle into three dashed items, or end on a line of four words. Returning another single paragraph is a failed rewrite.`
+          : `Rewrite this so it reads like a person wrote it. Keep the argument, the facts and the format identical — change only the writing.`,
         ``,
         rewriteNote(craft),
         ``,
         CRAFT_RULES,
+        ``,
+        // The shapes have to travel with the rewrite. Telling a model its draft is a wall of
+        // prose without also showing it the alternatives asks it to invent a structure from a
+        // complaint — and it answers by rewording the same paragraph.
+        POST_SHAPES,
         ``,
         `Return ONLY the rewritten text. No preamble, no explanation, no quotes around it.`,
         ``,

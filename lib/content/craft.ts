@@ -289,7 +289,13 @@ export function scoreDraft(text: string): CraftScore {
   const hasBreak = /\n\s*\n/.test(t);
   const hasList = lines.filter((l) => /^([-*•>]|\d+[.)])\s+/.test(l)).length >= 2;
   const hasPunchLine = lines.some((l) => l.split(/\s+/).length <= 5 && !/[:?]$/.test(l));
-  const longEnough = t.split(/\s+/).length >= 40;
+  // 40 words was too generous. A real generation came back as two prose sentences — 36
+  // words, no break, no list — which is precisely the shape this check exists to reject, and
+  // it passed. Short-form posts are short; the wall does not need to be tall to be a wall.
+  //
+  // 25 still exempts a deliberate one-liner ("Nobody reads your case studies. They skim the
+  // logo wall and leave." is twelve), which is the case worth protecting.
+  const longEnough = t.split(/\s+/).length >= 25;
   if (longEnough && !hasBreak && !hasList && !hasPunchLine) {
     issues.push({ code: "monotone_shape", detail: `${lines.length} line(s), no break, no list, no short line` });
   }
@@ -312,7 +318,19 @@ export function scoreDraft(text: string): CraftScore {
   const penalty = issues.reduce((n, i) => n + weight(i.code), 0);
   const score = Math.max(0, 1 - penalty / 10);
 
-  return { score: Number(score.toFixed(2)), issues, needsRewrite: penalty >= 4 };
+  // Some faults are disqualifying on their own.
+  //
+  // needsRewrite was purely a penalty total, so a post could carry one fatal structural
+  // problem and still ship. A real generation did exactly that: 54 words in a single
+  // unbroken line, monotone_shape flagged, score 0.90, needsRewrite false — the check fired
+  // and nothing acted on it. Accumulating small blemishes is not the only way to be
+  // unpublishable.
+  //
+  // Shape and opening are the two that decide whether a post is read at all, and neither can
+  // be offset by the rest of the writing being clean.
+  const fatal = issues.some((i) => i.code === "monotone_shape" || i.code === "weak_opening");
+
+  return { score: Number(score.toFixed(2)), issues, needsRewrite: penalty >= 4 || fatal };
 }
 
 /** What to tell the model when asking it to try again. Names the faults, not the vibe. */
