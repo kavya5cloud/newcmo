@@ -171,11 +171,47 @@ export async function GET(req: NextRequest) {
     }),
   );
 
-  // Both paths have to work. "healthy" going true while chat is broken is the exact failure
-  // this endpoint existed to prevent, and the first version of it had that bug.
-  const answeredIn = (mode: "once" | "stream") =>
-    providers.some((p) => "probes" in p && p.probes?.some((x) => x.mode === mode && x.answered));
-  const anyAnswered = answeredIn("once") && answeredIn("stream");
+  // "Can this serve a request?" — not "did anything, anywhere, answer?"
+  //
+  // The previous version asked whether some probe answered in each mode, across all
+  // providers. It reported healthy while the product was returning "The model returned
+  // nothing" to every user: Gemini's lead answered single-shot, a different Gemini model
+  // answered streaming, and the two together satisfied the check. No single model could
+  // actually serve a request, which is the only thing that matters.
+  //
+  // A provider serves when one of ITS models answers on BOTH paths. Anything less is a
+  // provider that works for half the product.
+  const servesFor = (p: (typeof providers)[number]) => {
+    if (!("probes" in p) || !p.probes) return false;
+    const models = new Set(p.probes.map((x) => x.model));
+    return [...models].some((m) =>
+      p.probes!.some((x) => x.model === m && x.mode === "once" && x.answered) &&
+      p.probes!.some((x) => x.model === m && x.mode === "stream" && x.answered));
+  };
+  const withServes = providers.map((p) => (deep && "probes" in p ? { ...p, serves: servesFor(p) } : p));
+  const anyAnswered = withServes.some((p) => "serves" in p && p.serves);
+
+  // Things that are not yet an outage but caused one today. Each is a sentence someone can
+  // act on, not a status word they have to interpret.
+  const warnings: string[] = [];
+  if (configured.length === 1) {
+    warnings.push(`Only ${configured[0]} is keyed. A single provider means one vendor's quota or retirement takes the whole product down — which is exactly what happened when GROQ_API_KEY was removed and Gemini's free tier hit its limit.`);
+  }
+  if (configured.length === 0) {
+    warnings.push("No provider has a key. Every generation will fail.");
+  }
+  for (const p of withServes) {
+    if (!("probes" in p) || !p.probes) continue;
+    // An override pinning a model that does not answer is invisible in a code diff and cost
+    // hours today: the code default was fixed while GROQ_MODEL kept production on a retired
+    // model, and the fallback quietly covered for it.
+    if (p.modelOverride && p.probes.some((x) => x.model === p.modelOverride && !x.answered)) {
+      warnings.push(`${p.name}: the ${p.name === "groq" ? "GROQ_MODEL" : p.name === "gemini" ? "GEMINI_MODEL" : "OPENAI_MODEL"} override pins "${p.modelOverride}", which is not answering. Delete the variable to use the tested default.`);
+    }
+    if (p.probes.some((x) => x.status === 429)) {
+      warnings.push(`${p.name}: rate limited. The key is fine; the allowance is spent. It will recover on its own, but it cannot be relied on alone.`);
+    }
+  }
 
   return NextResponse.json({
     ok: true,
@@ -184,9 +220,10 @@ export async function GET(req: NextRequest) {
     healthy: deep ? anyAnswered : configured.length > 0,
     probed: deep,
     configured,
+    ...(warnings.length ? { warnings } : {}),
     hint: deep
       ? undefined
       : "Add ?probe=1 to call each provider's lead model, or ?probe=all for the whole chain. A key is not proof the model exists.",
-    providers,
+    providers: withServes,
   }, { headers: { "Cache-Control": "no-store" } });
 }
