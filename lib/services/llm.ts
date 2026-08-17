@@ -56,6 +56,49 @@ const SYSTEM_PROMPT =
   "isn't given, reason from the domain and say what's an estimate. Be specific, concrete, " +
   "and concise. When asked for JSON, return only valid JSON with no markdown fences or prose.";
 
+/**
+ * Models a provider has retired under us. Ignored wherever they appear.
+ *
+ * This list exists because a correct code fix kept being overridden by a stale environment
+ * variable. GROQ_MODEL was set to llama-3.3-70b-versatile before Groq retired it; the default
+ * here was corrected and redeployed, and production still led with the dead model, because an
+ * env override beats a default by design. Every request paid a 404 before the fallback caught
+ * it, and the symptom — worse writing, dropped rewrites — looked nothing like a config
+ * problem.
+ *
+ * Deleting the variable is the right fix and remains the advice. This is the guard for when
+ * that has not happened yet: a name we have already watched fail is not worth one more
+ * round-trip per request, whoever asked for it.
+ *
+ * Add to this whenever a provider retires something. It is the one artefact that outlives the
+ * incident.
+ */
+export const RETIRED_MODELS: readonly string[] = [
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "gemini-2.5-flash-preview",
+];
+
+/**
+ * An env override, unless it names something already known dead.
+ *
+ * Loud on purpose: silently ignoring configuration is its own trap, and the log line is what
+ * tells someone the variable is doing nothing so they can remove it.
+ */
+function override(envName: string, raw: string | undefined): string | null {
+  const value = (raw || "").trim();
+  if (!value) return null;
+  if (RETIRED_MODELS.includes(value)) {
+    console.warn(JSON.stringify({
+      event: "model_override_ignored", envVar: envName, model: value,
+      hint: `${envName} names a retired model and was ignored. Delete the variable to silence this.`,
+    }));
+    return null;
+  }
+  return value;
+}
+
 function dedupe(list: string[]) {
   return [...new Set(list.filter(Boolean))];
 }
@@ -112,7 +155,7 @@ export const PROVIDERS: ProviderConfig[] = [
     // "say ok". Good for strategy, pure overhead for short copy. If token spend becomes a
     // problem again, cap it with generationConfig.thinkingConfig rather than downgrading.
     models: dedupe([
-      process.env.GEMINI_MODEL || "gemini-3.6-flash",
+      override("GEMINI_MODEL", process.env.GEMINI_MODEL) || "gemini-3.6-flash",
       "gemini-2.5-flash",
     ]),
     authHeader: "x-goog-api-key",
@@ -150,7 +193,7 @@ export const PROVIDERS: ProviderConfig[] = [
     // When this breaks a third time, list the catalogue first:
     //   curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
     models: dedupe([
-      process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+      override("GROQ_MODEL", process.env.GROQ_MODEL) || "openai/gpt-oss-120b",
       "openai/gpt-oss-20b",
     ]),
     authHeader: "Authorization",
@@ -162,7 +205,7 @@ export const PROVIDERS: ProviderConfig[] = [
     env: "OPENAI_API_KEY",
     prefix: "sk-",
     url: "https://api.openai.com/v1/chat/completions",
-    models: [process.env.OPENAI_MODEL || "gpt-4o-mini"],
+    models: [override("OPENAI_MODEL", process.env.OPENAI_MODEL) || "gpt-4o-mini"],
     authHeader: "Authorization",
     kind: "openai_compatible",
   },

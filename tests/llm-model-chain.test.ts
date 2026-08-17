@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PROVIDERS } from "@/lib/services/llm";
+import { PROVIDERS, RETIRED_MODELS as RETIRED } from "@/lib/services/llm";
 
 // Production logs from 2026-08-08 showed every request walking a chain of models that could
 // never answer it, then landing on the weakest one in the list. That is the whole reason the
@@ -38,11 +38,21 @@ describe("the model chain only lists models that can answer", () => {
   //             "does not exist or you do not have access to it". They were the entire Groq
   //             chain, so every request walked to the end and answered
   //             "Every provider failed to respond." Nothing in this repo had changed.
-  const RETIRED = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-  ];
+  // Imported rather than restated. Kept as a local copy this list would drift from the one
+  // the runtime actually enforces, and the test would go on passing against the wrong facts.
+
+  it("ignores an env override that names a retired model", async () => {
+    // Asking someone to delete a variable did not work three times running, and a stale
+    // GROQ_MODEL beats a corrected default by design — so production kept leading with a dead
+    // model after the fix shipped, paying a 404 on every request.
+    const { RETIRED_MODELS } = await import("@/lib/services/llm");
+    expect(RETIRED_MODELS).toContain("llama-3.3-70b-versatile");
+    for (const p of PROVIDERS) {
+      for (const m of p.models) {
+        expect(RETIRED_MODELS, `${p.name} resolved to retired ${m}`).not.toContain(m);
+      }
+    }
+  });
 
   it("ships no model that has already been retired", () => {
     for (const p of PROVIDERS) {
