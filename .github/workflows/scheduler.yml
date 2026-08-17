@@ -35,18 +35,34 @@ jobs:
   tick:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      BASE: https://www.trypopulr.in
     steps:
+      # Not configured is not the same as broken.
+      #
+      # This used to error and exit 1 when CRON_SECRET was missing, which meant a red run
+      # every five minutes for as long as the secret went unset — a notification stream that
+      # says nothing except "you have not done the setup yet", and the fastest way to teach
+      # someone to ignore this workflow entirely. The run now succeeds and says what it is
+      # waiting for, so a genuine failure later still stands out.
+      - name: Waiting for setup
+        if: env.CRON_SECRET == ''
+        run: |
+          echo "::notice::CRON_SECRET is not set, so nothing was dispatched."
+          echo "Add it under Settings → Secrets and variables → Actions, matching the value in Vercel."
+          echo "Until then scheduled posts stay queued — they are not lost, just not sent."
+          {
+            echo "### Scheduler idle"
+            echo ""
+            echo "\`CRON_SECRET\` is not set in repository secrets, so no work was dispatched."
+            echo "Scheduled posts remain queued until it is added."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Dispatch due work
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          BASE: https://www.trypopulr.in
+        if: env.CRON_SECRET != ''
         run: |
           set -uo pipefail
-
-          if [ -z "${CRON_SECRET}" ]; then
-            echo "::error::CRON_SECRET is not set in repository secrets. Every call would 401."
-            exit 1
-          fi
 
           fail=0
           for path in automation-publish social-publish; do
