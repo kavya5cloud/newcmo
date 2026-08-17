@@ -95,6 +95,7 @@ async function probe(providerName: string, model: string, timeoutMs: number, mod
       // logic cannot see it, so the chain stops on a model that answered nothing. Named.
       answered: res.ok && text.trim().length > 0,
       ...(res.ok && !text.trim() ? { note: "200 but empty — model spent its budget before answering" } : {}),
+      ...(res.status === 429 ? { note: "rate limited — the key and model are fine, the allowance is spent. The chain falls through to the next provider, which is working as designed." } : {}),
       ...(res.ok ? {} : { detail: raw.slice(0, 220) }),
     };
   } catch (e) {
@@ -124,7 +125,20 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const deep = new URL(req.url).searchParams.get("probe") === "1";
+  const mode = new URL(req.url).searchParams.get("probe");
+  const deep = mode === "1" || mode === "all";
+  // ?probe=1 calls the lead model only; ?probe=all calls every model in every chain.
+  //
+  // This was ?probe=1 hitting everything, and it burned a free tier flat. Gemini's allowance
+  // is small, each call spends two of it (single-shot plus stream), and ten runs of this
+  // endpoint while debugging pushed the provider into 429 — so the diagnostic caused the
+  // outage it then reported. A health check must not be able to degrade what it measures.
+  //
+  // The lead model is the honest default because it is the one that decides whether the
+  // product works: if it answers, users are served by it, and if it does not, the fallbacks
+  // are what the chain was built for. Use ?probe=all when auditing the whole chain, knowing
+  // it costs a request per model per path.
+  const everyModel = mode === "all";
   const configured = configuredProviderNames();
 
   const providers = await Promise.all(
@@ -149,10 +163,11 @@ export async function GET(req: NextRequest) {
       };
       if (!deep || !key) return row;
       // 12s each, run together: a provider that is merely slow should not stop the report.
+      const targets = everyModel ? p.models : p.models.slice(0, 1);
       const probes = await Promise.all(
-        p.models.flatMap((m) => [probe(p.name, m, 12_000, "once"), probe(p.name, m, 12_000, "stream")]),
+        targets.flatMap((m) => [probe(p.name, m, 12_000, "once"), probe(p.name, m, 12_000, "stream")]),
       );
-      return { ...row, probes };
+      return { ...row, probedModels: targets.length, probes };
     }),
   );
 
@@ -171,7 +186,7 @@ export async function GET(req: NextRequest) {
     configured,
     hint: deep
       ? undefined
-      : "Add ?probe=1 to call every model. A key is not proof the model exists.",
+      : "Add ?probe=1 to call each provider's lead model, or ?probe=all for the whole chain. A key is not proof the model exists.",
     providers,
   }, { headers: { "Cache-Control": "no-store" } });
 }
