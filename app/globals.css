@@ -3345,6 +3345,20 @@ html{scroll-padding-top:var(--eab-h,0px)}
    the content boundary — which is why the first version looked cramped no matter
    how much padding went in. The pane is flush; the cards inside it carry the
    edges. */
+/* Settings is a takeover, not a page inside the app shell.
+   
+   The Studio layout supplies a nav rail for every /studio route. Putting a second
+   rail inside one of those pages gave Settings two vertical navigations side by
+   side — the app's, then its own — which is why it read as wrong before anything
+   about the styling was. Okara's settings has one rail for the same reason, and a
+   back chevron precisely because the app nav is gone while you are in there.
+   
+   :has() rather than a body class from an effect: the nav must be absent in the
+   first painted frame, and a class applied after hydration means one frame with
+   both rails on screen. */
+.studio:has(.settings) { grid-template-columns: 1fr; }
+.studio:has(.settings) .st-nav { display: none; }
+
 .settings { max-width: 1120px; }
 .settings .set-head { display: flex; align-items: center; gap: 12px; margin-bottom: 34px; }
 .settings .set-back {
@@ -3377,7 +3391,6 @@ html{scroll-padding-top:var(--eab-h,0px)}
    and this is the only thing saying which pane you are looking at. */
 .settings .set-nav.on { color: var(--fg); background: rgba(255,255,255,.075); }
 .settings .set-nav.on svg { color: var(--acc); opacity: 1; }
-.settings .set-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acc); flex: 0 0 auto; }
 
 .settings .set-pane { min-width: 0; }
 .settings .set-pane-head { margin-bottom: 22px; }

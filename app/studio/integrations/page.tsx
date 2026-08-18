@@ -22,7 +22,7 @@ import Icon, { type IconName } from "@/app/components/Icon";
 // account or reading a plan changed here — only where they live and how you get to them.
 
 type SectionId = "accounts" | "sources" | "plan" | "refer" | "callbacks";
-type Item = { id: SectionId; label: string; blurb: string; icon: IconName; dot?: boolean };
+type Item = { id: SectionId; label: string; blurb: string; icon: IconName };
 
 // Typed explicitly rather than inferred from `as const`. flatMap over a readonly tuple of
 // readonly tuples widens in a way TypeScript will not accept back into the element type, and
@@ -31,7 +31,7 @@ const SECTIONS: { group: string; items: Item[] }[] = [
   {
     group: "AI CMO",
     items: [
-      { id: "accounts", label: "Accounts", blurb: "Where Populr is allowed to post. Nothing goes out anywhere you have not connected.", icon: "cast", dot: true },
+      { id: "accounts", label: "Accounts", blurb: "Where Populr is allowed to post. Nothing goes out anywhere you have not connected.", icon: "cast" },
       { id: "sources", label: "Data sources", blurb: "What Populr reads to build its analysis, and when each last synced.", icon: "chart" },
     ],
   },
@@ -39,7 +39,7 @@ const SECTIONS: { group: string; items: Item[] }[] = [
     group: "Billing",
     items: [
       { id: "plan", label: "Plan", blurb: "Your subscription, what it costs, and when it renews.", icon: "package" },
-      { id: "refer", label: "Refer and earn", blurb: "Three referrals adds another free month. They each get one too.", icon: "megaphone", dot: true },
+      { id: "refer", label: "Refer and earn", blurb: "Three referrals adds another free month. They each get one too.", icon: "megaphone" },
     ],
   },
   {
@@ -133,9 +133,9 @@ export default function SettingsPage() {
                 >
                   <Icon name={item.icon} size={17} />
                   <span>{item.label}</span>
-                  {/* A quiet marker on the rows that have something to act on. Not a count —
-                      a count that is wrong is worse than no count, and these are cheap. */}
-                  {item.dot && <i className="set-dot" aria-hidden="true" />}
+                  {/* No status dot. There was one on two rows, marking nothing — no count,
+                      no state, no event behind it. An indicator that indicates nothing is
+                      the thing it looks like it is warning you about. */}
                 </button>
               ))}
             </div>
