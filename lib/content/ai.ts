@@ -1,9 +1,9 @@
 import { generateText, configuredProviderNames } from "@/lib/services/llm";
-import { CRAFT_RULES, CRAFT_BANS, POST_SHAPES, INTERACTION, formFor, scoreDraft, rewriteNote } from "./craft";
+import { CRAFT_RULES, CRAFT_BANS, POST_SHAPES, INTERACTION, DISCOVERY, formFor, scoreDraft, rewriteNote } from "./craft";
 import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { createAdapterRegistry } from "@/lib/social/registry";
 import type { SocialPlatform } from "@/lib/social/types";
-import { compose, buildSchedule, FORMAT_META, type ComposeInput, type ComposedContent, type PlatformVariant } from "./compose";
+import { compose, buildSchedule, FORMAT_META, type ComposeInput, type ComposedContent, type PlatformVariant , cleanHashtags } from "./compose";
 import { assembleGenerationContext, contextToPrompt, type GenerationContext } from "./generation-context";
 
 // LLM-backed composition.
@@ -68,6 +68,8 @@ function buildPrompt(input: ComposeInput, ctx: GenerationContext): string {
     POST_SHAPES,
     ``,
     INTERACTION,
+    ``,
+    DISCOVERY,
     ``,
     formFor(ctx.platforms.map((p) => p.platform)),
     ``,
@@ -213,6 +215,18 @@ export async function composeWithAi(
         // complaint — and it answers by rewording the same paragraph.
         POST_SHAPES,
         ``,
+        // The rewrite is what ships. Almost every draft trips a shape check, so this second
+        // prompt — not the first — decides what a customer reads, and any guidance missing
+        // here is guidance that never reaches the post. DISCOVERY was absent, so hashtags and
+        // buyer keywords were added by the draft and then quietly removed by the rewrite.
+        //
+        // The platform rules go with it for the same reason: LinkedIn wants two or three tags
+        // on their own line and X wants none, and a rewrite that does not know where the post
+        // is going cannot honour either.
+        DISCOVERY,
+        ``,
+        formFor(ctx.platforms.map((p) => p.platform)),
+        ``,
         `Return ONLY the rewritten text. No preamble, no explanation, no quotes around it.`,
         ``,
         `---`,
@@ -240,7 +254,8 @@ export async function composeWithAi(
       title: (parsed.title ?? skeleton.title).trim().slice(0, 200),
       body,
       variants: normalizeVariants(parsed.variants, ctx, body),
-      hashtags: (parsed.hashtags ?? skeleton.hashtags).filter((h) => typeof h === "string").slice(0, 8)
+      // 8 was never defensible — the rules ask for three and the scorer flags four.
+      hashtags: cleanHashtags(parsed.hashtags ?? skeleton.hashtags)
         .map((h) => (h.startsWith("#") ? h : `#${h}`)),
       ctas: (parsed.ctas ?? skeleton.ctas).filter((c) => typeof c === "string").slice(0, 4),
       schedule: buildSchedule(input.platforms, input.now),

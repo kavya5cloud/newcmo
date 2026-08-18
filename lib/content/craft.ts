@@ -155,6 +155,43 @@ worked out.
 Never "thoughts?", never "agree?", never "let me know in the comments". Those are
 requests for engagement. A real question is a request for an answer.`;
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Being found.
+
+   Everything above makes a post worth reading once someone sees it. None of it
+   helps them see it. The rules permitted up to two hashtags and never once asked
+   for one, and said nothing at all about the words people actually search — so
+   posts came out clean, well-shaped, and invisible.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export const DISCOVERY = `BE FINDABLE
+
+Use the words your buyer would type. If they search "crm for small sales teams",
+those words belong in the first two lines — not "revenue orchestration platform".
+Take the terms from the context above; do not invent a vocabulary the market does
+not use.
+
+Once each, where it reads naturally. A post written for a search engine reads like
+one, and people leave. The test: read the line aloud. If nobody would say it that
+way, the keyword is doing damage.
+
+Hashtags are for discovery, not decoration, and they work differently per place:
+
+LinkedIn — two or three, specific. #b2bsales finds an audience; #marketing finds
+forty million posts and nobody. Put them on their own line at the end.
+
+Instagram, Threads — up to three, specific to the niche, at the end.
+
+X — one at most, and usually none. Tags do not drive reach there and read as
+someone trying to be found rather than someone worth reading.
+
+Reddit, Hacker News — none, ever. A hashtag marks you as a marketer in a room that
+removes marketers.
+
+Never the generic set: #marketing #growth #ai #startup #business #success. They
+are the hashtag equivalent of "in today's fast-paced world" — they signal that
+nobody chose them.`;
+
 export const CRAFT_BANS = `NEVER WRITE
 
 - These phrases, in any form: ${AI_TELLS.slice(0, 24).join("; ")}.
@@ -170,10 +207,10 @@ export const CRAFT_BANS = `NEVER WRITE
    ──────────────────────────────────────────────────────────────────────────── */
 
 export const PLATFORM_FORM: Record<string, string> = {
-  x: `X: the first sentence is the whole bet — it appears alone in a timeline. No preamble, no setup. One idea. Lowercase openings are fine. No hashtags.`,
-  linkedin: `LinkedIn: the first two lines show before "see more", so the hook has to survive being cut there. Short paragraphs, one or two lines each, with real line breaks. A specific story or number beats a lesson. No hashtag stack, no "thoughts?" sign-off.`,
+  x: `X: the first sentence is the whole bet — it appears alone in a timeline. No preamble, no setup. One idea. Lowercase openings are fine. At most one hashtag, usually none — tags do not drive reach here.`,
+  linkedin: `LinkedIn: the first two lines show before "see more", so the hook has to survive being cut there. Short paragraphs, one or two lines each, with real line breaks. A specific story or number beats a lesson. Two or three specific hashtags on their own line at the end — never the generic set. No "thoughts?" sign-off.`,
   reddit: `Reddit: you are a person in a thread, not a brand. Lead with the answer or the experience, not context. Mention the product only if it is genuinely the answer, and disclose the connection plainly. Any marketing cadence gets the post removed and the account remembered.`,
-  instagram: `Instagram: the caption's first line carries it. Conversational, present tense, no corporate rhythm. Line breaks between thoughts.`,
+  instagram: `Instagram: the caption's first line carries it. Conversational, present tense, no corporate rhythm. Line breaks between thoughts. Up to three niche-specific hashtags at the end.`,
   facebook: `Facebook: plainer and warmer than LinkedIn. Write the way you would to someone who does not work in this industry.`,
   threads: `Threads: closer to X than Instagram. Conversational, short, one idea, no hashtags.`,
   tiktok: `TikTok: this is spoken, not read. Write for a mouth — the first three seconds have to earn the next three.`,
@@ -306,8 +343,11 @@ export function scoreDraft(text: string): CraftScore {
     issues.push({ code: "summary_ending", detail: tail.slice(0, 60) });
   }
 
+  // Three, not two. Two was below what LinkedIn and Instagram actually reward, so the check
+  // was arguing with the guidance that now asks for tags. A stack is still a stack: the point
+  // is to stop the twelve-tag block, not to stop tags.
   const hashtags = (t.match(/#\w+/g) || []).length;
-  if (hashtags > 2) issues.push({ code: "hashtag_stack", detail: `${hashtags} hashtags` });
+  if (hashtags > 3) issues.push({ code: "hashtag_stack", detail: `${hashtags} hashtags` });
 
   const emoji = (t.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) || []).length;
   if (emoji > 1) issues.push({ code: "emoji_spam", detail: `${emoji} emoji` });
@@ -347,7 +387,7 @@ export function rewriteNote(s: CraftScore): string {
   if (byCode.has("flat_rhythm")) parts.push(`Every sentence is the same length. Break it up — put a short one after a long one.`);
   if (byCode.has("monotone_shape")) parts.push(`This is a wall of prose. Give it a shape: break the thoughts onto their own lines, turn the middle into three dashed items, or land it on a line of four words. Pick one.`);
   if (byCode.has("summary_ending")) parts.push(`Cut the closing summary. End on the sharpest line.`);
-  if (byCode.has("hashtag_stack")) parts.push(`Two hashtags at most.`);
+  if (byCode.has("hashtag_stack")) parts.push(`Three hashtags at most, and each one specific enough to find a real audience.`);
   if (byCode.has("emoji_spam")) parts.push(`One emoji at most.`);
 
   return parts.join(" ");

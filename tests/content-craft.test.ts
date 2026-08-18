@@ -235,3 +235,32 @@ describe("a fatal fault actually triggers a rewrite", () => {
     expect(scoreDraft(good).needsRewrite).toBe(false);
   });
 });
+
+describe("hashtags are a claim, not filler", () => {
+  // The composer attached the first five words of the prompt with a # in front. "Founders
+  // keep hiring an agency before…" shipped as #founders #keep #hiring #agency #before —
+  // five tags, three of them verbs, on a post about to be published. A stack of near-words
+  // at the end of a post is the most visible possible sign nobody read it.
+  it("adds none when it cannot know the topic", async () => {
+    const { buildHashtags } = await import("@/lib/content/compose");
+    expect(buildHashtags("Founders keep hiring an agency before they know which channel", "seed SaaS")).toEqual([]);
+  });
+
+  it("drops the generic set, which finds no audience", async () => {
+    const { cleanHashtags } = await import("@/lib/content/compose");
+    expect(cleanHashtags(["#marketing", "#growth", "#ai", "#startup"])).toEqual([]);
+  });
+
+  it("keeps specific tags and caps them at three", async () => {
+    // Three is the same ceiling scoreDraft enforces on the body, so prompt and contract agree.
+    const { cleanHashtags } = await import("@/lib/content/compose");
+    expect(cleanHashtags(["#b2bsales", "#pricingstrategy", "#saasgrowth", "#demandgen"]))
+      .toEqual(["#b2bsales", "#pricingstrategy", "#saasgrowth"]);
+  });
+
+  it("survives whatever the model returns", async () => {
+    const { cleanHashtags } = await import("@/lib/content/compose");
+    expect(cleanHashtags("not an array")).toEqual([]);
+    expect(cleanHashtags([null, 42, "#b2bsales"])).toEqual(["#b2bsales"]);
+  });
+});

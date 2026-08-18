@@ -215,9 +215,76 @@ export function buildVariants(text: string, platforms: SocialPlatform[]): Platfo
   });
 }
 
-export function buildHashtags(prompt: string, audience: string, limit = 6): string[] {
-  const src = [...keywords(prompt, 5), ...keywords(audience, 2)];
-  return [...new Set(src.map((w) => `#${w.replace(/[^a-z0-9]/g, "")}`))].filter((t) => t.length > 2).slice(0, limit);
+/**
+ * Words that are common enough to find nobody.
+ *
+ * #marketing returns forty million posts; a tag nobody can be found in is decoration. The
+ * generic set is also the hashtag equivalent of "in today's fast-paced world" — it signals
+ * that nobody chose it.
+ */
+const USELESS_TAGS = new Set([
+  "marketing", "growth", "business", "startup", "success", "content", "social",
+  "digital", "strategy", "brand", "branding", "tips", "motivation", "entrepreneur",
+  "ai", "tech", "innovation", "leadership", "sales", "founders", "founder",
+]);
+
+/** Verbs and connectives that are never a topic, whatever the stop-list let through. */
+const NOT_A_TOPIC = /^(keep|keeps|hiring|hire|before|after|when|while|make|makes|making|know|knows|knowing|using|used|need|needs|want|wants|stop|start|write|writing|post|posting|spend|spends|spending|find|finds|finding)$/;
+
+/**
+ * Hashtags worth attaching, or none.
+ *
+ * This used to be the first five words of the prompt with a # in front. "Founders keep hiring
+ * an agency before…" produced #founders #keep #hiring #agency #before — five tags, three of
+ * them verbs, attached to a post somebody was about to publish. That is worse than no tags:
+ * it is visibly automated, and it is the first thing a reader's eye lands on.
+ *
+ * Three rules now. Nouns only, since a verb is never a topic. Nothing from the generic set,
+ * which finds no audience. And a hard cap of three, because a stack reads as reach-chasing —
+ * the same limit scoreDraft enforces on the body.
+ *
+ * Returning an empty array is a valid, common answer. No tags beats bad tags, and a caller
+ * that wanted decoration can add its own.
+ */
+export function buildHashtags(prompt: string, audience: string, limit = 3): string[] {
+  // Deliberately empty, after two attempts at the opposite.
+  //
+  // The original took the first five words of the prompt: "Founders keep hiring an agency
+  // before…" became #founders #keep #hiring #agency #before. Filtering verbs and generic
+  // terms improved it to #agency #they #which — still not topics, because word frequency in
+  // one sentence cannot identify what a post is about. No stop-list closes that gap; the
+  // information is not in the input.
+  //
+  // A hashtag is a claim about which conversation a post belongs to. Guessing it wrong is
+  // worse than omitting it: a stack of near-words is the most visible possible sign that
+  // nobody read the post before it went out, and it sits at the end where the eye lands.
+  //
+  // Tags come from the model, which has the topic, and are filtered by cleanHashtags below.
+  // This path runs when the model was unavailable — and a fallback's job is to stay
+  // publishable, not to fill every field.
+  void prompt; void audience; void limit;
+  return [];
+}
+
+/**
+ * Tags a model proposed, reduced to the ones worth attaching.
+ *
+ * Three at most: more reads as reach-chasing, and it is the same ceiling scoreDraft enforces
+ * on the body, so the prompt and the contract agree. Generic terms are dropped whatever the
+ * model thought — #marketing finds forty million posts and therefore nobody.
+ */
+export function cleanHashtags(raw: unknown, limit = 3): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const word = item.trim().replace(/^#/, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+    if (word.length < 4 || USELESS_TAGS.has(word) || NOT_A_TOPIC.test(word)) continue;
+    const tag = `#${word}`;
+    if (!out.includes(tag)) out.push(tag);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 export function buildCtas(prompt: string): string[] {
