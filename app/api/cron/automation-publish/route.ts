@@ -5,6 +5,7 @@ import { extend, retryFailed, runDue, type PublishPort } from "@/lib/automation/
 import { resolveContent, type ResolvedContent } from "@/lib/automation/sources";
 import { angleKeyFor, topicForSlot } from "@/lib/automation/topic";
 import { assistantStore } from "@/lib/assistant/shared";
+import { can, tierForTenant } from "@/lib/billing/plans";
 import { recordGeneration } from "@/lib/content/generation-log";
 import type { Automation, QueueItem } from "@/lib/automation/types";
 
@@ -62,7 +63,21 @@ export async function GET(req: NextRequest) {
   const report: { tenant: string; published: number; failed: number; retried: number; extended: number }[] = [];
 
   try {
+    let gated = 0;
     for (const tenant of await repo.activeTenants()) {
+      // Publishing unattended is the paid capability. Drafting is not — the queue still fills,
+      // the work is still written, and it waits for a person to press publish.
+      //
+      // Enforced here rather than in the UI because this is the only place that actually
+      // sends anything. A gate a customer can skip by not opening the page is not a gate, and
+      // this route runs on a timer with nobody watching.
+      const tier = await tierForTenant(tenant);
+      if (!can(tier, "scheduled_publishing")) {
+        gated++;
+        console.info(JSON.stringify({ event: "publish_gated", tenant, tier }));
+        continue;
+      }
+
       const automations = await repo.listAutomations(tenant);
       let queue = await repo.listQueue(tenant);
 
@@ -173,7 +188,9 @@ export async function GET(req: NextRequest) {
       console.warn(JSON.stringify({ event: "dispatch_due_failed", error: String(e).slice(0, 200) }));
     }
 
-    return NextResponse.json({ ok: true, at: now, tenants: report.length, dispatched, report });
+    // `gated` is reported rather than hidden: a run that publishes nothing because every
+    // tenant is on a plan without it looks identical to a broken dispatcher otherwise.
+    return NextResponse.json({ ok: true, at: now, tenants: report.length, gated, dispatched, report });
   } catch (e) {
     return NextResponse.json({ error: "cron_failed", detail: String(e).slice(0, 200) }, { status: 503 });
   }
