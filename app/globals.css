@@ -1816,8 +1816,12 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .conn-name{font-size:13px;color:var(--fg)}
 .conn-right{display:flex;align-items:center;gap:7px}
 
+/* Status word, and under it the one qualifier that word needs. Right-aligned so the
+   column reads down cleanly whether or not a row has a second line. */
+.conn-stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .conn-status{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em;
   text-transform:uppercase}
+.conn-hint{font-style:normal;font-size:11px;line-height:1.2;color:var(--faint);white-space:nowrap}
 .conn-connected{color:var(--green)}
 .conn-linked_not_live{color:#e0b341}
 .conn-soon{color:var(--faint)}

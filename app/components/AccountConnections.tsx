@@ -48,7 +48,15 @@ const COPY: Record<RowState, { status: string; hint?: string }> = {
   // A token exists but nothing can go out. Saying "Connected" here would be the lie.
   linked_not_live: { status: "Linked", hint: "Publishing opens soon" },
   connect: { status: "" },
-  soon: { status: "Soon" },
+  // "Coming to Pro", not "Available in Pro".
+  //
+  // These four have no adapter at all — createLiveAdapters() returns LinkedIn and X and
+  // nothing else — and Instagram and Facebook additionally need Meta's approval, which is
+  // still pending. "Available in Pro" tells someone that buying Pro gets them Instagram
+  // publishing. They would pay and find nothing works, which is a refund and a review.
+  //
+  // One word apart, and it is the difference between a roadmap note and a false claim.
+  soon: { status: "Soon", hint: "Coming to Pro" },
 };
 
 export default function AccountConnections({ variant = "compact" }: { variant?: "compact" | "full" } = {}) {
@@ -151,7 +159,10 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
                 </button>
               ) : (
                 <span className="conn-right">
-                  <span className={"conn-status conn-" + state}>{copy.status}</span>
+                  <span className="conn-stat">
+                    <span className={"conn-status conn-" + state}>{copy.status}</span>
+                    {copy.hint && <em className="conn-hint">{copy.hint}</em>}
+                  </span>
                   {state === "connected" && (
                     <button className={full ? "conn-btn" : "conn-x"} title={`Disconnect ${r.label}`}
                       disabled={busy === r.account!.id} onClick={() => disconnect(r.account!.id)}>
@@ -165,10 +176,12 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
         })}
       </div>
 
-      {/* Said once, at the bottom, rather than repeated on four rows. */}
+      {/* Said once, at the bottom, rather than repeated on four rows. Names what is true
+          today — the writing already happens — before what is not yet. */}
       {rows.some((r) => stateOf(r) === "soon") && (
         <p className="conn-note">
-          Populr already writes for the rest. Publishing to them opens in early access.
+          Populr already writes for these. Publishing to them is coming to Pro — it needs
+          approval from each platform first, and none of it is live yet.
         </p>
       )}
     </div>
