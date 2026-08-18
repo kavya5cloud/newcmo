@@ -5,6 +5,7 @@ import AccountConnections from "@/app/components/AccountConnections";
 import ConnectorCockpit from "./ConnectorCockpit";
 import ReferAndEarn from "@/app/components/ReferAndEarn";
 import Billing from "@/app/components/Billing";
+import Icon, { type IconName } from "@/app/components/Icon";
 
 // Settings.
 //
@@ -21,7 +22,7 @@ import Billing from "@/app/components/Billing";
 // account or reading a plan changed here — only where they live and how you get to them.
 
 type SectionId = "accounts" | "sources" | "plan" | "refer" | "callbacks";
-type Item = { id: SectionId; label: string; blurb: string };
+type Item = { id: SectionId; label: string; blurb: string; icon: IconName; dot?: boolean };
 
 // Typed explicitly rather than inferred from `as const`. flatMap over a readonly tuple of
 // readonly tuples widens in a way TypeScript will not accept back into the element type, and
@@ -30,21 +31,21 @@ const SECTIONS: { group: string; items: Item[] }[] = [
   {
     group: "AI CMO",
     items: [
-      { id: "accounts", label: "Accounts", blurb: "Where Populr is allowed to post. Nothing goes out anywhere you have not connected." },
-      { id: "sources", label: "Data sources", blurb: "What Populr reads to build its analysis, and when each last synced." },
+      { id: "accounts", label: "Accounts", blurb: "Where Populr is allowed to post. Nothing goes out anywhere you have not connected.", icon: "cast", dot: true },
+      { id: "sources", label: "Data sources", blurb: "What Populr reads to build its analysis, and when each last synced.", icon: "chart" },
     ],
   },
   {
     group: "Billing",
     items: [
-      { id: "plan", label: "Plan", blurb: "Your subscription, what it costs, and when it renews." },
-      { id: "refer", label: "Refer and earn", blurb: "Three referrals adds another free month. They each get one too." },
+      { id: "plan", label: "Plan", blurb: "Your subscription, what it costs, and when it renews.", icon: "package" },
+      { id: "refer", label: "Refer and earn", blurb: "Three referrals adds another free month. They each get one too.", icon: "megaphone", dot: true },
     ],
   },
   {
     group: "Developer",
     items: [
-      { id: "callbacks", label: "Callback URLs", blurb: "The exact redirect URLs to register in your LinkedIn and X developer apps." },
+      { id: "callbacks", label: "Callback URLs", blurb: "The exact redirect URLs to register in your LinkedIn and X developer apps.", icon: "doc" },
     ],
   },
 ];
@@ -107,6 +108,14 @@ export default function SettingsPage() {
   return (
     <section className="st-section settings">
       <header className="set-head">
+        {/* Back before the title, and a real link rather than history.back() — someone who
+            opened Settings directly has nothing to go back to, and a chevron that does
+            nothing is worse than no chevron. */}
+        <a className="set-back" href="/app" aria-label="Back to the dashboard">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </a>
         <h1>Settings</h1>
       </header>
 
@@ -122,7 +131,11 @@ export default function SettingsPage() {
                   aria-current={active === item.id ? "page" : undefined}
                   onClick={() => go(item.id)}
                 >
-                  {item.label}
+                  <Icon name={item.icon} size={17} />
+                  <span>{item.label}</span>
+                  {/* A quiet marker on the rows that have something to act on. Not a count —
+                      a count that is wrong is worse than no count, and these are cheap. */}
+                  {item.dot && <i className="set-dot" aria-hidden="true" />}
                 </button>
               ))}
             </div>
