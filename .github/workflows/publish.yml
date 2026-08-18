@@ -38,19 +38,36 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://www.trypopulr.in' }}
     steps:
+      # Not configured is not the same as broken.
+      #
+      # This errored and exited 1 when CRON_SECRET was missing, every ten minutes, and had
+      # done so 333 times before anyone looked. A red run every ten minutes says nothing
+      # except "the setup is not finished", and it is the fastest way to train someone to
+      # ignore this workflow — so the genuine failure, when it comes, is ignored with it.
+      #
+      # The run now succeeds and says what it is waiting for. A wrong secret still fails
+      # loudly below, because that is a real problem.
+      - name: Waiting for setup
+        if: env.CRON_SECRET == ''
+        run: |
+          echo "::notice::CRON_SECRET is not set, so nothing was published."
+          echo "Add it under Settings → Secrets and variables → Actions, matching the value in Vercel."
+          echo "Due posts stay queued until then — they are not lost, just not sent."
+          {
+            echo "### Publishing idle"
+            echo ""
+            echo "\`CRON_SECRET\` is not set in repository secrets, so no publish pass ran."
+            echo "Due posts remain queued until it is added."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish anything due
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL || 'https://www.trypopulr.in' }}
+        if: env.CRON_SECRET != ''
         run: |
           set -euo pipefail
-
-          if [ -z "${CRON_SECRET}" ]; then
-            echo "::error::CRON_SECRET is not set. Add it under Settings → Secrets and variables → Actions."
-            echo "Without it the endpoint returns 401 and nothing publishes."
-            exit 1
-          fi
 
           echo "GET ${SITE_URL}/api/cron/automation-publish"
 
