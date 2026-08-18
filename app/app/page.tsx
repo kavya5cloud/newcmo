@@ -13,6 +13,7 @@ import { isContentEnginePath } from "@/lib/flags";
 import Icon from "@/app/components/Icon";
 import ResizableDash from "./_components/ResizableDash";
 import DashboardSkeleton from "./_components/DashboardSkeleton";
+import SeoAudit from "./_components/SeoAudit";
 import Section from "@/app/components/Section";
 import DocSkeleton from "@/app/components/DocSkeleton";
 import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
@@ -1075,8 +1076,14 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
 
               {tab === "seo" && (
                 <>
+                  {/* The audit runs on any public URL, so this tab has something real to show
+                      from the first session — it used to say "connect Search Console" and
+                      nothing else, which meant an empty tab until someone completed OAuth on
+                      a verified property. Search Console data still appears below when it is
+                      connected; the two are complementary, not alternatives. */}
+                  {url && <SeoAudit url={url} />}
                   {!gscData ? (
-                    <div className="placeholder"><b style={{ color: "var(--dim)" }}>SEO details</b><br /><span className="mono" style={{ fontSize: 11 }}>Connect Search Console to see queries, pages, and CTR fixes</span></div>
+                    <div className="placeholder" style={{ marginTop: 18 }}><b style={{ color: "var(--dim)" }}>Search Console</b><br /><span className="mono" style={{ fontSize: 11 }}>Connect it to add your real queries, positions and CTR</span></div>
                   ) : (
                     <>
                       <div className="an-h">Top queries</div>

@@ -3243,3 +3243,96 @@ html{scroll-padding-top:var(--eab-h,0px)}
 /* The log is the only live thing here, so it does not get a placeholder. */
 .appui .skl-shell .tlog .pl { color: var(--faint); }
 .appui .skl-shell .tlog .pl.done { color: var(--acc); }
+
+/* ── SEO audit ────────────────────────────────────────────────────────────
+   Measurements, presented as measurements.
+
+   The one rule the whole panel is built around: a number that could not be
+   measured shows an em dash, never a zero. On a dial those look identical and
+   only one of them is true — and this product ships a guide about tools that
+   invent statistics. */
+.appui .audit { display: flex; flex-direction: column; }
+.appui .audit-note { margin-top: 8px; font-size: 11.5px; color: var(--faint); font-style: italic; }
+.appui .audit-problem {
+  margin: 10px 0 4px; padding: 10px 12px;
+  border: 1px solid rgba(242,191,112,.3); border-left-width: 3px; border-radius: 10px;
+  background: rgba(242,191,112,.07);
+  font-size: 12.5px; line-height: 1.55; color: var(--amberr);
+}
+.appui .audit-wait {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 40px 20px; text-align: center; color: var(--dim); font-size: 13px;
+}
+.appui .audit-wait .audit-sub { color: var(--faint); font-size: 12px; }
+
+/* PageSpeed dials. Lighthouse's own bands and Lighthouse's own colours, because a
+   score that reads green here and orange on Google's page is a score nobody trusts. */
+.appui .psi-block { margin-top: 12px; }
+.appui .psi-head {
+  font-family: 'Geist Mono', monospace; font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px;
+}
+.appui .psi-rings { display: flex; gap: 8px; }
+.appui .psi-ring {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 12px 4px; border: 1px solid var(--edge); border-radius: 12px; position: relative;
+}
+.appui .psi-ring svg { transform: rotate(-90deg); }
+.appui .psi-track { fill: none; stroke: rgba(255,255,255,.09); stroke-width: 3; }
+.appui .psi-arc { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dasharray .6s var(--ease-out); }
+.appui .psi-num {
+  position: absolute; top: 24px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.appui .psi-label { font-size: 10px; color: var(--faint); text-align: center; line-height: 1.3; }
+.appui .psi-good { stroke: #7fd99a; color: #7fd99a; }
+.appui .psi-warn { stroke: var(--amberr); color: var(--amberr); }
+.appui .psi-bad  { stroke: var(--redd);   color: var(--redd); }
+.appui .psi-none { color: var(--faint); }
+
+/* Core Web Vitals */
+.appui .seg { display: flex; gap: 4px; margin: 10px 0; padding: 3px; background: rgba(255,255,255,.03); border-radius: 10px; }
+.appui .seg-b {
+  flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none;
+  color: var(--faint); font-size: 12.5px; cursor: pointer;
+}
+.appui .seg-b.on { background: rgba(255,255,255,.07); color: var(--fg); }
+.appui .cwv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.appui .cwv-cell {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center;
+  padding: 12px 13px; border: 1px solid var(--edge); border-radius: 12px;
+}
+.appui .cwv-dot { width: 7px; height: 7px; border-radius: 50%; }
+.appui .cwv-label { font-size: 12.5px; color: var(--dim); }
+.appui .cwv-value { grid-column: 1 / -1; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.appui .cwv-verdict { grid-column: 1 / -1; font-size: 11.5px; color: var(--faint); }
+.appui .cwv-pass { color: #7fd99a; background: #7fd99a; }
+.appui .cwv-needs-work { color: var(--amberr); background: var(--amberr); }
+.appui .cwv-fail { color: var(--redd); background: var(--redd); }
+/* The dot uses background, the text uses colour — same class, so they cannot disagree. */
+.appui .cwv-value.cwv-pass, .appui .cwv-value.cwv-needs-work, .appui .cwv-value.cwv-fail { background: none; }
+
+/* On-page signals */
+.appui .sig { display: flex; flex-direction: column; margin-top: 10px; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.appui .sig-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid var(--edge); }
+.appui .sig-row:first-child { border-top: 0; }
+.appui .sig-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+.appui .sig-label { flex: 1; font-size: 13px; color: var(--dim); }
+.appui .sig-value { font-size: 12.5px; font-family: 'Geist Mono', monospace; }
+.appui .sig-pass { color: #7fd99a; background: #7fd99a; }
+.appui .sig-warn { color: var(--amberr); background: var(--amberr); }
+.appui .sig-fail { color: var(--redd); background: var(--redd); }
+.appui .sig-value.sig-pass, .appui .sig-value.sig-warn, .appui .sig-value.sig-fail { background: none; }
+
+/* Issues */
+.appui .issue-count {
+  margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  background: rgba(242,191,112,.14); color: var(--amberr);
+  font-family: 'Geist Mono', monospace; font-size: 11px;
+}
+.appui .issues { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.appui .issue { padding: 11px 13px; border: 1px solid var(--edge); border-left-width: 3px; border-radius: 10px; }
+.appui .issue-warning { border-left-color: var(--amberr); background: rgba(242,191,112,.05); }
+.appui .issue-error { border-left-color: var(--redd); background: rgba(242,141,120,.06); }
+.appui .issue-t { font-size: 13px; font-weight: 500; color: var(--fg); }
+.appui .issue-d { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--faint); }
