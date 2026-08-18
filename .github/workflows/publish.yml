@@ -41,10 +41,9 @@ name: Publish due posts
 # secret is added. That is a real risk and the reason this comment is the first thing in
 # the file rather than a note at the bottom.
 on:
-  # schedule:
-  #   - cron: "*/10 * * * *"
+  schedule:
+    - cron: "*/10 * * * *"
   workflow_dispatch:
-
 # A run that overlaps the previous one would do no harm — slots are idempotent — but there is
 # no reason to pay for two at once.
 concurrency:
