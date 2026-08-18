@@ -19,27 +19,25 @@ name: Publish due posts
 #   Secret   CRON_SECRET   the same value as CRON_SECRET in Vercel
 #   Variable SITE_URL      optional; defaults to the production host below
 
-# ┌─────────────────────────────────────────────────────────────────────────────┐
-# │ TO TURN PUBLISHING ON: uncomment the two `schedule` lines below.             │
-# │ Nothing else in this file needs changing.                                    │
-# └─────────────────────────────────────────────────────────────────────────────┘
+# The schedule is on.
 #
-# The schedule is off because nothing it could do would work.
+# It was switched off while nothing it could do would work, and switched back on once
+# CRON_SECRET was set. To pause it again, comment out the two `schedule` lines below;
+# workflow_dispatch keeps working either way, so the wiring can always be checked by hand.
 #
-# Publishing needs two things that are not set: CRON_SECRET, without which every call
-# is a 401, and LinkedIn/X app credentials, without which the adapters are reference
-# stubs that reach nobody. Until both exist this job has no work it can perform.
+# Two things to know about a green run here:
 #
-# It ran every ten minutes anyway and failed 333 times before anyone looked. That was
-# fixed — a missing secret now skips instead of erroring — but a green run every ten
-# minutes that does nothing is the same problem quieter: 144 lines a day in the Actions
-# tab, all meaningless, which is how a person learns to stop reading it.
+#   Green does not mean a post went out. It means the endpoint answered. When there is no
+#   due work the pass finds nothing and still succeeds, which is correct and is most runs.
 #
-# workflow_dispatch stays, so this can be run by hand to check the wiring at any time.
+#   Nothing reaches LinkedIn or X until their app credentials are set. Without them
+#   createLiveAdapters() returns empty and the adapters are reference stubs — the job will
+#   dispatch, mark work published, and no account will show anything. The log line to read
+#   is the JSON body, not the tick.
 #
-# The failure mode of leaving it off is that publishing silently never happens after the
-# secret is added. That is a real risk and the reason this comment is the first thing in
-# the file rather than a note at the bottom.
+# History, so it is not repeated: this failed 333 times before anyone looked, because a
+# missing secret was treated as an error and it ran every ten minutes. A missing secret now
+# skips and the job stays green.
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -71,7 +69,6 @@ jobs:
         if: env.CRON_SECRET == ''
         run: |
           echo "::notice::CRON_SECRET is not set, so nothing was published."
-          echo "The schedule is also commented out in this file — uncomment it once the secret is set."
           echo "Add it under Settings → Secrets and variables → Actions, matching the value in Vercel."
           echo "Due posts stay queued until then — they are not lost, just not sent."
           {
