@@ -19,13 +19,30 @@ name: Publish due posts
 #   Secret   CRON_SECRET   the same value as CRON_SECRET in Vercel
 #   Variable SITE_URL      optional; defaults to the production host below
 
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ TO TURN PUBLISHING ON: uncomment the two `schedule` lines below.             │
+# │ Nothing else in this file needs changing.                                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# The schedule is off because nothing it could do would work.
+#
+# Publishing needs two things that are not set: CRON_SECRET, without which every call
+# is a 401, and LinkedIn/X app credentials, without which the adapters are reference
+# stubs that reach nobody. Until both exist this job has no work it can perform.
+#
+# It ran every ten minutes anyway and failed 333 times before anyone looked. That was
+# fixed — a missing secret now skips instead of erroring — but a green run every ten
+# minutes that does nothing is the same problem quieter: 144 lines a day in the Actions
+# tab, all meaningless, which is how a person learns to stop reading it.
+#
+# workflow_dispatch stays, so this can be run by hand to check the wiring at any time.
+#
+# The failure mode of leaving it off is that publishing silently never happens after the
+# secret is added. That is a real risk and the reason this comment is the first thing in
+# the file rather than a note at the bottom.
 on:
-  schedule:
-    # Every 10 minutes. GitHub's minimum is 5, and scheduled runs are best-effort — they can
-    # be delayed under load — so treat this as "within ten minutes or so", not to the second.
-    # Publishing is idempotent, so a late or repeated run is safe; a missed one is not.
-    - cron: "*/10 * * * *"
-  # So the first real run can be triggered by hand rather than waited for.
+  # schedule:
+  #   - cron: "*/10 * * * *"
   workflow_dispatch:
 
 # A run that overlaps the previous one would do no harm — slots are idempotent — but there is
@@ -55,6 +72,7 @@ jobs:
         if: env.CRON_SECRET == ''
         run: |
           echo "::notice::CRON_SECRET is not set, so nothing was published."
+          echo "The schedule is also commented out in this file — uncomment it once the secret is set."
           echo "Add it under Settings → Secrets and variables → Actions, matching the value in Vercel."
           echo "Due posts stay queued until then — they are not lost, just not sent."
           {
