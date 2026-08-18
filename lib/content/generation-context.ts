@@ -51,7 +51,7 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
   const missing: string[] = [];
   const sql = db();
 
-  const [accounts, brief, memory, brand, patterns] = await Promise.all([
+  const [accounts, brief, memory, brand, patterns, written] = await Promise.all([
     socialEngine().listAccounts(input.tenant).catch(() => { missing.push("connected platforms"); return []; }),
     marketPlatform().research.run({
       tenant: input.tenant, terms: input.terms.filter(Boolean).slice(0, 3),
@@ -60,6 +60,11 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
     marketPlatform().memory.list(input.tenant, undefined, 12).catch(() => { missing.push("market memory"); return []; }),
     learningEngine(sql).brand.latest(input.tenant).catch(() => { missing.push("brand DNA"); return null; }),
     learningEngine(sql).patterns.all().catch(() => { missing.push("pattern library"); return []; }),
+    // What this workspace has already been written. Its own read rather than a filter over
+    // the generic memory list, because the generic list is capped at 12 and a busy week of
+    // trends would push every previous angle out of it — which is precisely when repetition
+    // starts.
+    marketPlatform().memory.list(input.tenant, "content", 12).catch(() => { missing.push("what was already written"); return []; }),
   ]);
 
   const connected = [...new Set(accounts.filter((a) => a.status === "connected").map((a) => a.platform))];
@@ -90,14 +95,17 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
       opportunities: (brief?.opportunities ?? []).slice(0, 5).map((o) => `${o.title} → ${o.recommendedAction}`),
       keywords: (brief?.keywords ?? []).slice(0, 6).map((k) => k.keyword),
     },
-    memory: memory.slice(0, 8).map((m) => `${m.kind}/${m.key}: ${m.value}`),
+    // "content" rows are the already-written angles and get their own section below. Left in
+    // here too they would read as market observations, which would invite the model to write
+    // about them rather than away from them.
+    memory: memory.filter((m) => m.kind !== "content").slice(0, 8).map((m) => `${m.kind}/${m.key}: ${m.value}`),
     learned: {
       patterns: [...patterns].sort((a, b) => b.performance - a.performance).slice(0, 5)
         .map((p) => `${p.label}: ${p.value} performs ${Math.round(p.performance * 100)}%`),
       insights: [],
     },
     platforms,
-    previousCampaigns: [],
+    previousCampaigns: written.map((m) => m.value),
     missing,
   };
 }
@@ -118,7 +126,16 @@ export function contextToPrompt(ctx: GenerationContext): string {
   if (ctx.market.keywords.length) lines.push(`KEYWORDS WORTH RANKING FOR: ${ctx.market.keywords.join(", ")}`);
   if (ctx.memory.length) lines.push(`PREVIOUSLY OBSERVED (market memory): ${ctx.memory.join("; ")}`);
   if (ctx.learned.patterns.length) lines.push(`WHAT HAS PERFORMED BEFORE: ${ctx.learned.patterns.join("; ")}`);
-  if (ctx.previousCampaigns.length) lines.push(`PREVIOUS CAMPAIGNS: ${ctx.previousCampaigns.join("; ")}`);
+  // Stated as a prohibition, not as background. "Previous campaigns: X" reads as material to
+  // draw on and the model will happily draw on it by rewriting X. The instruction has to say
+  // what to do with the list, and it has to sit next to the list.
+  if (ctx.previousCampaigns.length) {
+    lines.push(
+      `ALREADY WRITTEN FOR THIS BUSINESS — DO NOT REPEAT THESE ANGLES OR OPENINGS:\n${
+        ctx.previousCampaigns.map((c) => `- ${c}`).join("\n")
+      }\nPick a different angle and a different opening line from every one of these. Saying the same thing in fresh words still counts as a repeat.`,
+    );
+  }
   if (ctx.platforms.length) {
     lines.push(`CONNECTED PLATFORMS AND THEIR HARD LIMITS:\n${ctx.platforms
       .map((p) => `- ${p.platform}: max ${p.maxText} characters, max ${p.maxAssets} assets${p.requiresAsset ? ", MEDIA REQUIRED" : ""}${p.allowsVideo ? "" : ", no video"}`)

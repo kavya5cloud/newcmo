@@ -30,6 +30,34 @@ export type Agent = {
 
 const clamp = (n: number) => Math.max(0, Math.min(1, Number(n.toFixed(3))));
 
+// ---- How an agent's work reads ----
+//
+// These lines are rendered straight into the AI Team panel as bullets, so they are the
+// product's voice, not log output. They were written as debug strings — raw UUIDs, lowercase
+// platform ids, "asset(s)", numbers with no separators — and read like a stack trace sitting
+// in the middle of a designed screen.
+
+/** Platform ids are internal. People know these by their names. */
+const PLATFORM_LABEL: Record<SocialPlatform, string> = {
+  linkedin: "LinkedIn", x: "X", instagram_business: "Instagram",
+  facebook_pages: "Facebook", threads: "Threads", pinterest: "Pinterest",
+};
+const platformName = (p: SocialPlatform): string => PLATFORM_LABEL[p] ?? p;
+
+/** "1 asset" / "2 assets" — never "asset(s)", which is a form field, not a sentence. */
+const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+
+/** Thousands separators, because 3000 chars and 30000 chars look alike at a glance. */
+const num = (n: number): string => n.toLocaleString("en-US");
+
+/**
+ * A job id a person can actually match against the Jobs screen.
+ *
+ * The full UUID was being printed in a bullet list. Nobody reads 36 characters of hex, and
+ * its only real use is comparing two of them — which the first segment does just as well.
+ */
+const jobRef = (id: string): string => id.split("-")[0] ?? id;
+
 /** Plan channel names → publishing platform ids. Same map the execution services use. */
 const CHANNEL_PLATFORM: Record<string, SocialPlatform> = {
   linkedin: "linkedin", instagram: "instagram_business", facebook: "facebook_pages",
@@ -71,7 +99,7 @@ export const researchAgent: Agent = {
       ok: true,
       task: step === "market_intelligence" ? "Scanning the market for openings" : `Researching ${ctx.audience}`,
       reasoning: live
-        ? `Read ${ctx.market.trends.length} trend(s), ${ctx.market.competitors.length} competitor(s) and ${ctx.market.opportunities.length} opportunity card(s) from Market Intelligence, recalled ${ctx.memory.length} prior observation(s) from Market Memory, and wrote ${remembered} new one(s) back for the next campaign.`
+        ? `Read ${plural(ctx.market.trends.length, "trend")}, ${plural(ctx.market.competitors.length, "competitor")} and ${plural(ctx.market.opportunities.length, "opportunity card")} from Market Intelligence, recalled ${plural(ctx.memory.length, "prior observation")} from Market Memory, and wrote ${plural(remembered, "new one", "new ones")} back for the next campaign.`
         : "Market Intelligence returned nothing for these terms, so this run has no fresh external evidence. Everything downstream should be treated as based on the brief alone.",
       confidence: clamp(live ? 0.5 + Math.min(0.4, outputs.length * 0.05) : 0.2),
       outputs: outputs.length ? outputs : ["No external signals observed for these terms."],
@@ -92,7 +120,7 @@ export const strategyAgent: Agent = {
 
     const publishable = ctx.campaign.channels.filter((c) => CHANNEL_PLATFORM[c.toLowerCase()]);
     const cadence = ctx.campaign.assetCount && publishable.length
-      ? `${Math.max(1, Math.round(ctx.campaign.assetCount / Math.max(1, publishable.length)))} post(s) per platform across ${publishable.length} platform(s)`
+      ? `${plural(Math.max(1, Math.round(ctx.campaign.assetCount / Math.max(1, publishable.length))), "post")} per platform across ${plural(publishable.length, "platform")}`
       : "cadence pending — no publishable platform on this campaign's channels";
 
     return {
@@ -127,9 +155,9 @@ export const contentAgent: Agent = {
     const variants: string[] = [];
     for (const ch of ctx.campaign.channels) {
       const platform = CHANNEL_PLATFORM[ch.toLowerCase()];
-      if (!platform) { variants.push(`${ch} — long-form (no platform limits apply)`); continue; }
+      if (!platform) { variants.push(`${ch} — long-form, no length limit`); continue; }
       const k = registry.get(platform)?.constraints();
-      if (k) variants.push(`${platform} — variant within ${k.maxText} chars${k.requiresAsset ? ", media required" : ""}`);
+      if (k) variants.push(`${platformName(platform)} — up to ${num(k.maxText)} characters${k.requiresAsset ? ", media required" : ""}`);
     }
 
     return {
@@ -137,7 +165,7 @@ export const contentAgent: Agent = {
       task: `Writing for ${ctx.campaign.channels.join(", ")}`,
       reasoning: `Commissioned job ${job.id} on the Job Engine for the campaign's ${ctx.campaign.assetCount} planned pieces. Per-platform variants are shaped by each adapter's own constraints rather than a hardcoded limit, and the voice comes from ${ctx.brand.voice.length ? "the learned Brand DNA" : "the campaign brief"}.`,
       confidence: clamp(ctx.brand.voice.length ? 0.7 : 0.5),
-      outputs: [`Job — ${job.id}`, ...variants, `Voice — ${ctx.brand.voice.join(" · ") || "from the brief"}`],
+      outputs: [`Job ${jobRef(job.id)} queued`, ...variants, `Voice — ${ctx.brand.voice.join(" · ") || "taken from the brief"}`],
     };
   },
 };
@@ -158,8 +186,9 @@ export const creativeAgent: Agent = {
     for (const ch of ctx.campaign.channels) {
       const platform = CHANNEL_PLATFORM[ch.toLowerCase()];
       const k = platform ? registry.get(platform)?.constraints() : null;
-      if (k?.requiresAsset) needs.push(`${platform} — media is mandatory, up to ${k.maxAssets} asset(s)`);
-      else if (k) needs.push(`${platform} — media optional, up to ${k.maxAssets} asset(s)${k.allowsVideo ? ", video supported" : ", no video"}`);
+      if (!platform) continue;
+      if (k?.requiresAsset) needs.push(`${platformName(platform)} — media required, up to ${plural(k.maxAssets, "asset")}`);
+      else if (k) needs.push(`${platformName(platform)} — media optional, up to ${plural(k.maxAssets, "asset")}${k.allowsVideo ? ", video supported" : ", no video"}`);
     }
 
     return {
@@ -167,7 +196,7 @@ export const creativeAgent: Agent = {
       task: `Producing visuals for ${ctx.campaign.title}`,
       reasoning: `Commissioned job ${job.id} for the campaign's visual assets. Format requirements are read from each platform adapter, so a platform that mandates media is never left with a text-only post. Brand consistency is anchored on ${ctx.brand.voice.length ? "the learned Brand DNA" : "the brief's creative direction"}.`,
       confidence: clamp(needs.length ? 0.68 : 0.4),
-      outputs: [`Job — ${job.id}`, ...(needs.length ? needs : ["No platform-specific media requirements on this campaign's channels."])],
+      outputs: [`Job ${jobRef(job.id)} queued`, ...(needs.length ? needs : ["No platform-specific media requirements on this campaign's channels."])],
     };
   },
 };
@@ -188,12 +217,12 @@ export const publishingAgent: Agent = {
       const checks = platforms
         .map((p) => registry.get(p as SocialPlatform)?.constraints())
         .filter(Boolean)
-        .map((k) => `${k!.platform} — ≤${k!.maxText} chars, ≤${k!.maxAssets} assets${k!.allowsScheduling ? ", schedulable" : ", immediate only"}`);
+        .map((k) => `${platformName(k!.platform as SocialPlatform)} — up to ${num(k!.maxText)} characters, ${plural(k!.maxAssets, "asset")}${k!.allowsScheduling ? ", scheduling supported" : ", immediate posting only"}`);
       return {
         ok: true,
         task: "Validating content against platform rules",
         reasoning: connected.length
-          ? `Checked the campaign against the live constraints of ${new Set(connected.map((a) => a.platform)).size} connected platform(s). Constraints are the adapters' own, so a platform changing its limits changes this check without a code edit.`
+          ? `Checked the campaign against the live constraints of ${plural(new Set(connected.map((a) => a.platform)).size, "connected platform")}. Constraints are the adapters' own, so a platform changing its limits changes this check without a code edit.`
           : "No connected platforms, so there is nothing to validate against yet. Connect an account and this becomes a real check.",
         confidence: clamp(connected.length ? 0.85 : 0.25),
         outputs: checks.length ? checks : ["No connected platforms to validate against."],
@@ -226,13 +255,13 @@ export const publishingAgent: Agent = {
         ctx.now + 86_400_000,
         "UTC",
       );
-      scheduled.push(`${account.platform} — job ${job.id}`);
+      scheduled.push(`${platformName(account.platform)} — job ${jobRef(job.id)}`);
     }
 
     return {
       ok: true,
-      task: `Scheduling across ${usable.length} platform(s)`,
-      reasoning: `Handed ${scheduled.length} post(s) to the Publishing Engine, which owns retries, backoff and the dead-letter queue. Nothing is published from here directly — the adapters do that on their own schedule.`,
+      task: `Scheduling across ${plural(usable.length, "platform")}`,
+      reasoning: `Handed ${plural(scheduled.length, "post")} to the Publishing Engine, which owns retries, backoff and the dead-letter queue. Nothing is published from here directly — the adapters do that on their own schedule.`,
       confidence: clamp(0.6 + usable.length * 0.1),
       outputs: scheduled,
     };
@@ -255,15 +284,15 @@ export const analyticsAgent: Agent = {
       ok: true,
       task: "Reporting on what actually happened",
       reasoning: published.length
-        ? `Read ${published.length} published post(s) and ${failed.length} failure(s) from publishing history. Reach and revenue are not reported because no platform has returned those metrics yet — an ROI number without them would be fiction.`
+        ? `Read ${plural(published.length, "published post")} and ${plural(failed.length, "failure")} from publishing history. Reach and revenue are not reported because no platform has returned those metrics yet — an ROI number without them would be fiction.`
         : "Nothing has published yet, so there is no performance to report. This will fill in as posts go live.",
       confidence: clamp(published.length ? 0.5 + Math.min(0.4, published.length * 0.05) : 0.15),
       outputs: published.length
         ? [
-          `Published — ${published.length}`,
-          ...[...byPlatform].map(([p, n]) => `${p} — ${n} post(s)`),
-          ...(failed.length ? [`Failed — ${failed.length}, retryable from Publishing`] : []),
-          `Scheduled — ${ctx.analytics.scheduled} still queued`,
+          `Published — ${num(published.length)}`,
+          ...[...byPlatform].map(([p, n]) => `${platformName(p as SocialPlatform)} — ${plural(n, "post")}`),
+          ...(failed.length ? [`Failed — ${num(failed.length)}, retryable from Publishing`] : []),
+          `Scheduled — ${num(ctx.analytics.scheduled)} still queued`,
         ]
         : ["No published results yet."],
     };
@@ -281,7 +310,7 @@ export const learningAgent: Agent = {
         ok: true,
         task: "Recommending changes to the rest of the campaign",
         reasoning: suggestions.length
-          ? `Compared the remaining campaign against ${suggestions.length} live opportunity card(s). These are recommendations only — the Execution Engine will not apply any of them without an approval.`
+          ? `Compared the remaining campaign against ${plural(suggestions.length, "live opportunity card")}. These are recommendations only — the Execution Engine will not apply any of them without an approval.`
           : "Nothing in the current market picture warrants changing the remaining campaign.",
         confidence: clamp(suggestions.length ? 0.6 : 0.35),
         outputs: suggestions.length ? suggestions.map((s) => `Recommend — ${s}`) : ["No changes recommended."],
@@ -318,7 +347,7 @@ export const learningAgent: Agent = {
     return {
       ok: true,
       task: "Folding results into what Populr knows",
-      reasoning: `Fed ${result.processedEvents} published outcome(s) through the Learning Engine, which updated the Pattern Library, Creative Memory, Brand DNA and Business Graph signals. The campaign outcome was written to Market Memory so the next Research pass recalls it.`,
+      reasoning: `Fed ${plural(result.processedEvents, "published outcome")} through the Learning Engine, which updated the Pattern Library, Creative Memory, Brand DNA and Business Graph signals. The campaign outcome was written to Market Memory so the next Research pass recalls it.`,
       confidence: clamp(0.5 + Math.min(0.4, result.processedEvents * 0.05)),
       outputs: [
         `Events ingested — ${result.processedEvents}`,

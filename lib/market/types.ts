@@ -193,6 +193,10 @@ export type MarketGraph = {
 
 export const MEMORY_RECORD_KINDS = [
   "trend", "competitor", "campaign", "audience", "seasonality", "opportunity",
+  // What this workspace has already been written for. Kept apart from "campaign", which
+  // holds generation metadata, because this is the one kind read back into the prompt as
+  // "do not write these again" — and it is only useful if nothing else is mixed into it.
+  "content",
 ] as const;
 export type MemoryRecordKind = (typeof MEMORY_RECORD_KINDS)[number];
 

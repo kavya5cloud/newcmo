@@ -268,7 +268,7 @@ function isUnsupportedModelAttempt(kind: string, body: string) {
   return /(model .*not found|model .*unavailable|unsupported model|does not exist)/.test(text);
 }
 
-async function callProvider(provider: ProviderConfig, model: string, key: string, prompt: string, requestId: string, retried = false): Promise<{ ok: true; text: string } | { ok: false; attempt: LLMAttempt }> {
+async function callProvider(provider: ProviderConfig, model: string, key: string, prompt: string, requestId: string, retried = false, temperature: number = LLM_TEMPERATURE): Promise<{ ok: true; text: string } | { ok: false; attempt: LLMAttempt }> {
   const started = Date.now();
   const promptChars = prompt.length;
   logEvent("llm_generate_attempt", {
@@ -295,7 +295,7 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
         ? JSON.stringify({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            generationConfig: { temperature: LLM_TEMPERATURE, maxOutputTokens: MAX_OUTPUT_TOKENS },
+            generationConfig: { temperature, maxOutputTokens: MAX_OUTPUT_TOKENS },
           })
         : JSON.stringify({
             model,
@@ -304,7 +304,7 @@ async function callProvider(provider: ProviderConfig, model: string, key: string
               { role: "user", content: prompt },
             ],
             max_tokens: MAX_OUTPUT_TOKENS,
-            temperature: LLM_TEMPERATURE,
+            temperature,
           });
     // Gemini puts the model + method in the URL path; OpenAI-compatible providers put the
     // model in the body and hit a single fixed endpoint.
@@ -663,12 +663,30 @@ export function streamConfig() {
  * de-dupes concurrent identical requests, and falls back to a stale cached answer
  * rather than erroring when every provider is exhausted.
  */
-export async function generateText(opts: { prompt: string; url?: string | null; sql?: Sql | null; requestId?: string }): Promise<GenerateResult> {
+export async function generateText(opts: {
+  prompt: string;
+  url?: string | null;
+  sql?: Sql | null;
+  requestId?: string;
+  /**
+   * Varies the cache identity. Analysis wants none — the same page should give the same
+   * answer. Writing wants one, or every request for a post inside the TTL returns the
+   * previous post verbatim.
+   */
+  cacheSalt?: string;
+  /**
+   * Per-call sampling. Defaults to the grounded, factual setting the whole product used to
+   * share. Copy needs more room than analysis does, and one global number cannot be right
+   * for both.
+   */
+  temperature?: number;
+}): Promise<GenerateResult> {
   const requestId = opts.requestId || randomUUID();
   const started = Date.now();
   const rawPrompt = opts.prompt;
   const sql = opts.sql ?? db();
-  const cacheKey = buildCacheKey(opts.url || null, rawPrompt);
+  const temperature = typeof opts.temperature === "number" ? opts.temperature : LLM_TEMPERATURE;
+  const cacheKey = buildCacheKey(opts.url || null, rawPrompt, opts.cacheSalt || "");
 
   if (sql) {
     const hit = await getCachedAnalysis(sql, cacheKey, ANALYSIS_TTL_MS);
@@ -701,7 +719,7 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
     provider: for (const { provider, key } of configuredProviders) {
       model: for (const model of provider.models) {
         if (deadModels.has(deadKey(provider.name, model))) continue model;
-        let attempt = await callProvider(provider, model, key, prompt, requestId);
+        let attempt = await callProvider(provider, model, key, prompt, requestId, false, temperature);
         if (attempt.ok) {
           if (sql) await putCachedAnalysis(sql, cacheKey, opts.url || null, attempt.text, provider.name, model);
           return { ok: true, text: attempt.text, provider: provider.name, model, retried: false };
@@ -731,7 +749,7 @@ export async function generateText(opts: { prompt: string; url?: string | null; 
         }
         for (const delayMs of [2000, 4000]) {
           await sleep(delayMs);
-          attempt = await callProvider(provider, model, key, prompt, requestId, true);
+          attempt = await callProvider(provider, model, key, prompt, requestId, true, temperature);
           if (attempt.ok) {
             if (sql) await putCachedAnalysis(sql, cacheKey, opts.url || null, attempt.text, provider.name, model);
             return { ok: true, text: attempt.text, provider: provider.name, model, retried: true };

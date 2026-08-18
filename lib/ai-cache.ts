@@ -22,9 +22,17 @@ export function sha256(s: string): string {
 // analyses (built by a previous version) are treated as misses and regenerated.
 export const CACHE_VERSION = process.env.CACHE_VERSION || "v1";
 
-/** Namespaced, versioned cache key. url+prompt are what actually vary a result. */
-export function buildCacheKey(url: string | null, prompt: string): string {
-  return sha256(`${CACHE_VERSION}\n${url || ""}\n${prompt}`);
+/**
+ * Namespaced, versioned cache key.
+ *
+ * `salt` exists because url+prompt is the right identity for an *analysis* and the wrong
+ * one for a *piece of writing*. Analysing the same page twice should give the same answer;
+ * asking for a post twice should not give the same post. Callers that want a fresh result
+ * pass something that varies — the date, an attempt number — and callers that want the
+ * cached answer pass nothing and behave exactly as before.
+ */
+export function buildCacheKey(url: string | null, prompt: string, salt = ""): string {
+  return sha256(`${CACHE_VERSION}\n${url || ""}\n${salt}\n${prompt}`);
 }
 
 let tablesReady = false;

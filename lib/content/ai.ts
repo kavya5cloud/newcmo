@@ -5,6 +5,17 @@ import { createAdapterRegistry } from "@/lib/social/registry";
 import type { SocialPlatform } from "@/lib/social/types";
 import { compose, buildSchedule, FORMAT_META, type ComposeInput, type ComposedContent, type PlatformVariant , cleanHashtags } from "./compose";
 import { assembleGenerationContext, contextToPrompt, type GenerationContext } from "./generation-context";
+import { dayKey, recordComposedAngle } from "./generation-log";
+
+/**
+ * Sampling for copy, as opposed to analysis.
+ *
+ * The service default is 0.4, chosen to keep *analysis* grounded and JSON reliable. Applied
+ * to writing it produces the same sentences for the same brief, which is most of why this
+ * product repeated itself. 0.8 is loose enough that two runs diverge and tight enough that
+ * the JSON contract still holds — the schema is enforced downstream either way.
+ */
+const COMPOSE_TEMPERATURE = Number(process.env.COMPOSE_TEMPERATURE || 0.8);
 
 // LLM-backed composition.
 //
@@ -55,6 +66,10 @@ function buildPrompt(input: ComposeInput, ctx: GenerationContext): string {
   return [
     `Write marketing content as Populr, an AI CMO working for this business.`,
     ``,
+    // The date earns its place twice: a model that knows the day stops writing "as we head
+    // into the new year" in August, and it is the thing that makes today's brief textually
+    // different from yesterday's, which is what breaks the cache.
+    `TODAY: ${dayKey(input.now)}`,
     `THE ASK: ${input.prompt}`,
     `FORMAT: ${meta.label} — ${meta.blurb}`,
     ``,
@@ -151,7 +166,14 @@ function deterministicResult(input: ComposeInput, reason: string): ComposeResult
 
 export async function composeWithAi(
   input: ComposeInput,
-  opts: { signal?: AbortSignal } = {},
+  opts: {
+    signal?: AbortSignal;
+    /**
+     * Bumped when the user asks for another take on the same brief. Without it, "regenerate"
+     * inside the cache window returns the post they were trying to get away from.
+     */
+    attempt?: number;
+  } = {},
 ): Promise<ComposeResult> {
   if (configuredProviderNames().length === 0) {
     return deterministicResult(input, "No AI provider is configured — set GROQ_API_KEY, GEMINI_API_KEY or OPENAI_API_KEY for model-written copy.");
@@ -163,7 +185,11 @@ export async function composeWithAi(
 
   if (opts.signal?.aborted) return deterministicResult(input, "Cancelled before generation started.");
 
-  const result = await generateText({ prompt: buildPrompt(input, ctx) });
+  // The salt is what makes this a request for writing rather than a lookup. The day alone
+  // would still hand back the same post to two people asking on the same afternoon, so the
+  // attempt rides along with it.
+  const cacheSalt = `compose:${dayKey(input.now)}:${opts.attempt ?? 0}`;
+  const result = await generateText({ prompt: buildPrompt(input, ctx), cacheSalt, temperature: COMPOSE_TEMPERATURE });
   if (!result.ok) {
     return deterministicResult(input, `Every AI provider failed (${result.error}). This draft is from the built-in composer.`);
   }
@@ -232,6 +258,11 @@ export async function composeWithAi(
         `---`,
         body,
       ].join("\n"),
+      // The rewrite carries the same salt and heat as the draft. Left on the defaults it
+      // would be the one cached, low-temperature step in a path built to be fresh — and it
+      // is the step whose output actually ships.
+      cacheSalt: `${cacheSalt}:rewrite`,
+      temperature: COMPOSE_TEMPERATURE,
     });
     if (retry.ok && retry.text.trim()) {
       const after = scoreDraft(retry.text.trim());
@@ -247,11 +278,17 @@ export async function composeWithAi(
   // The deterministic composer still owns scheduling: posting windows are an observed
   // model, not a thing to ask a language model to guess at.
   const skeleton = compose(input);
+  const title = (parsed.title ?? skeleton.title).trim().slice(0, 200);
+
+  // Write down what was just written, so the next run is told not to write it again. Not
+  // awaited: the caller is waiting on a post, not on bookkeeping, and recordComposedAngle
+  // swallows its own failures.
+  void recordComposedAngle(input.tenant, { title, body }, input.now);
 
   return {
     composed: {
       ...skeleton,
-      title: (parsed.title ?? skeleton.title).trim().slice(0, 200),
+      title,
       body,
       variants: normalizeVariants(parsed.variants, ctx, body),
       // 8 was never defensible — the rules ask for three and the scorer flags four.

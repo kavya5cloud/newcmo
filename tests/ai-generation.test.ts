@@ -88,3 +88,82 @@ describe("graceful degradation", () => {
     expect(r.degradedReason).toMatch(/Cancelled/);
   });
 });
+
+// The product repeated itself for three separate reasons, all of them in this path: the
+// cache was keyed on the prompt alone, the "already written" list was hardcoded empty, and
+// the copy shared a temperature chosen to keep analysis factual. These pin all three.
+describe("content has to be different tomorrow", () => {
+  it("keys the same prompt differently once a salt is given", async () => {
+    const { buildCacheKey } = await import("@/lib/ai-cache");
+    const prompt = "write a post about pricing";
+    // No salt is still the old behaviour, which analysis depends on.
+    expect(buildCacheKey(null, prompt)).toBe(buildCacheKey(null, prompt));
+    // A different day is a different request for writing.
+    expect(buildCacheKey(null, prompt, "compose:2026-08-19:0"))
+      .not.toBe(buildCacheKey(null, prompt, "compose:2026-08-20:0"));
+    // And so is a re-roll on the same day, or "regenerate" returns what you rejected.
+    expect(buildCacheKey(null, prompt, "compose:2026-08-19:0"))
+      .not.toBe(buildCacheKey(null, prompt, "compose:2026-08-19:1"));
+  });
+
+  it("tells the model what it already wrote, as a prohibition rather than as material", () => {
+    const p = contextToPrompt(ctx({
+      previousCampaigns: [`"Pricing is a promise" — opened with: Most founders price from fear…`],
+    }));
+    expect(p).toContain("DO NOT REPEAT");
+    expect(p).toContain("Pricing is a promise");
+    // The instruction has to travel with the list. A bare heading reads as source material.
+    expect(p).toMatch(/different angle and a different opening/i);
+  });
+
+  it("says nothing about repeats when there is nothing written yet", () => {
+    expect(contextToPrompt(ctx({ previousCampaigns: [] }))).not.toContain("DO NOT REPEAT");
+  });
+
+  it("reads its own angles back into the next brief, and keeps them out of market memory", async () => {
+    // The end-to-end shape of the fix: record an angle, assemble the next context, and it
+    // must arrive as "already written" and NOT as a market observation — a "content" row
+    // leaking into `memory` would invite the model to write ABOUT its own last post.
+    const { recordComposedAngle } = await import("@/lib/content/generation-log");
+    const { assembleGenerationContext } = await import("@/lib/content/generation-context");
+    const { marketPlatform } = await import("@/lib/market/shared");
+    const tenant = `t_${Math.random().toString(36).slice(2)}`;
+
+    await marketPlatform().memory.record(
+      (await import("@/lib/market/memory")).memoryRecord(tenant, "trend", "ai cmo", "rising", Date.now(), null),
+    );
+    await recordComposedAngle(tenant, { title: "Pricing is a promise", body: "Most founders price from fear" });
+
+    const assembled = await assembleGenerationContext({ tenant, audience: "founders", terms: ["pricing"] });
+    expect(assembled.previousCampaigns.join(" ")).toContain("Pricing is a promise");
+    expect(assembled.memory.join(" ")).not.toContain("Pricing is a promise");
+    expect(assembled.memory.join(" ")).toContain("ai cmo");
+  });
+
+  it("records the angle, not the post — a digest is what survives a year of generating", async () => {
+    const { recordComposedAngle, dayKey } = await import("@/lib/content/generation-log");
+    const { marketPlatform } = await import("@/lib/market/shared");
+    const tenant = `t_${Math.random().toString(36).slice(2)}`;
+    const body = Array.from({ length: 200 }, (_, i) => `word${i}`).join(" ");
+    await recordComposedAngle(tenant, { title: "Pricing is a promise", body }, Date.parse("2026-08-19T00:00:00Z"));
+
+    const rows = await marketPlatform().memory.list(tenant, "content", 10);
+    expect(rows.length).toBe(1);
+    expect(rows[0].value).toContain("Pricing is a promise");
+    expect(rows[0].value).toContain("word0");
+    // The opener, not the body. 200 words in must not be there.
+    expect(rows[0].value).not.toContain("word199");
+    expect(rows[0].key).toContain(dayKey(Date.parse("2026-08-19T00:00:00Z")));
+  });
+
+  it("does not overwrite the morning's angle with the afternoon's", async () => {
+    const { recordComposedAngle } = await import("@/lib/content/generation-log");
+    const { marketPlatform } = await import("@/lib/market/shared");
+    const tenant = `t_${Math.random().toString(36).slice(2)}`;
+    const at = Date.parse("2026-08-19T09:00:00Z");
+    await recordComposedAngle(tenant, { title: "First", body: "one two three" }, at);
+    await recordComposedAngle(tenant, { title: "Second", body: "four five six" }, at);
+    const rows = await marketPlatform().memory.list(tenant, "content", 10);
+    expect(rows.length).toBe(2);
+  });
+});

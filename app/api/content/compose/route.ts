@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
       audience: String(body.audience || "founders").slice(0, 120),
       platforms,
       now: Date.now(),
-    }, { signal: req.signal });
+      // "Give me another one" has to reach the cache key or it is not another one. Clamped
+      // because this is the only thing a caller can vary freely to force fresh model calls.
+    }, { signal: req.signal, attempt: Math.min(20, Math.max(0, Number(body.attempt) || 0)) });
     const composed = generation.composed;
 
     // Metadata the Learning Engine can correlate with what these posts go on to do.
