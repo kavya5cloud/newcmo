@@ -12,6 +12,7 @@ import { extractJson, LlmJsonError } from "@/lib/llm-json";
 import { isContentEnginePath } from "@/lib/flags";
 import Icon from "@/app/components/Icon";
 import ResizableDash from "./_components/ResizableDash";
+import DashboardSkeleton from "./_components/DashboardSkeleton";
 import Section from "@/app/components/Section";
 import DocSkeleton from "@/app/components/DocSkeleton";
 import { DELIVERABLE_RULES } from "@/lib/cmo/quality-rules";
@@ -707,8 +708,22 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   }, [chatMode, profile, url]);
 
   /* ================= ONBOARDING ================= */
+  const steps = ["reading your site", "building product profile", "checking channels", "scoring opportunities", "writing today's plan"];
+
+  // Once the analysis starts, the dashboard's shape appears immediately.
+  //
+  // It used to stay on the onboarding screen with a progress list for the full ten to twenty
+  // seconds. A progress list says "it is working"; it never says "here is what you are
+  // getting", and that is the question a person has ten seconds after pasting a URL.
+  if (!entered && progress >= 0) {
+    return (
+      <div className="appui">
+        <DashboardSkeleton steps={steps} progress={progress} />
+      </div>
+    );
+  }
+
   if (!entered) {
-    const steps = ["reading your site", "building product profile", "checking channels", "scoring opportunities", "writing today's plan"];
     return (
       <div className="appui">
         {accountsEnabled && !authUser && (

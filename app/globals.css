@@ -3197,3 +3197,49 @@ html{scroll-padding-top:var(--eab-h,0px)}
   transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .landing .aisum-links a:hover { color: var(--acc); border-color: rgba(213,255,114,.32); }
+
+/* ── Skeleton dashboard ───────────────────────────────────────────────────
+   The layout, before it has anything in it.
+
+   The shimmer is deliberately slow and low-contrast. A fast, bright sweep
+   reads as a loading spinner wearing a costume and draws the eye to the one
+   part of the screen with no information on it. This should register as
+   "content is coming" in peripheral vision and then be ignored. */
+.appui .skl {
+  display: block; border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,.045) 25%, rgba(255,255,255,.085) 37%, rgba(255,255,255,.045) 63%);
+  background-size: 400% 100%;
+  animation: skl-sweep 1.8s ease-in-out infinite;
+}
+@keyframes skl-sweep { 0% { background-position: 100% 0 } 100% { background-position: 0 0 } }
+/* Reduced motion gets the layout without the movement — the shape is the point. */
+@media (prefers-reduced-motion: reduce) { .appui .skl { animation: none } }
+
+.appui .skl-shell .col-body { display: flex; flex-direction: column; gap: 14px; }
+.appui .skl-stack { display: flex; flex-direction: column; gap: 8px; }
+.appui .skl-label { margin-top: 6px; }
+
+.appui .skl-stats { display: flex; gap: 10px; }
+.appui .skl-stat {
+  flex: 1; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 16px 8px; border: 1px solid var(--edge); border-radius: 12px;
+}
+.appui .skl-chart {
+  height: 128px; border: 1px solid var(--edge); border-radius: 12px;
+  background: linear-gradient(180deg, rgba(213,255,114,.05), transparent 70%);
+}
+
+.appui .skl-row { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border: 1px solid var(--edge); border-radius: 12px; }
+.appui .skl-dot { width: 26px; height: 26px; border-radius: 8px; flex: 0 0 auto; }
+.appui .skl-rowb { display: flex; flex-direction: column; gap: 7px; flex: 1; }
+
+/* The one message bubble on the right, so the chat column reads as a conversation
+   rather than as four more grey lines. */
+.appui .skl-msg-me {
+  align-self: flex-end; max-width: 78%; padding: 10px 12px;
+  border-radius: 14px 14px 4px 14px; background: rgba(255,255,255,.05);
+}
+
+/* The log is the only live thing here, so it does not get a placeholder. */
+.appui .skl-shell .tlog .pl { color: var(--faint); }
+.appui .skl-shell .tlog .pl.done { color: var(--acc); }
