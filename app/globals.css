@@ -1821,9 +1821,15 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .conn-stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .conn-status{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em;
   text-transform:uppercase}
-.conn-hint{font-style:normal;font-size:11px;line-height:1.2;color:var(--faint);white-space:nowrap}
+/* Wraps rather than nowrap: a hint long enough to need two lines is better stacked than
+   pushing the row's buttons off a phone screen, which is what nowrap did here. */
+.conn-hint{font-style:normal;font-size:11px;line-height:1.25;color:var(--faint);text-align:right}
 .conn-connected{color:var(--green)}
 .conn-linked_not_live{color:#e0b341}
+/* Paused shares the amber of linked-but-not-live: both mean "real connection, nothing goes
+   out". Pro is the accent — it is the one row state that is an offer rather than a warning. */
+.conn-paused{color:#e0b341}
+.conn-needs_plan{color:var(--acc)}
 .conn-soon{color:var(--faint)}
 
 .conn-btn{padding:4px 12px;border:1px solid var(--line);border-radius:100px;background:none;

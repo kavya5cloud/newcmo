@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { requirePlan } from "@/lib/billing/gate";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { readPlatform } from "@/lib/social/api-helpers";
 import { appCredential } from "@/lib/social/app-credentials";
@@ -27,6 +28,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ platform: s
   if (!limit.allowed) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
   }
+
+  // Refused here rather than at the first post. Sending someone to LinkedIn's consent
+  // screen, taking the grant, storing the token, and only then telling them their plan
+  // ended would be a worse experience and a pointless credential to hold.
+  const denied = await requirePlan(session.userId);
+  if (denied) return denied;
 
   const platform = readPlatform((await ctx.params).platform);
   if (!platform) return NextResponse.json({ error: "invalid_platform" }, { status: 422 });

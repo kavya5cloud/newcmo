@@ -262,4 +262,48 @@ describe("what a connection row is allowed to claim", () => {
     const stale = { ...connected, status: "disconnected" };
     expect(stateOf(row({ account: stale, live: true }))).toBe("connect");
   });
+
+  // Publishing is gated on the plan server-side. These four cases are the UI agreeing with
+  // that gate rather than contradicting it.
+  it("will not say Connected once the plan has lapsed, because nothing will publish", async () => {
+    const { stateOf } = await import("@/app/components/AccountConnections");
+    expect(stateOf(row({ account: connected, live: true }), false)).toBe("paused");
+  });
+
+  it("asks a lapsed account to subscribe rather than offering a connect that would 402", async () => {
+    const { stateOf } = await import("@/app/components/AccountConnections");
+    expect(stateOf(row({ live: true }), false)).toBe("needs_plan");
+  });
+
+  it("does not offer a plan for a platform that has no adapter — that would be selling nothing", async () => {
+    const { stateOf } = await import("@/app/components/AccountConnections");
+    expect(stateOf(row({ live: false, earlyAccess: true }), false)).toBe("soon");
+  });
+
+  it("defaults to having a plan, so a signed-out visitor is never asked to subscribe first", async () => {
+    const { stateOf } = await import("@/app/components/AccountConnections");
+    expect(stateOf(row({ live: true }))).toBe("connect");
+  });
+});
+
+describe("the plan gate the publishing routes share", () => {
+  it("lets an anonymous caller through — there is nothing billable it can reach", async () => {
+    const { requirePlan } = await import("@/lib/billing/gate");
+    expect(await requirePlan(null)).toBeNull();
+    expect(await requirePlan(undefined)).toBeNull();
+  });
+
+  it("refuses with 402 and the reason, not a bare 403", async () => {
+    const { accessFor } = await import("@/lib/billing/access");
+    // The gate's refusal is accessFor's answer in HTTP clothing; this pins the decision it
+    // is dressing up. A lapsed trial with no subscription must not be allowed.
+    const decided = accessFor({ trialEndsAt: 1_000, subscription: null }, 2_000);
+    expect(decided.allowed).toBe(false);
+    expect(decided.reason).toBe("trial_ended");
+  });
+
+  it("keeps a trial account publishing — the first month is free and that includes posting", async () => {
+    const { accessFor } = await import("@/lib/billing/access");
+    expect(accessFor({ trialEndsAt: 10_000, subscription: null }, 2_000).allowed).toBe(true);
+  });
 });

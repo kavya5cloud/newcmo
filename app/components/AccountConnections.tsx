@@ -33,21 +33,35 @@ export type Row = {
 };
 
 /** What this row can do, in the user's terms. */
-export type RowState = "connected" | "linked_not_live" | "connect" | "soon";
+export type RowState = "connected" | "paused" | "linked_not_live" | "connect" | "needs_plan" | "soon";
 
-export function stateOf(r: Row): RowState {
+/**
+ * @param hasPlan Whether the account may publish at all — trial or subscription. Defaults
+ *   true so a signed-out visitor, who has no plan to be lapsed, still sees Connect rather
+ *   than being asked to subscribe before being asked to sign in.
+ */
+export function stateOf(r: Row, hasPlan = true): RowState {
   const linked = r.account?.status === "connected";
-  if (linked && r.live) return "connected";
+  // Publishing is gated on the plan server-side, so a lapsed account with a perfectly good
+  // token still cannot post. Leaving this row on "Connected" would put back the exact lie
+  // this component exists to prevent — the connection is real, the publishing is not.
+  if (linked && r.live) return hasPlan ? "connected" : "paused";
   if (linked) return "linked_not_live";
-  if (r.live) return "connect";
+  if (r.live) return hasPlan ? "connect" : "needs_plan";
   return "soon";
 }
 
 const COPY: Record<RowState, { status: string; hint?: string }> = {
   connected: { status: "Connected" },
+  // The account is fine; the plan is not. Said as "Paused" rather than "Expired" because
+  // nothing was lost — the token is still here and posting resumes on payment.
+  paused: { status: "Paused", hint: "Subscribe to resume" },
   // A token exists but nothing can go out. Saying "Connected" here would be the lie.
   linked_not_live: { status: "Linked", hint: "Publishing opens soon" },
   connect: { status: "" },
+  // Built, working, and behind the plan — unlike `soon`, which is not built at all. Two
+  // different sentences on purpose: this one is a thing you can buy today.
+  needs_plan: { status: "Pro", hint: "Subscribe to connect" },
   // "Coming to Pro", not "Available in Pro".
   //
   // These four have no adapter at all — createLiveAdapters() returns LinkedIn and X and
@@ -64,11 +78,23 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Trial or subscription — the same question the routes ask, asked once for the whole list.
+  // Starts true so the rows never flash "Subscribe" at a paying customer while /me is in
+  // flight; the only thing a wrong optimistic value costs is one refused click.
+  const [hasPlan, setHasPlan] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const d = await fetch(`/api/social/accounts?wsid=${encodeURIComponent(workspaceId())}`, { cache: "no-store" })
-        .then((r) => r.json());
+      const [d, me] = await Promise.all([
+        fetch(`/api/social/accounts?wsid=${encodeURIComponent(workspaceId())}`, { cache: "no-store" })
+          .then((r) => r.json()),
+        // Best effort. If this fails we assume the plan is fine and let the server refuse —
+        // locking someone out of their own accounts because /me timed out is the worse bug.
+        fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+      ]);
+      // Signed out is not lapsed. Those rows want "Connect" (which prompts a sign-in), not
+      // a subscription pitch aimed at someone with no account yet.
+      setHasPlan(!me?.user || me?.access?.allowed !== false);
       if (!d?.ok) { setErr("Couldn't load your accounts."); return; }
 
       const live = new Map<SocialPlatform, boolean>(
@@ -105,6 +131,14 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
         return;
       }
       const d = await probe.json().catch(() => ({}));
+      // 402 is the plan gate. It carries its own sentence — "your free month has ended",
+      // "your last payment failed" — and those are different problems with different fixes,
+      // so use what the server said rather than flattening both into one generic line.
+      if (probe.status === 402) {
+        setHasPlan(false);
+        setErr(d?.hint || "Publishing is part of the plan. Subscribe to connect an account.");
+        return;
+      }
       setErr(d?.error === "sign_in_required"
         ? "Sign in first, then connect your account."
         : "That connection isn't available yet. Nothing is wrong on your side.");
@@ -126,7 +160,7 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
 
   if (!rows) return null;
 
-  const connectedCount = rows.filter((r) => stateOf(r) === "connected").length;
+  const connectedCount = rows.filter((r) => stateOf(r, hasPlan) === "connected").length;
 
   return (
     <div className={"conn" + (full ? " conn-full" : "")}>
@@ -143,13 +177,21 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
 
       <div className="conn-list">
         {rows.map((r) => {
-          const state = stateOf(r);
+          const state = stateOf(r, hasPlan);
           const copy = COPY[state];
+          // Paused is still a live connection, so it keeps the handle and the ability to
+          // disconnect. Losing the plan should never look like losing the account.
+          const linked = state === "connected" || state === "paused";
+          // Settings shows a Subscribe button, which says the same thing as the hint and
+          // says it as something you can press. Two of them crowd the row off the screen on
+          // a phone. The dashboard has no button, so there the hint is the whole message.
+          const canBuy = state === "needs_plan" || state === "paused";
+          const hint = canBuy && full ? undefined : copy.hint;
           return (
             <div className="conn-row" key={r.platform}>
               <span className="conn-name">
                 {r.label}
-                {full && state === "connected" && <em className="conn-handle">{r.account!.handle}</em>}
+                {full && linked && <em className="conn-handle">{r.account!.handle}</em>}
                 {full && state === "soon" && <em className="conn-handle">Populr writes for it now</em>}
               </span>
 
@@ -161,9 +203,14 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
                 <span className="conn-right">
                   <span className="conn-stat">
                     <span className={"conn-status conn-" + state}>{copy.status}</span>
-                    {copy.hint && <em className="conn-hint">{copy.hint}</em>}
+                    {hint && <em className="conn-hint">{hint}</em>}
                   </span>
-                  {state === "connected" && (
+                  {/* A link, not a fetch: /api/billing/checkout reads the session, builds the
+                      checkout server-side and redirects on to Polar. */}
+                  {canBuy && full && (
+                    <a className="conn-btn" href="/api/billing/checkout">Subscribe</a>
+                  )}
+                  {linked && (
                     <button className={full ? "conn-btn" : "conn-x"} title={`Disconnect ${r.label}`}
                       disabled={busy === r.account!.id} onClick={() => disconnect(r.account!.id)}>
                       {full ? "Disconnect" : "×"}
@@ -176,9 +223,17 @@ export default function AccountConnections({ variant = "compact" }: { variant?: 
         })}
       </div>
 
-      {/* Said once, at the bottom, rather than repeated on four rows. Names what is true
-          today — the writing already happens — before what is not yet. */}
-      {rows.some((r) => stateOf(r) === "soon") && (
+      {/* Said once, at the bottom, rather than repeated on six rows.
+          Two separate facts, and collapsing them would misinform in one direction or the
+          other: publishing anywhere is paid, and four of these cannot be published to at
+          any price yet. */}
+      {full && (
+        <p className="conn-note">
+          Publishing and scheduling are part of the $15/mo plan, and free for your first
+          month. Populr writes your posts either way.
+        </p>
+      )}
+      {rows.some((r) => stateOf(r, hasPlan) === "soon") && (
         <p className="conn-note">
           Populr already writes for these. Publishing to them is coming to Pro — it needs
           approval from each platform first, and none of it is live yet.

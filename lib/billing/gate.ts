@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { db, ensureSchema } from "@/lib/db";
 import { bonusDaysFor } from "@/lib/referrals-store";
 import { accessFor, ACCESS_MESSAGE, type Access } from "./access";
@@ -54,4 +55,29 @@ export async function accessForUser(userId: string, now: number = Date.now()): P
 /** The sentence to show when access is refused. */
 export function accessMessage(access: Access): string {
   return ACCESS_MESSAGE[access.reason];
+}
+
+/**
+ * The gate, in the shape an API route needs. Null means carry on.
+ *
+ * Five routes now refuse the same way, and the 402 body is what the interface reads to
+ * decide what to say. Written once here so those five cannot drift into five different
+ * error codes for one situation — which is how a lapsed customer gets a different, worse
+ * message depending on which button they pressed.
+ *
+ * Anonymous callers pass. They cannot reach anything billable: connecting an account
+ * requires a session, so every real credential lives under a "user:" workspace, and an
+ * anonymous request can only touch the reference adapter that publishes nowhere.
+ */
+export async function requirePlan(
+  userId: string | null | undefined,
+  now: number = Date.now(),
+): Promise<NextResponse | null> {
+  if (!userId) return null;
+  const access = await accessForUser(userId, now);
+  if (access.allowed) return null;
+  return NextResponse.json(
+    { error: access.reason, hint: accessMessage(access) },
+    { status: 402 },
+  );
 }

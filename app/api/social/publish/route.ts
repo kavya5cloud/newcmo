@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { requirePlan } from "@/lib/billing/gate";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { socialEngine } from "@/lib/social/shared";
@@ -13,6 +14,11 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   const limit = rateLimit(requestKey(req.headers, session?.userId), session ? 30 : 6, 60_000);
   if (!limit.allowed) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+
+  // Publishing is part of the plan. Checked before the body is even read: a lapsed account
+  // should get the same answer for a malformed request as a well-formed one.
+  const denied = await requirePlan(session?.userId);
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "bad_request" }, { status: 400 }); }
