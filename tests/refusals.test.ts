@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { refusalRepo, resetRefusalRepoForTests } from "@/lib/refusals/store";
 import { scoreRefusals, REASON_LABEL, REFUSAL_REASONS, type Refusal } from "@/lib/refusals/types";
+import type { CandidateStrategy, StrategyScore } from "@/lib/cmo/planner";
 
 // The ledger is the one claim in this category that cannot be asserted — making it requires
 // having declined things and then having been checked. Which means the failure mode is not a
@@ -113,5 +114,84 @@ describe("the scorecard cannot flatter itself", () => {
     for (const r of REFUSAL_REASONS) {
       expect(REASON_LABEL[r], `${r} has no label`).toBeTruthy();
     }
+  });
+});
+
+describe("refusals come from the plan, not from a model", () => {
+  // planDecision scores every channel, recommends the best, keeps two alternatives and drops
+  // the rest. Those dropped candidates are the refusals — considered, scored, rejected, and
+  // until now never written down. Deriving them from the score is what stops the ledger
+  // filling with plausible-sounding skips nobody actually decided.
+  // Typed against the real CandidateStrategy rather than cast. The first version used
+  // `as never` with invented field names — "alignment" and "speed" do not exist on
+  // StrategyScore — and every test passed while the source read undefined. Only tsc caught it.
+  const cand = (channel: string, total: number, over: Partial<StrategyScore> = {}): CandidateStrategy => ({
+    id: `strat_${channel}`, title: `Invest in ${channel}`, channel,
+    rationale: "r", requiredActions: [],
+    score: {
+      total, expectedImpact: 0.7, historicalPerformance: 0.5, businessAlignment: 0.7,
+      confidence: 0.7, cost: 0.5, time: 0.5, risk: 0.5, dependencies: 0.5, ...over,
+    },
+  });
+
+  it("records nothing when there was no real choice", async () => {
+    // Three candidates means one recommended and two alternatives. Declining nothing.
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    expect(refusalsFromPlan([cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7)], "ws1", 0)).toEqual([]);
+  });
+
+  it("records everything past the three that survive", async () => {
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const out = refusalsFromPlan(
+      [cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4), cand("ugc", 0.3)],
+      "ws1", 0,
+    );
+    expect(out.map((r) => r.channel)).toEqual(["hn", "ugc"]);
+  });
+
+  it("names the winner as what was done instead", async () => {
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const out = refusalsFromPlan([cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4)], "ws1", 0);
+    expect(out[0].insteadDid).toBe("Invest in seo");
+  });
+
+  it("blames the most decisive weakness, not the lowest number", async () => {
+    // A channel this audience does not use is not "slightly worse" — it is the wrong channel,
+    // and "better use of the time" would be true and useless.
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const out = refusalsFromPlan(
+      [cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4, { businessAlignment: 0.2 })],
+      "ws1", 0,
+    );
+    expect(out[0].reason).toBe("wrong_audience");
+  });
+
+  it("explains with the same numbers that chose the reason", async () => {
+    // If the sentence were a lookup table it would drift from the classification within a week.
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const out = refusalsFromPlan(
+      [cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4, { confidence: 0.1 })],
+      "ws1", 0,
+    );
+    expect(out[0].reason).toBe("no_evidence");
+    expect(out[0].explanation).toMatch(/10\/100 confidence/);
+  });
+
+  it("gives no checkable date to a judgement nothing can settle", async () => {
+    // No measurement ever arrives saying "your buyers were on this channel all along".
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const out = refusalsFromPlan(
+      [cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4, { businessAlignment: 0.2 })],
+      "ws1", 0,
+    );
+    expect(out[0].checkableAt).toBeNull();
+  });
+
+  it("gives a date to the ones performance can settle", async () => {
+    const { refusalsFromPlan } = await import("@/lib/refusals/from-plan");
+    const now = 1_000_000;
+    const out = refusalsFromPlan([cand("seo", 0.9), cand("x", 0.8), cand("reddit", 0.7), cand("hn", 0.4)], "ws1", now);
+    expect(out[0].reason).toBe("better_use_of_time");
+    expect(out[0].checkableAt).toBe(now + 30 * 86_400_000);
   });
 });
