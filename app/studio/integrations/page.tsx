@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AccountConnections from "@/app/components/AccountConnections";
 import ConnectorCockpit from "./ConnectorCockpit";
 import ReferAndEarn from "@/app/components/ReferAndEarn";
@@ -8,77 +8,142 @@ import Billing from "@/app/components/Billing";
 
 // Settings.
 //
-// Connecting your accounts is why most people come here, so it is the page rather than a
-// section of it. Connecting used to be spread across three screens — this one, the
-// publishing page and the connector cockpit — and two of them posted to the reference
-// endpoint, which fabricates a connection. There is one place and one real OAuth flow now.
+// Was one page scrolling through Accounts, Plan, Refer and earn, and a disclosure holding
+// the connector cockpit. Everything was reachable, and everything was reachable at once —
+// which means the page had no shape and the eye had nowhere to rest. Billing sat below the
+// fold on a laptop, so the panel a paying customer needs was the hardest thing to find.
 //
-// The cockpit still exists, with its event streams and sync history. It answers questions
-// almost nobody has, so it sits under Advanced, closed, where anyone who needs it can still
-// find it and everyone else never reads the word "connector".
+// A grouped rail with one section on screen at a time. Each pane is a whole subject rather
+// than a slice, which is why the rail is grouped rather than a flat list of six links: the
+// groups are the answer to "where would I look for this".
+//
+// The panes themselves are the components that already worked. Nothing about connecting an
+// account or reading a plan changed here — only where they live and how you get to them.
+
+type SectionId = "accounts" | "sources" | "plan" | "refer" | "callbacks";
+type Item = { id: SectionId; label: string; blurb: string };
+
+// Typed explicitly rather than inferred from `as const`. flatMap over a readonly tuple of
+// readonly tuples widens in a way TypeScript will not accept back into the element type, and
+// the error it produces is four screens long and says nothing useful.
+const SECTIONS: { group: string; items: Item[] }[] = [
+  {
+    group: "AI CMO",
+    items: [
+      { id: "accounts", label: "Accounts", blurb: "Where Populr is allowed to post. Nothing goes out anywhere you have not connected." },
+      { id: "sources", label: "Data sources", blurb: "What Populr reads to build its analysis, and when each last synced." },
+    ],
+  },
+  {
+    group: "Billing",
+    items: [
+      { id: "plan", label: "Plan", blurb: "Your subscription, what it costs, and when it renews." },
+      { id: "refer", label: "Refer and earn", blurb: "Three referrals adds another free month. They each get one too." },
+    ],
+  },
+  {
+    group: "Developer",
+    items: [
+      { id: "callbacks", label: "Callback URLs", blurb: "The exact redirect URLs to register in your LinkedIn and X developer apps." },
+    ],
+  },
+];
+
+const ALL: Item[] = SECTIONS.flatMap((g) => g.items);
+const isSectionId = (v: string): v is SectionId => ALL.some((i) => i.id === v);
 
 /**
  * The exact callback URLs to register in the LinkedIn and X developer apps.
  *
- * Read from window.location.origin, which is the same origin the server builds the
- * redirect_uri from — so what is shown here is what actually gets sent. Providers compare
- * that string exactly and will not follow a redirect to reach it, which makes a mismatch
- * here the most common reason a connection fails after the user has already consented.
+ * Read from window.location.origin, which is the same origin the server builds redirect_uri
+ * from — so what is shown is what actually gets sent. Providers compare that string exactly
+ * and will not follow a redirect to reach it, which makes a mismatch here the most common
+ * reason a connection fails after the person has already consented.
  */
 function CallbackUrls() {
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const [origin, setOrigin] = useState("");
+  // In an effect, not during render: window does not exist on the server, and reading it
+  // inline makes the first client render disagree with the HTML that was sent.
+  useEffect(() => setOrigin(window.location.origin), []);
   if (!origin) return null;
   return (
     <div className="set-callbacks">
-      <h3>Callback URLs</h3>
-      <p>Register these exactly, in the LinkedIn and X developer apps.</p>
       <code>{origin}/api/social/oauth/linkedin/callback</code>
       <code>{origin}/api/social/oauth/x/callback</code>
+      <p className="set-hint">
+        Paste them exactly. A trailing slash or the wrong host is rejected after the person has
+        already approved access, which looks like the connection silently failing.
+      </p>
     </div>
   );
 }
 
 export default function SettingsPage() {
-  const [advanced, setAdvanced] = useState(false);
+  const [active, setActive] = useState<SectionId>("accounts");
+
+  // The hash carries the section, so a link into Settings can land on the right pane and a
+  // refresh does not throw you back to Accounts. Read in an effect for the same reason as
+  // above — and kept in sync with the back button, which otherwise changes the URL and
+  // nothing else.
+  useEffect(() => {
+    const read = () => {
+      const h = window.location.hash.replace(/^#/, "");
+      if (isSectionId(h)) setActive(h);
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+
+  const go = (id: SectionId) => {
+    setActive(id);
+    // replaceState rather than a hash assignment: this should not stack a history entry per
+    // click, or leaving Settings means pressing back once per pane visited.
+    window.history.replaceState(null, "", `#${id}`);
+  };
+
+  const meta = ALL.find((i) => i.id === active)!;
 
   return (
-    <section className="st-section">
-      <header className="st-shead">
+    <section className="st-section settings">
+      <header className="set-head">
         <h1>Settings</h1>
-        <p>Connect the accounts Populr posts to. Nothing goes out anywhere you haven&apos;t connected.</p>
       </header>
 
-      <div className="set-block">
-        <h2 className="set-h2">Accounts</h2>
-        <AccountConnections variant="full" />
-      </div>
+      <div className="set-shell">
+        <nav className="set-rail" aria-label="Settings sections">
+          {SECTIONS.map((g) => (
+            <div className="set-grp" key={g.group}>
+              <p className="set-grp-t">{g.group}</p>
+              {g.items.map((item) => (
+                <button
+                  key={item.id}
+                  className={"set-nav" + (active === item.id ? " on" : "")}
+                  aria-current={active === item.id ? "page" : undefined}
+                  onClick={() => go(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
 
-      <div className="set-block">
-        <h2 className="set-h2">Plan</h2>
-        <Billing />
-      </div>
-
-      <div className="set-block">
-        <h2 className="set-h2">Refer and earn</h2>
-        <ReferAndEarn />
-      </div>
-
-      <div className="set-block">
-        <button className="set-disclose" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
-          Advanced
-        </button>
-        {advanced ? (
-          <div className="set-adv">
-            <CallbackUrls />
-            <p className="set-adv-note">
-              Data sources behind Populr&apos;s analysis, and their sync history. These are not the
-              accounts it posts to — none of this needs touching for publishing to work.
-            </p>
-            <ConnectorCockpit />
+        <div className="set-pane">
+          {/* Every pane opens with its own title and one line saying what it is for. The old
+              page had a single description at the top covering four unrelated subjects, so
+              three of them went unexplained. */}
+          <div className="set-pane-head">
+            <h2>{meta.label}</h2>
+            <p>{meta.blurb}</p>
           </div>
-        ) : (
-          <p className="set-adv-hint">Data sources, sync history, event stream.</p>
-        )}
+
+          {active === "accounts" && <AccountConnections variant="full" />}
+          {active === "plan" && <Billing />}
+          {active === "refer" && <ReferAndEarn />}
+          {active === "callbacks" && <CallbackUrls />}
+          {active === "sources" && <ConnectorCockpit />}
+        </div>
       </div>
     </section>
   );
