@@ -75,11 +75,22 @@ describe("composer", () => {
     expect(slots.find((s) => s.platform === "instagram_business")!.rationale).toContain("No posting-window data");
   });
 
-  it("derives hashtags from the prompt, never boilerplate", () => {
-    const tags = buildHashtags(PROMPT, "seed-stage founders");
-    expect(tags.length).toBeGreaterThan(0);
-    expect(tags.every((t) => t.startsWith("#") && t.length > 2)).toBe(true);
-    expect(tags.join(" ")).toMatch(/shipped|launch|mission|publishes|founders/);
+  // Was: "derives hashtags from the prompt, never boilerplate", asserting at least one tag
+  // came back. It passed for the whole time the behaviour was indefensible, because deriving
+  // tags from the prompt is exactly what produced #founders #keep #hiring #agency #before —
+  // the words of the sentence with a # in front, three of them verbs, on a post about to be
+  // published. The test was enforcing the bug.
+  //
+  // Word frequency in one sentence cannot identify a topic; no stop-list closes that. So the
+  // deterministic path returns none, and tags come from the model via cleanHashtags.
+  it("adds no hashtags when it cannot know the topic", () => {
+    expect(buildHashtags(PROMPT, "seed-stage founders")).toEqual([]);
+  });
+
+  it("keeps a model's specific tags and drops the ones that find nobody", async () => {
+    const { cleanHashtags } = await import("@/lib/content/compose");
+    expect(cleanHashtags(["#marketing", "#growth", "#startup"])).toEqual([]);
+    expect(cleanHashtags(["#b2bsales", "#churnrate"])).toEqual(["#b2bsales", "#churnrate"]);
   });
 
   it("rejects a format it does not support", () => {
