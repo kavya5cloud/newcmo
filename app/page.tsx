@@ -236,6 +236,34 @@ export default function Landing() {
           </form>
           <p className="under">free for a month · no card · nothing publishes without you</p>
 
+          {/* Ask an assistant about us, rather than waiting to be cited by one.
+              
+              Okara does this and it is the right instinct: the people evaluating an AI CMO
+              are the same people who ask ChatGPT before they ask Google. A prefilled query is
+              also the only honest way to influence an AI answer — you cannot buy a citation,
+              but you can make the question easy to ask.
+              
+              Plain links with an encoded query. No SDK, no tracking, nothing to break. */}
+          <div className="aisum">
+            <span>Ask an AI about Populr</span>
+            <span className="aisum-links">
+              {([
+                ["ChatGPT", "https://chatgpt.com/?q="],
+                ["Claude", "https://claude.ai/new?q="],
+                ["Perplexity", "https://www.perplexity.ai/search?q="],
+              ] as const).map(([name, base]) => (
+                <a
+                  key={name}
+                  href={`${base}${encodeURIComponent("What is Populr (trypopulr.in) and how does it compare to hiring a marketing agency?")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {name}
+                </a>
+              ))}
+            </span>
+          </div>
+
           {/* Supa Launch badge. Their asset on their CDN, so the host is allow-listed in
               the CSP's img-src — without that the image is silently blocked and the page
               shows a broken frame with nothing in the console to explain it.
@@ -325,22 +353,73 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* How it works, told as three acts rather than three features.
+          
+          The middle act is the one nobody else in the category has. Every competitor's
+          "step 2" is a list of agents producing more; ours is the product deciding what not
+          to do and writing down why. That is the whole argument, so it gets the space.
+          
+          The documents are named as files on purpose. "Populr understands your brand" is a
+          claim; product-information.md is a thing you can open and correct. */}
       <section id="how">
         <div className="wrap">
           <p className="label">How it works</p>
-          <h2 style={{ marginTop: 14 }}>Three steps. No dashboard babysitting.</h2>
-          <div className="grid">
-            {[
-              ["01", "Connect", "One URL. Populr reads your site, GA4, and Search Console to learn what your business actually is and where revenue comes from."],
-              ["02", "Run", "Agents work every channel daily — SEO, AI-search visibility, Reddit, content. Everything drafts in the background."],
-              ["03", "Approve", "Populr skips low-value work with a reason attached and sends you the few things worth doing. Nothing ships without you."],
-            ].map(([n, h, p]) => (
-              <div className="cell" key={n}>
-                <span className="label" style={{ color: "var(--green)" }}>{n}</span>
-                <h3>{h}</h3>
-                <p>{p}</p>
+          <h2 style={{ marginTop: 14 }}>Read the business. Decide. Then publish.</h2>
+          <p className="start-lede">
+            Most tools start at step three and generate. Populr will not write a line until it
+            can say who your buyers are and what you sell.
+          </p>
+
+          <div className="act">
+            <div className="act-n mono">01</div>
+            <div className="act-b">
+              <h3>It reads first</h3>
+              <p>
+                One URL. Populr reads your site, and your GA4 and Search Console if you connect
+                them, then writes four documents about your business — and keeps them where you
+                can read and correct them.
+              </p>
+              {/* Four, not five. Content strategy is not one of them yet, and listing a file
+                  that does not exist is the kind of small lie that costs a customer the first
+                  time they click it. */}
+              <ul className="docs-strip">
+                {["product-information.md", "competitor-analysis.md", "brand-voice.md", "marketing-strategy.md"].map((d) => (
+                  <li key={d} className="mono">{d}</li>
+                ))}
+              </ul>
+              <p className="act-note">Every agent reads these before it writes a word, so nothing drifts off-message.</p>
+            </div>
+          </div>
+
+          <div className="act">
+            <div className="act-n mono">02</div>
+            <div className="act-b">
+              <h3>It decides — and says no</h3>
+              <p>
+                This is the part other tools skip. Populr looks at everything it could do today
+                and refuses most of it, with the reason attached. Four articles for a keyword
+                three incumbents already own is not work, it is a quarter.
+              </p>
+              <div className="act-receipt">
+                <div><span className="mono">skipped</span> Write 4 articles for &quot;best crm&quot; <em>— won&apos;t rank</em></div>
+                <div><span className="mono">skipped</span> Daily LinkedIn posts <em>— your buyers aren&apos;t there this week</em></div>
+                <div className="do"><span className="mono">do today</span> Fix the pricing page <em>— 61% leave in 9s</em></div>
               </div>
-            ))}
+              <p className="act-note">You can disagree with any of it. The reasoning is always shown.</p>
+            </div>
+          </div>
+
+          <div className="act">
+            <div className="act-n mono">03</div>
+            <div className="act-b">
+              <h3>You approve. It publishes.</h3>
+              <p>
+                The few things worth doing arrive written, in your voice, sized for where they
+                are going. Approve one and it publishes through your own connected account.
+                Nothing leaves without you.
+              </p>
+              <p className="act-note">Disconnect an account and Populr stops reaching it immediately.</p>
+            </div>
           </div>
         </div>
       </section>

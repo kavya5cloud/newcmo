@@ -3123,3 +3123,77 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .home-dismiss:hover { color: var(--fg); background: rgba(255,255,255,.06); }
 /* Touch has no hover, so on a phone the control is simply always there. */
 @media (hover: none) { .home-dismiss { opacity: 1 } }
+
+/* ── How it works, as three acts ──────────────────────────────────────────
+   Was three equal cells in a row. Equal cells say the three steps matter
+   equally, and they do not: the middle one is the only thing here a
+   competitor cannot copy, because it requires the product to refuse work and
+   show its reasoning. Stacked rows let it take the room it deserves. */
+.landing .act {
+  display: grid; grid-template-columns: 56px 1fr; gap: 20px;
+  padding: 30px 0;
+  border-top: 1px solid var(--edge);
+}
+.landing .act:first-of-type { border-top: 0; padding-top: 14px; }
+.landing .act-n { font-size: 12.5px; letter-spacing: .1em; color: var(--faint); padding-top: 5px; }
+.landing .act-b h3 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+.landing .act-b > p { margin: 0; max-width: 62ch; color: var(--dim); line-height: 1.6; }
+.landing .act-note {
+  margin-top: 12px !important; font-size: 13px; color: var(--faint);
+}
+
+/* The documents, named as files. "Populr understands your brand" is a claim;
+   a filename is a thing you can open, read, and correct. */
+.landing .docs-strip {
+  list-style: none; margin: 16px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.landing .docs-strip li {
+  padding: 6px 11px; font-size: 12px; color: var(--dim);
+  border: 1px solid var(--edge); border-radius: 8px;
+  background: rgba(255,255,255,.026);
+}
+
+/* The refusals. Struck through, reason attached, one green row at the bottom —
+   the same shape as the hero frame and the dashboard, so the argument looks
+   identical everywhere it is made. */
+.landing .act-receipt {
+  margin-top: 16px; border: 1px solid var(--edge); border-radius: 12px;
+  overflow: hidden; background: rgba(255,255,255,.018);
+}
+.landing .act-receipt > div {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+  padding: 12px 15px; font-size: 14px; color: var(--dim);
+  border-top: 1px solid var(--edge);
+}
+.landing .act-receipt > div:first-child { border-top: 0; }
+.landing .act-receipt span {
+  flex: 0 0 auto; font-size: 10.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--faint);
+}
+.landing .act-receipt em { font-style: normal; color: var(--faint); font-size: 13px; }
+.landing .act-receipt .do { background: rgba(213,255,114,.07); color: var(--fg); }
+.landing .act-receipt .do span { color: var(--acc); }
+.landing .act-receipt .do em { color: var(--dim); }
+
+@media (max-width: 720px) {
+  .landing .act { grid-template-columns: 1fr; gap: 8px; padding: 22px 0 }
+  .landing .act-n { padding-top: 0 }
+}
+
+/* ── Ask an AI about us ───────────────────────────────────────────────────
+   You cannot buy a citation in an AI answer, but you can make the question
+   trivial to ask — and the people evaluating an AI CMO are the same people who
+   ask an assistant before they ask Google. */
+.landing .aisum {
+  margin-top: 22px; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: center; gap: 10px;
+  font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--faint);
+}
+.landing .aisum-links { display: flex; gap: 7px; }
+.landing .aisum-links a {
+  padding: 5px 11px; border: 1px solid var(--edge); border-radius: 999px;
+  color: var(--dim); text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.landing .aisum-links a:hover { color: var(--acc); border-color: rgba(213,255,114,.32); }
