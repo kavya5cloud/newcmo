@@ -749,7 +749,13 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && analyze()}
-                type={source === "website" ? "url" : "text"}
+                // Always text. type="url" made the browser reject a bare domain here too, so
+                // the two entry points disagreed: the home page took "linear.app" and this one
+                // refused it. canonicalSource() adds the scheme for either.
+                type="text"
+                inputMode={source === "website" ? "url" : "text"}
+                autoCapitalize="off"
+                autoCorrect="off"
                 placeholder={SOURCES.find((s) => s.id === source)?.placeholder}
                 autoComplete="off"
                 spellCheck={false}

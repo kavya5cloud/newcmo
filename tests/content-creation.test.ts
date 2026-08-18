@@ -210,3 +210,35 @@ describe("UGC store", () => {
     expect(await repo.list("a")).toHaveLength(1);
   });
 });
+
+describe("a bare domain is a valid website", () => {
+  // Nobody types https://. The inputs used type="url", so the browser rejected "linear.app"
+  // with its own bubble before any of this ran — while canonicalSource had always been able
+  // to handle it. The validation and the parser disagreed, and the stricter one was wrong.
+  it("adds the scheme to a bare domain", async () => {
+    const { canonicalSource } = await import("@/app/app/_lib/sources");
+    expect(canonicalSource("website", "linear.app").url).toBe("https://linear.app");
+  });
+
+  it("shows the domain without the scheme it just added", async () => {
+    const { canonicalSource } = await import("@/app/app/_lib/sources");
+    expect(canonicalSource("website", "linear.app").display).toBe("linear.app");
+  });
+
+  it("leaves a full URL alone", async () => {
+    const { canonicalSource } = await import("@/app/app/_lib/sources");
+    expect(canonicalSource("website", "https://linear.app/pricing").url).toBe("https://linear.app/pricing");
+  });
+
+  it("keeps http:// rather than silently upgrading it", async () => {
+    // Rewriting to https would send someone to a host that may not answer there, and the
+    // failure would look like the site being unreachable.
+    const { canonicalSource } = await import("@/app/app/_lib/sources");
+    expect(canonicalSource("website", "http://example.com").url).toBe("http://example.com");
+  });
+
+  it("trims what people actually paste", async () => {
+    const { canonicalSource } = await import("@/app/app/_lib/sources");
+    expect(canonicalSource("website", "  linear.app  ").url).toBe("https://linear.app");
+  });
+});

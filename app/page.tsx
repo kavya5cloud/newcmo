@@ -219,12 +219,25 @@ export default function Landing() {
               A plain GET form: no JavaScript needed to submit, and /app reads ?url= and
               starts on arrival. */}
           <form className="hero-form" action="/app" method="get">
+            {/* type="text", not type="url".
+                
+                With type="url" the browser refuses "linear.app" before any of our code runs —
+                it demands a scheme and shows its own "Please enter a URL" bubble. Nobody types
+                https://. canonicalSource() has always prepended it for a bare domain, so the
+                only thing rejecting the shorter form was the input itself.
+                
+                inputMode="url" still gets the URL keyboard on a phone, which is the part of
+                type="url" worth keeping. autoCapitalize is off because iOS capitalises the
+                first letter of a text field by default and "Linear.app" is not a host. */}
             <input
-              type="url"
+              type="text"
               name="url"
-              placeholder="https://yourcompany.com"
+              placeholder="yourcompany.com"
               aria-label="Your website"
+              inputMode="url"
               autoComplete="url"
+              autoCapitalize="off"
+              autoCorrect="off"
               spellCheck={false}
               required
             />

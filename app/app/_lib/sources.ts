@@ -9,7 +9,7 @@
 export type SourceType = "website" | "instagram" | "linkedin" | "x" | "youtube" | "gbp";
 
 export const SOURCES: { id: SourceType; label: string; placeholder: string }[] = [
-  { id: "website", label: "website", placeholder: "https://yourcompany.com" },
+  { id: "website", label: "website", placeholder: "yourcompany.com" },
   { id: "instagram", label: "instagram", placeholder: "@yourhandle" },
   { id: "linkedin", label: "linkedin", placeholder: "company name or linkedin.com/company/…" },
   { id: "x", label: "x", placeholder: "@yourhandle" },
