@@ -33,6 +33,35 @@ export const ANGLES = [
 
 export type Angle = (typeof ANGLES)[number];
 
+/**
+ * How today's post is built, as opposed to what it is about.
+ *
+ * Seven angles on a seven-day week means the second Monday asks for exactly what the first
+ * Monday asked for. Angle alone was never going to carry a month. Pairing it with a form
+ * that turns on a different cycle takes the repeat from every 7 days to every 42, because
+ * 7 and 6 share no factor — and a reader notices a shape sooner than a subject anyway.
+ *
+ * These are shapes, not templates. The composer already owns the writing; this only says
+ * what the post should look like when it lands.
+ */
+export const FORMS = [
+  { key: "story", ask: "Tell it as one short story with a beginning and an end." },
+  { key: "list", ask: "Build it around three short dashed points." },
+  { key: "contrast", ask: "Set two things against each other — what people do, and what works." },
+  { key: "question", ask: "Open on a real question and spend the post answering it." },
+  { key: "note", ask: "Write it as a short direct note, no framing and no wind-up." },
+  { key: "number", ask: "Anchor it on one concrete number or detail and build outward." },
+] as const;
+
+export type Form = (typeof FORMS)[number];
+
+/** The form for one slot. Same staggering as the angle, on its own cycle. */
+export function formFor(at: number, platform: SocialPlatform): Form {
+  let shift = 0;
+  for (let i = 0; i < platform.length; i++) shift = (shift + platform.charCodeAt(i)) % FORMS.length;
+  return FORMS[(dayIndex(at) + shift) % FORMS.length];
+}
+
 /** Which angles a goal leans on. The goal shifts emphasis; it does not narrow to one note. */
 const GOAL_ANGLES: Record<Goal, readonly string[]> = {
   customers: ["problem", "result", "myth", "howto"],
@@ -86,12 +115,16 @@ export type TopicContext = {
  */
 export function topicForSlot(slot: QueueItem, ctx: TopicContext = {}): string {
   const angle = angleFor(slot.at, slot.platform as SocialPlatform, ctx.goal ?? "active");
+  const form = formFor(slot.at, slot.platform as SocialPlatform);
   const product = (ctx.product || "").trim();
   const audience = (ctx.audience || "").trim() || "the people you sell to";
   const oneLiner = (ctx.oneLiner || "").trim();
 
   const parts: string[] = [];
   parts.push(`Write ${angle.ask}.`);
+  // What it is about, then how it is built. Both turn over daily, on cycles that do not
+  // line up, so the same pairing does not come round for six weeks.
+  parts.push(form.ask);
 
   if (product) {
     parts.push(oneLiner
@@ -120,4 +153,9 @@ export function topicForSlot(slot: QueueItem, ctx: TopicContext = {}): string {
  */
 export function angleKeyFor(slot: QueueItem, goal: Goal = "active"): string {
   return angleFor(slot.at, slot.platform as SocialPlatform, goal).key;
+}
+
+/** The form key, logged beside the angle. "lesson/list" is the pair that must not recur. */
+export function formKeyFor(slot: QueueItem): string {
+  return formFor(slot.at, slot.platform as SocialPlatform).key;
 }

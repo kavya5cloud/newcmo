@@ -3,8 +3,10 @@ import { socialEngine } from "@/lib/social/shared";
 import { automationRepo } from "@/lib/automation/shared";
 import { extend, retryFailed, runDue, type PublishPort } from "@/lib/automation/runner";
 import { resolveContent, type ResolvedContent } from "@/lib/automation/sources";
-import { angleKeyFor, topicForSlot } from "@/lib/automation/topic";
+import { angleKeyFor, formKeyFor, topicForSlot } from "@/lib/automation/topic";
 import { assistantStore } from "@/lib/assistant/shared";
+import { loadCanonicalProfile } from "@/lib/services/cmo-context";
+import { db } from "@/lib/db";
 import { recordGeneration } from "@/lib/content/generation-log";
 import type { Automation, QueueItem } from "@/lib/automation/types";
 
@@ -80,6 +82,18 @@ export async function GET(req: NextRequest) {
       // still far better than one prompt repeated forever.
       const settings = await assistantStore().get(tenant).catch(() => null);
 
+      // Who this business is. Without it the daily brief read "Write a lesson learned the
+      // hard way. Write it for the people you sell to." — the same seven briefs for every
+      // workspace on the platform, naming nobody. The composer assembles brand voice and
+      // market context on its own, but voice is how you sound, not who you are, and a post
+      // that never says what the company does reads like every other post it has written.
+      //
+      // business_profiles is the canonical record and loadCanonicalProfile is the existing
+      // reader for it; a browser-supplied profile is never trusted here.
+      const sql = db();
+      const profile = sql ? await loadCanonicalProfile(sql, tenant).catch(() => null) : null;
+      const audience = (profile?.audience || "").trim() || "founders";
+
       // Recently written openings, so today is told what not to repeat. fromAiQueue saves
       // every generated post as a draft, so the drafts are the record of what has been said.
       // Cheap, and more reliable than asking a model to "be original".
@@ -120,9 +134,17 @@ export async function GET(req: NextRequest) {
             // anything that changed between one day and the next — that is this.
             topic: topicForSlot(slot, {
               goal: settings?.goal,
+              product: profile?.name,
+              oneLiner: profile?.oneLiner,
+              audience,
+              // Two do-not-repeat lists exist and they do different jobs. This one is the
+              // same-run guard: several slots generate back to back, and scheduledTexts is
+              // the only thing that knows what was written thirty seconds ago. The other —
+              // previousCampaigns, assembled inside the composer — is the across-days
+              // memory, and it cannot see a post from earlier in this same run.
               recent: [...recentTexts, ...scheduledTexts],
             }),
-            audience: "founders",
+            audience,
             now,
           });
           if (resolved) provenance.set(slot.id, resolved);
@@ -133,6 +155,8 @@ export async function GET(req: NextRequest) {
             event: "slot_topic", tenant, slot: slot.id, platform: slot.platform,
             day: new Date(slot.at).toISOString().slice(0, 10),
             angle: angleKeyFor(slot, settings?.goal),
+            form: formKeyFor(slot),
+            named: !!profile?.name,
             resolved: !!resolved,
           }));
 

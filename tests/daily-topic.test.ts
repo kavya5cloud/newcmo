@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ANGLES, angleFor, angleKeyFor, dayIndex, topicForSlot } from "@/lib/automation/topic";
+import { ANGLES, angleFor, angleKeyFor, dayIndex, formFor, formKeyFor, topicForSlot } from "@/lib/automation/topic";
 import type { QueueItem } from "@/lib/automation/types";
 import type { SocialPlatform } from "@/lib/social/types";
 
@@ -118,5 +118,54 @@ describe("the brief itself", () => {
 
   it("exposes the angle for the record", () => {
     expect(angleKeyFor(slot(at), "launch")).toBe(angleFor(at, "linkedin", "launch").key);
+  });
+});
+
+// Angle alone cycles every seven days, so the second Monday asked for exactly what the
+// first Monday asked for — a real repeat, on the cadence a weekly poster would notice
+// first. Pairing it with a form on a six-day cycle is what these pin.
+describe("the brief does not come round again for six weeks", () => {
+  const start = Date.UTC(2026, 0, 1, 9, 0);
+  const briefKey = (at: number, p: SocialPlatform = "linkedin") =>
+    `${angleKeyFor(slot(at, p))}/${formKeyFor(slot(at, p))}`;
+
+  it("repeated the whole brief every 7 days when the angle was all there was", () => {
+    // The old behaviour, still true of the angle on its own — this is what was wrong.
+    expect(angleFor(start, "linkedin").key).toBe(angleFor(start + 7 * DAY, "linkedin").key);
+  });
+
+  it("no longer repeats at 7 days, or at any point inside six weeks", () => {
+    const keys = Array.from({ length: 42 }, (_, i) => briefKey(start + i * DAY));
+    expect(new Set(keys).size).toBe(42);
+  });
+
+  it("comes round only at 42, which is where a rotation honestly ends", () => {
+    expect(briefKey(start)).toBe(briefKey(start + 42 * DAY));
+  });
+
+  it("does not hand two platforms the same brief on the same morning", () => {
+    for (let i = 0; i < 14; i++) {
+      const at = start + i * DAY;
+      expect(briefKey(at, "linkedin"), `day ${i}`).not.toBe(briefKey(at, "x"));
+    }
+  });
+
+  it("says who the business is, and asks for a shape", () => {
+    const brief = topicForSlot(slot(start), {
+      product: "Populr", oneLiner: "an AI CMO that reasons", audience: "seed-stage founders",
+    });
+    // The gap this closes: the brief used to name nobody, for every workspace alike.
+    expect(brief).toContain("Populr");
+    expect(brief).toContain("an AI CMO that reasons");
+    expect(brief).toContain("seed-stage founders");
+    expect(brief).not.toContain("the people you sell to");
+    // And it must ask for a form, or the shape rotation reaches nothing.
+    expect(brief).toContain(formFor(start, "linkedin").ask);
+  });
+
+  it("still reads sensibly for a workspace that has never been analysed", () => {
+    const brief = topicForSlot(slot(start));
+    expect(brief).toContain("the people you sell to");
+    expect(brief.length).toBeGreaterThan(40);
   });
 });
