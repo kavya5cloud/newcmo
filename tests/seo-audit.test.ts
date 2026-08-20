@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readSignals } from "@/lib/seo/audit";
 
 // This panel shows numbers next to the word "PageSpeed", so the standard is higher than
@@ -70,5 +70,51 @@ describe("on-page signals are read, not guessed", () => {
     for (const s of readSignals(page(`<title>x</title>`)).signals) {
       expect(s.note.length, `${s.label} has no note`).toBeGreaterThan(20);
     }
+  });
+});
+
+// The screen showed "Mobile audit unavailable (429). Desktop audit unavailable (429)." —
+// two lines carrying one fact, and a status code presented to someone whose dials are
+// blank as though it were their problem. It is not: 429 is Google throttling us.
+describe("what the panel says when Google will not answer", () => {
+  const psiFail = (status: number) =>
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("pagespeedonline")) return new Response("rate limited", { status });
+      // The page itself still fetches, so on-page signals survive a PSI failure.
+      return new Response(page(`<title>Populr — your AI CMO</title>`), { status: 200 });
+    });
+
+  it("says it once, blames the right party, and keeps the status code out of it", async () => {
+    vi.stubGlobal("fetch", psiFail(429));
+    const { auditUrl } = await import("@/lib/seo/audit");
+    const r = await auditUrl("https://example.com");
+    vi.unstubAllGlobals();
+
+    expect(r.problems.length).toBe(1);
+    expect(r.problems[0]).toContain("rate-limiting our requests");
+    expect(r.problems[0]).not.toContain("429");
+    // And it must not read as the site being broken.
+    expect(r.problems[0]).toMatch(/not blocking your site/i);
+  });
+
+  it("still reports the half that runs locally rather than failing whole", async () => {
+    vi.stubGlobal("fetch", psiFail(429));
+    const { auditUrl } = await import("@/lib/seo/audit");
+    const r = await auditUrl("https://example.com");
+    vi.unstubAllGlobals();
+    // On-page signals come from the page's own HTML and owe Google nothing.
+    expect(r.signals.length).toBeGreaterThan(0);
+    // Unmeasured scores stay null. A zero here would read as "your site scored zero".
+    expect(r.mobile.performance).toBeNull();
+  });
+
+  it("distinguishes a throttle from a plain failure, because the advice differs", async () => {
+    vi.stubGlobal("fetch", psiFail(500));
+    const { auditUrl } = await import("@/lib/seo/audit");
+    const r = await auditUrl("https://example.com");
+    vi.unstubAllGlobals();
+    expect(r.problems[0]).toContain("try again shortly");
+    expect(r.problems[0]).not.toContain("rate-limiting");
   });
 });

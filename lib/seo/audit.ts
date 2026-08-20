@@ -126,7 +126,20 @@ async function runPsi(url: string, strategy: "mobile" | "desktop", signal: Abort
   if (key) q.set("key", key);
 
   const res = await fetch(`${PSI}?${q}`, { signal, headers: { Accept: "application/json" } });
-  if (!res.ok) return { ok: false as const, status: res.status, body: (await res.text()).slice(0, 300) };
+  if (!res.ok) {
+    // A 429 with no key is a configuration problem wearing a transient status code, and it
+    // will not clear by waiting. Unauthenticated PageSpeed quota is small and counted per
+    // IP, and serverless egress IPs are shared — so in production the unkeyed path is rate
+    // limited more or less immediately. Logged here with the fix named, because the person
+    // who can fix it reads logs and the person seeing the screen cannot.
+    if (res.status === 429 && !key) {
+      console.warn(JSON.stringify({
+        event: "psi_rate_limited_unkeyed", strategy,
+        hint: "PAGESPEED_API_KEY is not set. Unauthenticated PageSpeed quota is per-IP and shared on serverless hosts, so this will keep happening until a key is set.",
+      }));
+    }
+    return { ok: false as const, status: res.status, keyed: !!key, body: (await res.text()).slice(0, 300) };
+  }
   const json = await res.json();
   return { ok: true as const, json };
 }
@@ -242,8 +255,8 @@ export async function auditUrl(url: string, opts: { timeoutMs?: number } = {}): 
 
   try {
     const [mobileRes, desktopRes, page] = await Promise.all([
-      runPsi(url, "mobile", controller.signal).catch((e) => ({ ok: false as const, status: 0, body: String(e).slice(0, 160) })),
-      runPsi(url, "desktop", controller.signal).catch((e) => ({ ok: false as const, status: 0, body: String(e).slice(0, 160) })),
+      runPsi(url, "mobile", controller.signal).catch((e) => ({ ok: false as const, status: 0, keyed: false, body: String(e).slice(0, 160) })),
+      runPsi(url, "desktop", controller.signal).catch((e) => ({ ok: false as const, status: 0, keyed: false, body: String(e).slice(0, 160) })),
       fetch(url, { signal: controller.signal, headers: { "User-Agent": "populr-audit/1.0" } })
         .then((r) => (r.ok ? r.text() : ""))
         .catch(() => ""),
@@ -251,8 +264,21 @@ export async function auditUrl(url: string, opts: { timeoutMs?: number } = {}): 
 
     const empty: ScoreSet = { performance: null, accessibility: null, bestPractices: null, seo: null };
 
-    if (!mobileRes.ok) problems.push(`Mobile audit unavailable (${mobileRes.status || "network"}).`);
-    if (!desktopRes.ok) problems.push(`Desktop audit unavailable (${desktopRes.status || "network"}).`);
+    // Said once. Both runs fail together for the same reason nearly every time, and two
+    // lines carrying one fact read as two separate faults.
+    //
+    // The status code is dropped from the customer's copy on purpose. "(429)" is not
+    // information to someone whose dials are blank — it is a number that looks like their
+    // problem. What they need is whether it was them or us, and whether to wait. The code
+    // and the fix go to the log instead.
+    if (!mobileRes.ok || !desktopRes.ok) {
+      const both = !mobileRes.ok && !desktopRes.ok;
+      const which = both ? "Speed scores" : !mobileRes.ok ? "Mobile speed scores" : "Desktop speed scores";
+      const rateLimited = [mobileRes, desktopRes].some((r) => !r.ok && r.status === 429);
+      problems.push(rateLimited
+        ? `${which} are unavailable — Google is rate-limiting our requests, not blocking your site. Everything below was still measured.`
+        : `${which} could not be fetched from Google just now. Nothing is wrong with your site; try again shortly.`);
+    }
     if (!page) problems.push("Could not read the page's HTML, so on-page signals were skipped.");
 
     const onPage = page ? readSignals(page) : { signals: [], issues: [] };
