@@ -59,7 +59,7 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
     }).catch(() => { missing.push("market intelligence"); return null; }),
     marketPlatform().memory.list(input.tenant, undefined, 12).catch(() => { missing.push("market memory"); return []; }),
     learningEngine(sql).brand.latest(input.tenant).catch(() => { missing.push("brand DNA"); return null; }),
-    learningEngine(sql).patterns.all().catch(() => { missing.push("pattern library"); return []; }),
+    learningEngine(sql).patterns.all(input.tenant).catch(() => { missing.push("pattern library"); return []; }),
     // What this workspace has already been written. Its own read rather than a filter over
     // the generic memory list, because the generic list is capped at 12 and a busy week of
     // trends would push every previous angle out of it — which is precisely when repetition

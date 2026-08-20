@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { workspaceKey } from "@/lib/intel";
 import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { learningEngine } from "@/lib/learning/shared";
@@ -16,7 +17,10 @@ export async function GET(req: NextRequest) {
 
   const p = req.nextUrl.searchParams;
   const kind = p.get("kind");
-  const patterns = await learningEngine(db()).patterns.search({
+  // Scoped to the caller's workspace. This route used to search every pattern in the
+  // database and return the best, whoever they belonged to.
+  const key = (await workspaceKey(p.get("wsid"))) ?? "default";
+  const patterns = await learningEngine(db()).patterns.search(key, {
     kind: kind && (PATTERN_KINDS as readonly string[]).includes(kind) ? (kind as PatternKind) : undefined,
     platform: p.get("platform") || undefined,
     audience: p.get("audience") || undefined,

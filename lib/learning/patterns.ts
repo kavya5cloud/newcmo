@@ -20,28 +20,45 @@ const PATTERN_FOR_KIND: Partial<Record<AssetKind, PatternKind>> = {
 
 const WIN_THRESHOLD = 0.35; // aggregate score at/above which an asset counts as "winning"
 
+/**
+ * Rows written before patterns had an owner.
+ *
+ * They were extracted from whichever workspaces happened to ingest first and cannot now be
+ * attributed to any of them, so they are never returned to anyone. Deleting them would be
+ * defensible too; keeping them inert costs nothing and loses no evidence.
+ */
+export const UNATTRIBUTED = "__unattributed__";
+
 /** Extract patterns from aggregated performance. Deterministic; sorted best-first. */
-export function extractPatterns(aggregates: AssetAggregate[], opts: { minScore?: number } = {}): Pattern[] {
+export function extractPatterns(
+  aggregates: AssetAggregate[],
+  opts: { minScore?: number; workspaceKey?: string } = {},
+): Pattern[] {
   const min = opts.minScore ?? WIN_THRESHOLD;
+  const ws = opts.workspaceKey ?? UNATTRIBUTED;
   const patterns: Pattern[] = [];
 
   for (const a of aggregates) {
     if (a.score < min) continue;
     const kind = a.kind ? PATTERN_FOR_KIND[a.kind] : undefined;
     if (kind) {
-      patterns.push(makePattern(kind, a.kind ? ASSET_KIND_META[a.kind].label : a.assetKey, a.assetKey, a));
+      patterns.push(makePattern(kind, a.kind ? ASSET_KIND_META[a.kind].label : a.assetKey, a.assetKey, a, ws));
     }
     // Posting-time pattern when a best hour is known.
     if (a.bestHour !== null) {
-      patterns.push(makePattern("winning_posting_time", `${a.platform} best hour`, `hour_${a.bestHour}`, a));
+      patterns.push(makePattern("winning_posting_time", `${a.platform} best hour`, `hour_${a.bestHour}`, a, ws));
     }
   }
   return patterns.sort((x, y) => y.performance - x.performance || x.id.localeCompare(y.id));
 }
 
-function makePattern(kind: PatternKind, label: string, value: string, a: AssetAggregate): Pattern {
+function makePattern(kind: PatternKind, label: string, value: string, a: AssetAggregate, workspaceKey: string): Pattern {
   return {
-    id: idFrom("pat", kind, value, a.platform, a.audience ?? "", a.campaignId ?? ""),
+    // workspaceKey leads the id. Two businesses posting an asset with the same key are two
+    // different facts, and merging them produces a performance number that describes
+    // neither of them.
+    id: idFrom("pat", workspaceKey, kind, value, a.platform, a.audience ?? "", a.campaignId ?? ""),
+    workspaceKey,
     kind, label, value,
     performance: a.score,
     confidence: clamp01(a.score * 0.6 + Math.min(1, a.eventCount / 5) * 0.4),
@@ -65,8 +82,9 @@ export function searchPatterns(patterns: Pattern[], q: PatternQuery = {}, limit 
 
 export interface PatternStore {
   record(p: Pattern): Promise<Pattern>;
-  search(q?: PatternQuery, limit?: number): Promise<Pattern[]>;
-  all(): Promise<Pattern[]>;
+  /** Scoped to one workspace. There is no unscoped read — that was the bug. */
+  search(workspaceKey: string, q?: PatternQuery, limit?: number): Promise<Pattern[]>;
+  all(workspaceKey: string): Promise<Pattern[]>;
 }
 
 export class InMemoryPatternStore implements PatternStore {
@@ -79,8 +97,12 @@ export class InMemoryPatternStore implements PatternStore {
     this.map.set(p.id, next);
     return next;
   }
-  async search(q: PatternQuery = {}, limit = 20) { return searchPatterns([...this.map.values()], q, limit); }
-  async all() { return [...this.map.values()]; }
+  async search(workspaceKey: string, q: PatternQuery = {}, limit = 20) {
+    return searchPatterns([...this.map.values()].filter((p) => p.workspaceKey === workspaceKey), q, limit);
+  }
+  async all(workspaceKey: string) {
+    return [...this.map.values()].filter((p) => p.workspaceKey === workspaceKey);
+  }
 }
 
 let patReady = false;
@@ -89,6 +111,7 @@ async function ensurePatternTable(sql: Sql) {
   if (!RUNTIME_DDL) { patReady = true; return; }
   await sql`CREATE TABLE IF NOT EXISTS learn_patterns (
     id TEXT PRIMARY KEY,
+    workspace_key TEXT NOT NULL DEFAULT ${UNATTRIBUTED},
     kind TEXT NOT NULL,
     performance REAL NOT NULL DEFAULT 0,
     confidence REAL NOT NULL DEFAULT 0,
@@ -97,7 +120,12 @@ async function ensurePatternTable(sql: Sql) {
     data JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`;
+  // Existing deployments have the table without the column. Added separately so an upgrade
+  // does not depend on the CREATE running, and defaulted to the sentinel so rows written
+  // before ownership existed stay unreadable rather than being handed to whoever asks next.
+  await sql`ALTER TABLE learn_patterns ADD COLUMN IF NOT EXISTS workspace_key TEXT NOT NULL DEFAULT ${UNATTRIBUTED}`;
   await sql`CREATE INDEX IF NOT EXISTS idx_learn_pat_kind ON learn_patterns (kind, performance DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_learn_pat_ws ON learn_patterns (workspace_key, performance DESC)`;
   patReady = true;
 }
 
@@ -106,8 +134,8 @@ export class NeonPatternStore implements PatternStore {
   async record(p: Pattern) {
     await ensurePatternTable(this.sql);
     const rows = (await this.sql`
-      INSERT INTO learn_patterns (id, kind, performance, confidence, version, platform, audience, industry, data)
-      VALUES (${p.id}, ${p.kind}, ${p.performance}, ${p.confidence}, ${p.version}, ${p.platform}, ${p.audience}, ${p.industry}, ${JSON.stringify(p)}::jsonb)
+      INSERT INTO learn_patterns (id, workspace_key, kind, performance, confidence, version, platform, audience, industry, data)
+      VALUES (${p.id}, ${p.workspaceKey}, ${p.kind}, ${p.performance}, ${p.confidence}, ${p.version}, ${p.platform}, ${p.audience}, ${p.industry}, ${JSON.stringify(p)}::jsonb)
       ON CONFLICT (id) DO UPDATE SET
         version = learn_patterns.version + 1,
         performance = (learn_patterns.performance * learn_patterns.version + EXCLUDED.performance) / (learn_patterns.version + 1),
@@ -116,14 +144,18 @@ export class NeonPatternStore implements PatternStore {
       RETURNING data`) as { data: Pattern }[];
     return rows[0]?.data ?? p;
   }
-  async search(q: PatternQuery = {}, limit = 20) {
+  async search(workspaceKey: string, q: PatternQuery = {}, limit = 20) {
     await ensurePatternTable(this.sql);
-    const rows = (await this.sql`SELECT data FROM learn_patterns ORDER BY performance DESC LIMIT 500`) as { data: Pattern }[];
+    const rows = (await this.sql`
+      SELECT data FROM learn_patterns WHERE workspace_key = ${workspaceKey}
+      ORDER BY performance DESC LIMIT 500`) as { data: Pattern }[];
     return searchPatterns(rows.map((r) => r.data), q, limit);
   }
-  async all() {
+  async all(workspaceKey: string) {
     await ensurePatternTable(this.sql);
-    const rows = (await this.sql`SELECT data FROM learn_patterns ORDER BY performance DESC LIMIT 500`) as { data: Pattern }[];
+    const rows = (await this.sql`
+      SELECT data FROM learn_patterns WHERE workspace_key = ${workspaceKey}
+      ORDER BY performance DESC LIMIT 500`) as { data: Pattern }[];
     return rows.map((r) => r.data);
   }
 }

@@ -54,6 +54,19 @@ export type PatternKind = (typeof PATTERN_KINDS)[number];
 
 export type Pattern = {
   id: string;
+  /**
+   * Whose pattern this is.
+   *
+   * Added because it was missing, and its absence was not cosmetic: learn_patterns had no
+   * tenant column, PatternStore.all() returned the global top 500 by performance, and
+   * generation-context fed the top 5 into every workspace's prompt under the heading
+   * "WHAT HAS PERFORMED BEFORE". One business's asset keys, campaign ids and performance
+   * numbers were being shown to another business as its own learning.
+   *
+   * It is also in the pattern id. Without it, two workspaces with the same asset key
+   * collide on one row and blend their performance into a number belonging to neither.
+   */
+  workspaceKey: string;
   kind: PatternKind;
   label: string;
   value: string;

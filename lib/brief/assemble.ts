@@ -143,7 +143,7 @@ export async function assembleBrief(opts: AssembleOptions): Promise<DailyBrief> 
   const performance: PerformanceSection = { bestPlatform: null, winningFormat: null, bestTime: null, improvements: [], detail: [] };
   try {
     const sql = db();
-    const patterns = await learningEngine(sql).patterns.all();
+    const patterns = await learningEngine(sql).patterns.all(tenant);
     const published = history.filter((h) => h.state === "published");
 
     const byPlatform = new Map<string, number>();

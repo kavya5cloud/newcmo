@@ -53,12 +53,37 @@ describe("Pattern Library", () => {
 
   it("stores, versions and searches patterns", async () => {
     const store = new InMemoryPatternStore();
-    const patterns = extractPatterns(aggregatePerformance(events));
+    const patterns = extractPatterns(aggregatePerformance(events), { workspaceKey: "user:a" });
     for (const p of patterns) await store.record(p);
     const first = patterns[0];
     const re = await store.record(first); // same id → version bump
     expect(re.version).toBe(2);
-    expect((await store.search({ kind: "winning_video_structure" })).length).toBeGreaterThan(0);
+    expect((await store.search("user:a", { kind: "winning_video_structure" })).length).toBeGreaterThan(0);
+  });
+
+  // The leak: learn_patterns had no owner column, all() returned the global top 500 by
+  // performance, and generation-context fed the top 5 into every workspace's prompt under
+  // "WHAT HAS PERFORMED BEFORE". One business's asset keys, campaign ids and numbers were
+  // shown to another business as its own learning.
+  it("never returns one workspace's patterns to another", async () => {
+    const store = new InMemoryPatternStore();
+    for (const p of extractPatterns(aggregatePerformance(events), { workspaceKey: "user:a" })) await store.record(p);
+    for (const p of extractPatterns(aggregatePerformance(events), { workspaceKey: "user:b" })) await store.record(p);
+
+    const a = await store.all("user:a");
+    expect(a.length).toBeGreaterThan(0);
+    expect(a.every((p) => p.workspaceKey === "user:a")).toBe(true);
+    expect(await store.search("user:b", { kind: "winning_video_structure" }))
+      .not.toEqual(await store.search("user:a", { kind: "winning_video_structure" }));
+    expect(await store.all("user:c")).toEqual([]);
+  });
+
+  // Identical aggregates from two businesses are two facts. Sharing an id merges them into
+  // one blended performance number that describes neither.
+  it("does not collide two workspaces onto one row", async () => {
+    const a = extractPatterns(aggregatePerformance(events), { workspaceKey: "user:a" });
+    const b = extractPatterns(aggregatePerformance(events), { workspaceKey: "user:b" });
+    expect(a[0].id).not.toBe(b[0].id);
   });
 
   it("search filters and is deterministic", () => {

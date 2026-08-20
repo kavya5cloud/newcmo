@@ -65,7 +65,7 @@ export class LearningEngine {
     const aggregates = aggregatePerformance(events);
 
     // 1) Pattern Library
-    const extracted = extractPatterns(aggregates);
+    const extracted = extractPatterns(aggregates, { workspaceKey: ctx.workspaceKey });
     const recordedPatterns = [];
     for (const p of extracted) recordedPatterns.push(await this.patterns.record(p));
 
@@ -119,7 +119,7 @@ export class LearningEngine {
 
   /** Summary numbers for the dashboard. */
   async snapshot(workspaceKey: string) {
-    const patterns = await this.patterns.all();
+    const patterns = await this.patterns.all(workspaceKey);
     const brand = await this.brand.latest(workspaceKey);
     const signals = await this.signals.list(workspaceKey);
     return {

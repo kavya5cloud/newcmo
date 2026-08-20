@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const key = (await workspaceKey(req.nextUrl.searchParams.get("wsid"))) ?? "default";
   const sql = db();
   const engine = learningEngine(sql);
-  const patterns = await engine.patterns.all();
+  const patterns = await engine.patterns.all(key);
   const brand = await engine.brand.latest(key);
   const accuracy = await feedbackStore(sql).accuracy();
   const snapshot = await engine.snapshot(key);
