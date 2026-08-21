@@ -28,6 +28,7 @@ const ctx: SharedContext = {
   connectedPlatforms: [{ platform: "linkedin", handle: "@populr", status: "connected" }],
   analytics: { published: 0, failed: 0, scheduled: 0 },
   market: { headline: "h", trends: ["ai cmo (80%)"], competitors: ["Okara: posting daily"], opportunities: ["Own the term → publish a comparison"] },
+  site: null, drafts: [],
   previousCampaigns: [], memory: [], now: 5_000,
 };
 
@@ -257,5 +258,87 @@ describe("team store", () => {
     await repo.save(state);
     expect((await repo.get("a", plan.launchId)).controls.paused.content).toBe(true);
     expect((await repo.get("b", plan.launchId)).controls.paused.content).toBeUndefined();
+  });
+});
+
+// The two agents added to match a competitor's roster. Both work through an engine that
+// already existed and was invisible: craft.ts graded every draft and said so to nobody, and
+// the SEO audit ran only when someone opened a tab.
+describe("the Editor grades real drafts", () => {
+  it("says nothing rather than inventing an opinion with no drafts", async () => {
+    const { editorAgent } = await import("@/lib/agents/agents");
+    const r = await editorAgent.run({ ...ctx, drafts: [] }, "editing");
+    expect(r.ok).toBe(true);
+    expect(r.outputs).toEqual(["No drafts to review."]);
+    expect(r.reasoning).toMatch(/no drafts/i);
+  });
+
+  it("names the fault it found, not a mood", async () => {
+    const { editorAgent } = await import("@/lib/agents/agents");
+    const r = await editorAgent.run({
+      ...ctx,
+      drafts: [{
+        id: "d1", title: "Weak one",
+        // Deliberately trips the checks: a stock opening and no concrete detail.
+        text: "In today's fast-paced world, businesses are looking for innovative solutions that unlock growth and drive results at scale for everyone involved.",
+      }],
+    }, "editing");
+    expect(r.ok).toBe(true);
+    expect(r.outputs.join(" ")).toMatch(/Reviewed — 1 draft/);
+    // A named, deterministic fault — the point of grading with the same scorer as the writer.
+    expect(r.outputs.join(" ")).toMatch(/Stock AI phrasing|Opening that fits any post|Unsourced claim/);
+  });
+
+  it("passes clean copy instead of always finding something", async () => {
+    const { editorAgent } = await import("@/lib/agents/agents");
+    const r = await editorAgent.run({
+      ...ctx,
+      drafts: [{
+        id: "d2", title: "Fine",
+        text: "We cut onboarding from nine screens to three.\n\nSupport tickets about setup dropped by half the following week.\n\nThat is the whole change.",
+      }],
+    }, "editing");
+    expect(r.outputs[0]).toContain("Reviewed — 1 draft");
+    expect(r.reasoning).toMatch(/passed|Nothing was rewritten/i);
+  });
+});
+
+describe("the SEO agent will not audit a site it was not given", () => {
+  it("reports the gap instead of guessing a URL from the brand name", async () => {
+    const { seoAgent } = await import("@/lib/agents/agents");
+    const r = await seoAgent.run({ ...ctx, site: null }, "site_audit");
+    expect(r.ok).toBe(true);
+    expect(r.outputs.join(" ")).toMatch(/No site connected/);
+    expect(r.reasoning).toMatch(/guessed/i);
+  });
+});
+
+describe("the roster stays coherent as it grows", () => {
+  it("gives every agent exactly one owner per workflow step", async () => {
+    const { AGENT_PROFILES } = await import("@/lib/agents/registry");
+    const { AGENT_IDS } = await import("@/lib/agents/types");
+    const seen = new Map<string, string>();
+    for (const id of AGENT_IDS) {
+      for (const step of AGENT_PROFILES[id].steps) {
+        expect(seen.has(step), `${step} owned by ${seen.get(step)} and ${id}`).toBe(false);
+        seen.set(step, id);
+      }
+    }
+  });
+
+  it("puts the Editor before Publishing, or it is a critic rather than a gate", async () => {
+    const { TEAM_ORDER, AGENT_DEPENDENCIES } = await import("@/lib/agents/registry");
+    expect(TEAM_ORDER.indexOf("editor")).toBeLessThan(TEAM_ORDER.indexOf("publishing"));
+    expect(AGENT_DEPENDENCIES.publishing).toContain("editor");
+  });
+
+  it("has a profile and a runnable agent for every id", async () => {
+    const { AGENT_PROFILES } = await import("@/lib/agents/registry");
+    const { AGENTS } = await import("@/lib/agents/agents");
+    const { AGENT_IDS } = await import("@/lib/agents/types");
+    for (const id of AGENT_IDS) {
+      expect(AGENT_PROFILES[id], `${id} has no profile`).toBeTruthy();
+      expect(typeof AGENTS[id]?.run, `${id} has no agent`).toBe("function");
+    }
   });
 });

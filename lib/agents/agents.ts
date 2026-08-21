@@ -9,10 +9,12 @@ import { db } from "@/lib/db";
 import type { PlatformId } from "@/lib/publishing/types";
 import type { SocialPlatform } from "@/lib/social/types";
 import type { WorkflowStep } from "@/lib/execution/types";
+import { scoreDraft } from "@/lib/content/craft";
+import { auditUrl } from "@/lib/seo/audit";
 import { hasMarketData } from "./context";
 import type { AgentId, AgentOutcome, SharedContext } from "./types";
 
-// The seven agents.
+// The nine agents.
 //
 // Each one is a worker with a single job, and each does that job *through an existing
 // service* — no agent talks to a provider, a platform or a database directly, and no agent
@@ -57,6 +59,14 @@ const num = (n: number): string => n.toLocaleString("en-US");
  * its only real use is comparing two of them — which the first segment does just as well.
  */
 const jobRef = (id: string): string => id.split("-")[0] ?? id;
+
+/** Craft issue codes in the words an operator would use. Unknown codes pass through. */
+const CRAFT_ISSUE_LABEL: Record<string, string> = {
+  ai_tell: "Stock AI phrasing",
+  vague_claim: "Unsourced claim",
+  weak_opening: "Opening that fits any post",
+  monotone_shape: "Every sentence the same length",
+};
 
 /** Plan channel names → publishing platform ids. Same map the execution services use. */
 const CHANNEL_PLATFORM: Record<string, SocialPlatform> = {
@@ -299,6 +309,107 @@ export const analyticsAgent: Agent = {
   },
 };
 
+// ---- Editor ----
+
+export const editorAgent: Agent = {
+  id: "editor",
+  async run(ctx) {
+    // The grader is lib/content/craft.ts — the same one the composer runs before a draft is
+    // ever returned. Deliberately the same code and not a second opinion: an Editor that
+    // graded by different rules than the writer would reject work the writer was told to
+    // produce, and the two would drift apart within a week.
+    if (ctx.drafts.length === 0) {
+      return {
+        ok: true,
+        task: "Waiting for copy to edit",
+        reasoning: "Nothing has been written for this workspace yet. An editor with no drafts has no opinion worth recording, and inventing one would be the slop this agent exists to remove.",
+        confidence: 0.9,
+        outputs: ["No drafts to review."],
+      };
+    }
+
+    const reviewed = ctx.drafts.map((d) => ({ draft: d, craft: scoreDraft(d.text) }));
+    const flagged = reviewed.filter((r) => r.craft.needsRewrite);
+    const issueCounts = new Map<string, number>();
+    for (const r of reviewed) {
+      for (const i of r.craft.issues) issueCounts.set(i.code, (issueCounts.get(i.code) ?? 0) + 1);
+    }
+
+    const avg = reviewed.reduce((sum, r) => sum + r.craft.score, 0) / reviewed.length;
+    const outputs = [
+      `Reviewed — ${plural(reviewed.length, "draft")}, ${flagged.length} sent back`,
+      ...[...issueCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([code, n]) => `${CRAFT_ISSUE_LABEL[code] ?? code} — ${n}`),
+      ...flagged.slice(0, 4).map((r) => `Rewrite — "${r.draft.title}" scored ${r.craft.score.toFixed(1)}`),
+    ];
+
+    return {
+      ok: true,
+      task: `Editing ${plural(reviewed.length, "draft")}`,
+      reasoning: flagged.length
+        ? `${plural(flagged.length, "draft")} failed the craft check and were sent back for a rewrite. The checks are deterministic — stock AI phrasing, unsourced claims, an opening that would fit any post about anything, and sentences that all run to one length — so a draft is rejected for a named fault rather than a mood.`
+        : `Every draft passed. Average craft score ${avg.toFixed(1)}. Nothing was rewritten, which is the correct outcome when nothing is wrong; a rewrite loop that always finds something is a token bill, not an editor.`,
+      confidence: clamp(0.55 + Math.min(0.35, reviewed.length * 0.05)),
+      outputs,
+    };
+  },
+};
+
+// ---- SEO ----
+
+export const seoAgent: Agent = {
+  id: "seo",
+  async run(ctx) {
+    if (!ctx.site) {
+      return {
+        ok: true,
+        task: "Waiting for a site to audit",
+        reasoning: "No website has been analysed for this workspace, so there is nothing to measure. Auditing a URL guessed from the brand name would produce a real-looking score for a page that may not be theirs.",
+        confidence: 0.9,
+        outputs: ["No site connected — add one from Home to enable the audit."],
+      };
+    }
+
+    const audit = await auditUrl(ctx.site, { timeoutMs: 45_000 }).catch(() => null);
+    if (!audit) {
+      return {
+        ok: false,
+        task: `Auditing ${ctx.site}`,
+        reasoning: "The audit could not complete. Nothing is reported rather than a partial score, because a page-speed number missing half its inputs reads as a verdict.",
+        confidence: 0.2,
+        outputs: [],
+        error: "The site audit did not complete.",
+      };
+    }
+
+    // On-page signals are read from the page's own HTML and owe Google nothing, so they
+    // survive the PageSpeed rate limiting that leaves the dials blank.
+    const errors = audit.issues.filter((i) => i.severity === "error");
+    const warnings = audit.issues.filter((i) => i.severity === "warning");
+    const outputs = [
+      ...audit.issues.slice(0, 6).map((i) => `${i.severity === "error" ? "Fix" : "Improve"} — ${i.title}`),
+      ...audit.signals.slice(0, 4).map((s) => `${s.label} — ${s.value}`),
+    ];
+
+    return {
+      ok: true,
+      task: `Auditing ${ctx.site}`,
+      reasoning: [
+        `Read the page's own HTML for title, description, headings and structured data, and asked Google for speed scores.`,
+        errors.length || warnings.length
+          ? `Found ${plural(errors.length, "issue")} to fix and ${plural(warnings.length, "improvement")}.`
+          : `Nothing failed the on-page checks.`,
+        audit.problems.length ? audit.problems[0] : "",
+      ].filter(Boolean).join(" "),
+      // Confidence tracks what was actually measured. Speed scores missing is not a reason
+      // to sound as sure as a run that had them.
+      confidence: clamp(audit.problems.length ? 0.5 : 0.8),
+      outputs: outputs.length ? outputs : ["No on-page issues found."],
+    };
+  },
+};
+
 // ---- Learning ----
 
 export const learningAgent: Agent = {
@@ -363,6 +474,8 @@ export const AGENTS: Record<AgentId, Agent> = {
   strategy: strategyAgent,
   content: contentAgent,
   creative: creativeAgent,
+  editor: editorAgent,
+  seo: seoAgent,
   publishing: publishingAgent,
   analytics: analyticsAgent,
   learning: learningAgent,

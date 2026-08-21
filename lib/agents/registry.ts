@@ -30,6 +30,20 @@ export const AGENT_PROFILES: Record<AgentId, AgentProfile> = {
     uses: ["Content Studio", "Job Engine", "Creative Director"],
     steps: ["asset_generation"],
   },
+  editor: {
+    id: "editor", name: "Editor", role: "Cuts the AI slop before anything reaches you",
+    responsibilities: ["Grade every draft", "Reject stock AI phrasing", "Catch unsourced claims", "Send weak openings back", "Break up monotone prose"],
+    // The same grader the composer runs, on purpose. An editor working from different rules
+    // than the writer rejects work the writer was instructed to produce.
+    uses: ["Craft scorer", "Content Studio"],
+    steps: ["editing"],
+  },
+  seo: {
+    id: "seo", name: "SEO", role: "Reads the site the way a search engine does",
+    responsibilities: ["On-page audit", "Title and description checks", "Heading structure", "Core Web Vitals", "PageSpeed scores"],
+    uses: ["SEO audit", "PageSpeed Insights"],
+    steps: ["site_audit"],
+  },
   publishing: {
     id: "publishing", name: "Publishing", role: "Gets approved work out safely, on every platform",
     responsibilities: ["Prepare publishing", "Validate content", "Optimise for platforms", "Schedule", "Retry", "Approval routing"],
@@ -68,9 +82,15 @@ export const AGENT_DEPENDENCIES: Record<AgentId, AgentId[]> = {
   strategy: ["research"],
   content: ["strategy", "research"],
   creative: ["strategy", "content"],
-  publishing: ["content", "creative"],
+  // Nothing reaches Publishing without passing the Editor. That is the point of having one:
+  // an editor downstream of publishing is a critic, not a gate.
+  editor: ["content"],
+  seo: ["research"],
+  publishing: ["content", "creative", "editor"],
   analytics: ["publishing"],
   learning: ["analytics"],
 };
 
-export const TEAM_ORDER: AgentId[] = ["research", "strategy", "content", "creative", "publishing", "analytics", "learning"];
+export const TEAM_ORDER: AgentId[] = [
+  "research", "strategy", "seo", "content", "creative", "editor", "publishing", "analytics", "learning",
+];

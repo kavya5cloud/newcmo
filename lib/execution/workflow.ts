@@ -43,6 +43,17 @@ export type ExecutionServices = {
   plan?(ctx: ExecutionContext): Promise<StepOutcome>;
   /** Job Engine (M11) — background generation work. */
   generate(ctx: ExecutionContext, kind: "asset" | "copy"): Promise<StepOutcome>;
+  /**
+   * Craft scorer — grade the copy before anything is optimised or queued.
+   *
+   * Optional for the same reason `plan` is: every existing caller constructs this object,
+   * and a required member would break them all to add a step they can simply not run. When
+   * absent the step records that nothing was graded rather than claiming it passed — an
+   * un-run editor reporting "approved" is the worst possible default here.
+   */
+  edit?(ctx: ExecutionContext): Promise<StepOutcome>;
+  /** SEO audit — read the site the way a search engine does. Optional; see `edit`. */
+  siteAudit?(ctx: ExecutionContext): Promise<StepOutcome>;
   /** Cross-Platform Publishing (M12) — per-platform constraints. */
   optimizeForPlatforms(ctx: ExecutionContext): Promise<StepOutcome>;
   /** Cross-Platform Publishing (M12) — queue/publish through the adapters. */
@@ -72,8 +83,14 @@ export class WorkflowCoordinator {
           ok: true,
           note: `${c.campaign.assetPlan.summary.total} assets planned across ${c.campaign.channels.join(", ")}`,
         }),
+      site_audit: (c) => this.services.siteAudit
+        ? this.services.siteAudit(c)
+        : Promise.resolve({ ok: true, note: "No site audit configured for this run." }),
       asset_generation: (c) => this.services.generate(c, "asset"),
       copy_generation: (c) => this.services.generate(c, "copy"),
+      editing: (c) => this.services.edit
+        ? this.services.edit(c)
+        : Promise.resolve({ ok: true, note: "No editor configured for this run — copy was not graded." }),
       platform_optimization: (c) => this.services.optimizeForPlatforms(c),
       // Approval is a gate, not work: the ApprovalCoordinator decides whether it pauses.
       approval: async () => ({ ok: true, note: "Approved" }),

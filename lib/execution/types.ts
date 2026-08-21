@@ -7,16 +7,19 @@
 
 /** The one workflow Populr executes, in order. Each step delegates; none re-implements. */
 export const WORKFLOW_STEPS = [
-  "mission", "research", "market_intelligence", "campaign_planning",
-  "asset_generation", "copy_generation", "platform_optimization", "approval",
+  "mission", "research", "market_intelligence", "site_audit", "campaign_planning",
+  // Editing sits between writing and publishing, which is the only position that makes it a
+  // gate rather than a critic. After publishing it would be a review of work already sent.
+  "asset_generation", "copy_generation", "editing", "platform_optimization", "approval",
   "publishing", "analytics", "learning", "optimization",
 ] as const;
 export type WorkflowStep = (typeof WORKFLOW_STEPS)[number];
 
 export const STEP_LABEL: Record<WorkflowStep, string> = {
   mission: "Mission", research: "Research", market_intelligence: "Market intelligence",
+  site_audit: "Site audit",
   campaign_planning: "Campaign planning", asset_generation: "Asset generation",
-  copy_generation: "Copy generation", platform_optimization: "Platform optimisation",
+  copy_generation: "Copy generation", editing: "Editing", platform_optimization: "Platform optimisation",
   approval: "Approval", publishing: "Publishing", analytics: "Analytics",
   learning: "Learning", optimization: "Optimise remaining campaign",
 };

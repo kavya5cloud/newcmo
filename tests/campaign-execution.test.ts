@@ -79,7 +79,10 @@ describe("campaign execution engine", () => {
     const e = engine();
     const r = await e.run(emptyExecutionState("t", plan.launchId, 0), plan, c0);
     expect(r.stopped).toBe("waiting_approval");
-    expect(r.ran).toEqual(["mission", "research", "market_intelligence", "campaign_planning", "asset_generation", "copy_generation", "platform_optimization"]);
+    // site_audit and editing are in the workflow but unconfigured in this fixture, so they
+    // run as no-ops. They still appear here: a step that reports "nothing was graded" has
+    // run, and hiding it would make the run look like it skipped a gate it did not have.
+    expect(r.ran).toEqual(["mission", "research", "market_intelligence", "site_audit", "campaign_planning", "asset_generation", "copy_generation", "editing", "platform_optimization"]);
     expect(r.state.campaigns[c0].status).toBe("waiting_approval");
   });
 

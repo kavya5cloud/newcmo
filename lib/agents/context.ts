@@ -2,6 +2,7 @@ import { marketPlatform } from "@/lib/market/shared";
 import { socialEngine } from "@/lib/social/shared";
 import { learningEngine } from "@/lib/learning/shared";
 import { db } from "@/lib/db";
+import { loadCanonicalProfile } from "@/lib/services/cmo-context";
 import type { LaunchCampaign, LaunchPlan } from "@/lib/launch/types";
 import type { SharedContext } from "./types";
 
@@ -26,7 +27,8 @@ export type AssembleInput = {
 export async function assembleContext(input: AssembleInput): Promise<SharedContext> {
   const { tenant, plan, campaign, now } = input;
 
-  const [accounts, jobs, history, memory, market] = await Promise.all([
+  const sql = db();
+  const [accounts, jobs, history, memory, market, drafts, profile] = await Promise.all([
     socialEngine().listAccounts(tenant).catch(() => []),
     socialEngine().listJobs(tenant).catch(() => []),
     socialEngine().listHistory(tenant).catch(() => []),
@@ -35,6 +37,11 @@ export async function assembleContext(input: AssembleInput): Promise<SharedConte
       tenant, terms: [plan.mission, campaign.title], competitors: [],
       industry: "saas", audience: campaign.brief.audience,
     }).catch(() => null),
+    // The Editor grades what has actually been written, not a sample it invents.
+    socialEngine().listDrafts(tenant).catch(() => []),
+    // business_profiles is where the analysed site lives. Absent for a workspace that has
+    // never been analysed, which the SEO agent reports rather than papering over.
+    sql ? loadCanonicalProfile(sql, tenant).catch(() => null) : Promise.resolve(null),
   ]);
 
   // Brand voice comes from the Learning Engine's evolved Brand DNA when it exists — the
@@ -71,6 +78,8 @@ export async function assembleContext(input: AssembleInput): Promise<SharedConte
       kpis: plan.kpis,
     },
     connectedPlatforms: accounts.map((a) => ({ platform: a.platform, handle: a.handle, status: a.status })),
+    site: (profile as { url?: string } | null)?.url?.trim() || null,
+    drafts: drafts.slice(0, 12).map((d) => ({ id: d.id, title: d.title, text: d.content.text })),
     analytics: {
       published: history.filter((h) => h.state === "published").length,
       failed: jobs.filter((j) => j.state === "failed" || j.state === "dead_letter").length,

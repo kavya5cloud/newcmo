@@ -9,7 +9,7 @@ import type { WorkflowStep } from "@/lib/execution/types";
 // Market Memory and the Learning Engine.
 
 export const AGENT_IDS = [
-  "research", "strategy", "content", "creative", "publishing", "analytics", "learning",
+  "research", "strategy", "content", "creative", "editor", "seo", "publishing", "analytics", "learning",
 ] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
 
@@ -82,6 +82,14 @@ export type SharedContext = {
   campaign: { id: string; title: string; goal: string; phase: string; channels: string[]; assetCount: number };
   goals: { objectives: string[]; kpis: { metric: string; target: string; timeframe: string }[] };
   connectedPlatforms: { platform: string; handle: string; status: string }[];
+  /**
+   * The business's own site, when one has been analysed. Null is a normal state — a
+   * workspace can run a whole campaign without ever having given us a URL — and the SEO
+   * agent says so rather than auditing something it guessed at.
+   */
+  site: string | null;
+  /** Copy already written for this workspace, so the Editor grades real drafts. */
+  drafts: { id: string; title: string; text: string }[];
   analytics: { published: number; failed: number; scheduled: number };
   market: { headline: string; trends: string[]; competitors: string[]; opportunities: string[] };
   /** Prior launches and campaigns already recorded — what Populr has done before. */
