@@ -3,6 +3,9 @@ import { learningEngine } from "@/lib/learning/shared";
 import { marketPlatform } from "@/lib/market/shared";
 import { socialEngine } from "@/lib/social/shared";
 import { createAdapterRegistry } from "@/lib/social/registry";
+import { referenceRepo } from "@/lib/intelligence/store";
+import { referencesToPrompt } from "@/lib/intelligence/retrieve";
+import type { Reference } from "@/lib/intelligence/types";
 import type { SocialPlatform } from "@/lib/social/types";
 
 // The context every generation consumes.
@@ -30,8 +33,14 @@ export type GenerationContext = {
   };
   /** Recall from Market Memory — what this workspace has observed before. */
   memory: string[];
-  /** What the Learning Engine has established works. */
+  /** What the Learning Engine has established works. Scoped to this workspace. */
   learned: { patterns: string[]; insights: string[] };
+  /**
+   * Marketing craft from the intelligence corpus — the shared library plus anything private
+   * to this workspace. Distinct from `learned`, which is only ever this business's own
+   * measured results; these are patterns that hold before there is anything to measure.
+   */
+  references: Reference[];
   platforms: { platform: SocialPlatform; maxText: number; maxAssets: number; requiresAsset: boolean; allowsVideo: boolean }[];
   previousCampaigns: string[];
   /** Sections that failed to load, named so the prompt can say so out loud. */
@@ -51,7 +60,7 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
   const missing: string[] = [];
   const sql = db();
 
-  const [accounts, brief, memory, brand, patterns, written] = await Promise.all([
+  const [accounts, brief, memory, brand, patterns, written, references] = await Promise.all([
     socialEngine().listAccounts(input.tenant).catch(() => { missing.push("connected platforms"); return []; }),
     marketPlatform().research.run({
       tenant: input.tenant, terms: input.terms.filter(Boolean).slice(0, 3),
@@ -65,6 +74,15 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
     // trends would push every previous angle out of it — which is precisely when repetition
     // starts.
     marketPlatform().memory.list(input.tenant, "content", 12).catch(() => { missing.push("what was already written"); return []; }),
+    // The corpus. Retrieval is deterministic and local, so this cannot fail slowly — but it
+    // degrades like every other source rather than taking the generation with it.
+    referenceRepo().find({
+      workspaceKey: input.tenant,
+      channel: input.platforms?.[0] ?? null,
+      audience: input.audience,
+      terms: input.terms,
+      limit: 5,
+    }).catch(() => { missing.push("marketing intelligence corpus"); return []; }),
   ]);
 
   const connected = [...new Set(accounts.filter((a) => a.status === "connected").map((a) => a.platform))];
@@ -104,6 +122,7 @@ export async function assembleGenerationContext(input: ContextInput): Promise<Ge
         .map((p) => `${p.label}: ${p.value} performs ${Math.round(p.performance * 100)}%`),
       insights: [],
     },
+    references,
     platforms,
     previousCampaigns: written.map((m) => m.value),
     missing,
@@ -125,7 +144,10 @@ export function contextToPrompt(ctx: GenerationContext): string {
   if (ctx.market.opportunities.length) lines.push(`OPPORTUNITIES: ${ctx.market.opportunities.join("; ")}`);
   if (ctx.market.keywords.length) lines.push(`KEYWORDS WORTH RANKING FOR: ${ctx.market.keywords.join(", ")}`);
   if (ctx.memory.length) lines.push(`PREVIOUSLY OBSERVED (market memory): ${ctx.memory.join("; ")}`);
-  if (ctx.learned.patterns.length) lines.push(`WHAT HAS PERFORMED BEFORE: ${ctx.learned.patterns.join("; ")}`);
+  if (ctx.learned.patterns.length) lines.push(`WHAT HAS PERFORMED BEFORE (this business): ${ctx.learned.patterns.join("; ")}`);
+  // Placed after the business's own evidence on purpose. General craft should inform how
+  // something is written; it must never outrank what this business has actually measured.
+  if (ctx.references.length) lines.push(referencesToPrompt(ctx.references));
   // Stated as a prohibition, not as background. "Previous campaigns: X" reads as material to
   // draw on and the model will happily draw on it by rewriting X. The instruction has to say
   // what to do with the list, and it has to sit next to the list.

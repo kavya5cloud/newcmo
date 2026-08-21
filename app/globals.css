@@ -3527,3 +3527,46 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .appui .issue-error { border-left-color: var(--redd); background: rgba(242,141,120,.06); }
 .appui .issue-t { font-size: 13px; font-weight: 500; color: var(--fg); }
 .appui .issue-d { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--faint); }
+
+/* ---- Marketing intelligence library ------------------------------------
+   Rows, not cards. A reference is a line of evidence and reads like one; tiling
+   them turns a corpus into a shop window, which is the wrong claim to make about
+   a library whose point is provenance rather than volume. */
+.intel-head{margin-bottom:20px}
+.intel-h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px}
+.intel-sub{margin:0;max-width:64ch;font-size:13.5px;line-height:1.55;color:var(--dim)}
+
+.intel-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:22px 0 14px}
+.intel-search{flex:1 1 220px;min-width:0;padding:8px 12px;border:1px solid var(--line);
+  border-radius:100px;background:var(--panel);color:var(--fg);font-size:13px}
+.intel-search:focus{outline:none;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+.intel-kinds{display:flex;flex-wrap:wrap;gap:6px}
+.intel-kinds .conn-btn.on{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+
+.intel-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.intel-row{padding:16px 0;border-top:1px solid var(--line)}
+.intel-row-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
+.intel-kind,.intel-chan,.intel-lic{font-family:'Geist Mono',monospace;font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase}
+.intel-kind{color:var(--acc)}
+.intel-chan{color:var(--dim)}
+/* Licence sits with the labels rather than in the footer: what we are allowed to do with a
+   row is part of what the row is, not a footnote to it. */
+.intel-lic{margin-left:auto;color:var(--faint)}
+.intel-pattern{margin:0 0 4px;font-size:15px;line-height:1.45;color:var(--fg)}
+.intel-evidence{margin:0;max-width:74ch;font-size:13px;line-height:1.6;color:var(--dim)}
+.intel-metrics{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:12px;
+  font-size:12.5px;color:var(--fg)}
+.intel-metrics em{font-style:normal;color:var(--faint)}
+.intel-row-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;
+  font-size:11.5px;color:var(--faint)}
+.intel-src a{color:var(--dim);text-decoration:underline}
+.intel-src a:hover{color:var(--acc)}
+.intel-tags{display:flex;flex-wrap:wrap;gap:6px}
+.intel-tags em{font-style:normal;padding:2px 8px;border:1px solid var(--line);border-radius:100px}
+.intel-empty{margin:24px 0;max-width:60ch;font-size:13.5px;line-height:1.6;color:var(--faint)}
+
+@media (max-width:640px){
+  .intel-lic{margin-left:0}
+  .intel-h1{font-size:20px}
+}

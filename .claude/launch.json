@@ -4,8 +4,21 @@
     {
       "name": "cosmos",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "cosmos-nodb",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "DATABASE_URL= npm run dev -- -p 3011"
+      ],
+      "port": 3011,
       "autoPort": false
     }
   ]

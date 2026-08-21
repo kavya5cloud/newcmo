@@ -14,6 +14,7 @@ const ctx = (over: Partial<GenerationContext> = {}): GenerationContext => ({
   learned: { patterns: ["hook: question performs 80%"], insights: [] },
   platforms: [{ platform: "x", maxText: 280, maxAssets: 4, requiresAsset: false, allowsVideo: true }],
   previousCampaigns: [],
+  references: [],
   missing: [],
   ...over,
 });

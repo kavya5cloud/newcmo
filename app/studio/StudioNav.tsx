@@ -41,6 +41,10 @@ const NAV: Item[] = [
     match: (p) => p === "/studio/social" || p === "/studio/publishing" || p === "/studio/launch",
   },
   {
+    href: "/studio/intelligence", label: "Intelligence",
+    icon: svg(<><path d="M12 3a6 6 0 0 0-3.6 10.8V17h7.2v-3.2A6 6 0 0 0 12 3z" /><path d="M9.6 20h4.8" /></>),
+  },
+  {
     href: "/studio/learning", label: "Results",
     icon: svg(<><path d="M4 19V5M4 19h16" /><path d="M8 16l4-6 3 3 5-7" /></>),
     // Opportunities and performance are both "how is it going", so they live together.
