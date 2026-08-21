@@ -38,7 +38,13 @@ const NAV: Item[] = [
   {
     href: "/studio/social", label: "Publishing",
     icon: svg(<><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></>),
-    match: (p) => p === "/studio/social" || p === "/studio/publishing" || p === "/studio/launch",
+    match: (p) => p === "/studio/social" || p === "/studio/publishing",
+  },
+  {
+    // The nine agents and what they each produced. It had no nav entry at all — reachable
+    // only by typing the URL — which is a strange place to leave the thing the product is.
+    href: "/studio/launch", label: "Team",
+    icon: svg(<><circle cx="9" cy="8" r="3" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.5a3 3 0 0 1 0 5.6" /><path d="M17.5 19a5.5 5.5 0 0 0-2-4.2" /></>),
   },
   {
     href: "/studio/intelligence", label: "Intelligence",

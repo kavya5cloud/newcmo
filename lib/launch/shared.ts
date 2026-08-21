@@ -15,6 +15,35 @@ export const DEFAULT_LAUNCH: LaunchInput = {
   timelineDays: 28,
 };
 
+/**
+ * A launch input for a real business, or null when we do not know one.
+ *
+ * Null rather than a filled-in guess: the page falls back to DEFAULT_LAUNCH and labels
+ * itself a worked example, which is honest. A plan for a business named "" presented as
+ * the visitor's own is not.
+ *
+ * Extracted from the page so it can be tested. It decides what every visitor sees on the
+ * flagship screen, which is too much judgement to leave inside a component.
+ */
+export function launchInputFor(
+  profile: { name?: string; oneLiner?: string; audience?: string; url?: string } | null,
+): LaunchInput | null {
+  const name = profile?.name?.trim();
+  if (!name) return null;
+  const clean = (v: string | undefined) => v?.trim() || undefined;
+  return {
+    ...DEFAULT_LAUNCH,
+    mission: `Grow ${name}`,
+    business: {
+      name,
+      oneLiner: clean(profile?.oneLiner),
+      audience: clean(profile?.audience),
+      url: clean(profile?.url),
+    },
+    audience: clean(profile?.audience),
+  };
+}
+
 let stateRepo: WorkspaceStateRepo | null = null;
 
 export function workspaceStateRepo(): WorkspaceStateRepo {

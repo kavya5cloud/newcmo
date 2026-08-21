@@ -3570,3 +3570,12 @@ html{scroll-padding-top:var(--eab-h,0px)}
   .intel-lic{margin-left:0}
   .intel-h1{font-size:20px}
 }
+
+/* The worked-example notice on the Launch Workspace. Amber, like every other "real but not
+   yours" state in the product — the same colour Paused and Linked use, so the meaning is
+   learned once. */
+.lw-example{margin:10px 0 0;padding:10px 14px;max-width:70ch;
+  border:1px solid color-mix(in srgb,#e0b341 35%,var(--line));border-radius:9px;
+  background:color-mix(in srgb,#e0b341 7%,transparent);
+  font-size:12.5px;line-height:1.55;color:var(--dim)}
+.lw-example a{color:var(--acc);text-decoration:underline}

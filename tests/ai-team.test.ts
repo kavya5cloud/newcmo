@@ -342,3 +342,42 @@ describe("the roster stays coherent as it grows", () => {
     }
   });
 });
+
+// Every visitor to the flagship screen watched nine agents do real work on OUR company:
+// the plan was DEFAULT_LAUNCH unconditionally. These pin who the team now works for.
+describe("the team plans for the visitor's business, or says it is an example", () => {
+  it("refuses to build a plan from a profile with no name", async () => {
+    const { launchInputFor } = await import("@/lib/launch/shared");
+    expect(launchInputFor(null)).toBeNull();
+    expect(launchInputFor({})).toBeNull();
+    // Whitespace is not a name. A mission reading "Grow    " shown as theirs is worse than
+    // an example clearly labelled as ours.
+    expect(launchInputFor({ name: "   " })).toBeNull();
+  });
+
+  it("names the real business in the mission", async () => {
+    const { launchInputFor } = await import("@/lib/launch/shared");
+    const input = launchInputFor({ name: "Acme", oneLiner: "invoices for freelancers", audience: "freelancers" })!;
+    expect(input.mission).toBe("Grow Acme");
+    expect(input.business.name).toBe("Acme");
+    expect(input.business.oneLiner).toBe("invoices for freelancers");
+    expect(input.audience).toBe("freelancers");
+  });
+
+  it("carries no trace of our own default business", async () => {
+    const { launchInputFor, DEFAULT_LAUNCH } = await import("@/lib/launch/shared");
+    const input = launchInputFor({ name: "Acme" })!;
+    expect(JSON.stringify(input)).not.toContain(DEFAULT_LAUNCH.business.name);
+    // Unknown fields are absent, not inherited from the example.
+    expect(input.business.audience).toBeUndefined();
+    expect(input.business.oneLiner).toBeUndefined();
+  });
+
+  it("still produces a real plan the engine can run", async () => {
+    const { launchInputFor } = await import("@/lib/launch/shared");
+    const { createLaunch } = await import("@/lib/launch/engine");
+    const plan = createLaunch(launchInputFor({ name: "Acme", audience: "freelancers" })!);
+    expect(plan.campaigns.length).toBeGreaterThan(0);
+    expect(plan.mission).toContain("Acme");
+  });
+});
