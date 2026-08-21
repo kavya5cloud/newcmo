@@ -25,6 +25,12 @@ type Item = { href: string; label: string; icon: ReactNode; match?: (p: string) 
 
 const NAV: Item[] = [
   {
+    // First, and deliberately outside /studio: the whole point is that a founder can read
+    // this and stop, without entering the workspace at all.
+    href: "/tomorrow", label: "Tomorrow",
+    icon: svg(<><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18" /><path d="M12 13v4M10 15h4" /></>),
+  },
+  {
     href: "/app", label: "Home",
     icon: svg(<><path d="M4 11l8-6 8 6" /><path d="M6 10v9h12v-9" /></>),
   },

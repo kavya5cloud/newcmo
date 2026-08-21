@@ -3579,3 +3579,56 @@ html{scroll-padding-top:var(--eab-h,0px)}
   background:color-mix(in srgb,#e0b341 7%,transparent);
   font-size:12.5px;line-height:1.55;color:var(--dim)}
 .lw-example a{color:var(--acc);text-decoration:underline}
+
+/* ---- Tomorrow ------------------------------------------------------------
+   One screen, one decision. Deliberately narrow and vertical: this is read top to
+   bottom in about fifteen seconds and then acted on. Nothing here is a column,
+   a tab or a filter, because every one of those is another decision and the whole
+   point is that the decisions were already made. */
+.tm{max-width:660px;margin:0 auto;padding:56px 24px 96px}
+.tm-head{margin-bottom:32px}
+.tm-day{display:block;font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.tm-h1{margin:0;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.25}
+
+.tm-list{list-style:none;margin:0;padding:0}
+.tm-post{display:flex;align-items:flex-start;gap:16px;padding:18px 0;border-top:1px solid var(--line)}
+.tm-time{flex:0 0 auto;padding-top:1px;font-family:'Geist Mono',monospace;font-size:12.5px;color:var(--acc)}
+.tm-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tm-where{font-size:12px;color:var(--faint);display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.tm-warn{font-style:normal;color:#e0b341}
+.tm-what{font-size:15.5px;line-height:1.4;color:var(--fg)}
+.tm-form{font-size:12.5px;line-height:1.45;color:var(--dim)}
+/* Visible, never loud. Dropping a post is a real action but it is not the one this
+   page is for, so it does not compete with the button that is. */
+.tm-drop{flex:0 0 auto;padding:4px 10px;border:1px solid transparent;border-radius:100px;
+  background:none;color:var(--faint);font-size:11.5px;transition:color .15s,border-color .15s}
+.tm-drop:hover{color:var(--fg);border-color:var(--line)}
+.tm-drop:disabled{opacity:.5}
+
+.tm-empty{margin:28px 0 0;max-width:52ch;font-size:14.5px;line-height:1.65;color:var(--dim)}
+.tm-empty a{color:var(--acc);text-decoration:underline}
+
+.tm-skip{margin-top:44px;padding-top:28px;border-top:1px solid var(--line)}
+.tm-h2{margin:0 0 16px;font-size:14px;font-weight:500;color:var(--dim);letter-spacing:-.01em}
+.tm-skip-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.tm-skip-list li{display:flex;flex-direction:column;gap:3px}
+.tm-skip-what{font-size:14px;color:var(--fg)}
+.tm-skip-why{font-size:12.5px;line-height:1.5;color:var(--faint)}
+
+.tm-decide{margin-top:48px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.tm-go{padding:13px 26px;border:0;border-radius:100px;background:var(--acc);color:#0b0d0a;
+  font-size:15px;font-weight:600;letter-spacing:-.01em;transition:filter .15s}
+.tm-go:hover{filter:brightness(1.08)}
+.tm-go:disabled{opacity:.6}
+.tm-decide-note{margin:0;font-size:12.5px;color:var(--faint)}
+.tm-standalone{margin-top:40px}
+
+@media (max-width:640px){
+  .tm{padding:36px 18px 72px}
+  .tm-h1{font-size:23px}
+  .tm-post{gap:12px}
+}
+.tm-more{display:inline-block;margin-bottom:26px;font-size:12.5px;color:var(--faint);
+  text-decoration:none;transition:color .15s}
+.tm-more:hover{color:var(--acc)}
