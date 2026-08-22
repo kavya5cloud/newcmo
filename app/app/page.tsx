@@ -763,10 +763,49 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   // It used to stay on the onboarding screen with a progress list for the full ten to twenty
   // seconds. A progress list says "it is working"; it never says "here is what you are
   // getting", and that is the question a person has ten seconds after pasting a URL.
+  /**
+   * The returning-customer wall.
+   *
+   * Built once and rendered in every branch, because it used to live only in the dashboard
+   * return — and a customer coming back after their month is exactly the person who does not
+   * reach it. With no workspace in local storage the page takes the `!entered` early return,
+   * shows "What are we growing?", and the first thing they learn about their expired trial
+   * is a 402 in the console after they paste a URL and wait.
+   *
+   * An overlay rather than a replacement screen, so the sentence about their work being safe
+   * is visibly true: the dashboard sits behind it where there is one.
+   */
+  const expiredLock = authUser && liveTrial && !liveTrial.active ? (
+    <div className="trial-lock">
+      <div className="trial-lock-card">
+        <span className="app-wordmark app-wordmark-lg">Populr.</span>
+        <h2>Your free month has ended</h2>
+        <p>Subscribe to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
+        {/* A link, not a fetch: /api/billing/checkout reads the session, builds the
+            checkout server-side and redirects on to Polar. It used to be a mailto saying
+            card payments were not self-serve, which was true when it was written and is
+            the kind of sentence nobody remembers to delete. */}
+        <a
+          className="acct-btn pri"
+          style={{ marginTop: 18, display: "inline-block", textDecoration: "none" }}
+          href="/api/billing/checkout"
+        >
+          Subscribe — $15/mo
+        </a>
+        <div className="trial-lock-foot">
+          <a href="/account">Account</a>
+          <span> · </span>
+          <button onClick={logout}>Log out</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (!entered && progress >= 0) {
     return (
       <div className="appui">
         <DashboardSkeleton steps={steps} progress={progress} />
+        {expiredLock}
       </div>
     );
   }
@@ -781,6 +820,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
           <span className="who" style={{ position: "fixed", top: 18, right: 18, zIndex: 5 }}><span className="whoemail">{authUser}</span><button className="lo" onClick={logout}>logout</button></span>
         )}
         {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+        {/* The branch a returning customer actually lands on. Without this the first thing
+            they learned about their expired month was a 402, after pasting a URL and waiting
+            for an analysis that was never going to run. */}
+        {expiredLock}
         <div className="onboard">
           <canvas className="dots" ref={dotsRef} aria-hidden="true" />
           <div className="ob-in">
@@ -1409,31 +1452,7 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
         </div>
       )}
       {authOpen && <AuthModal onClose={() => { if (!mustSignIn) setAuthOpen(false); }} forced={mustSignIn} />}
-      {authUser && liveTrial && !liveTrial.active && (
-        <div className="trial-lock">
-          <div className="trial-lock-card">
-            <span className="app-wordmark app-wordmark-lg">Populr.</span>
-            <h2>Your free month has ended</h2>
-            <p>Subscribe to keep your AI CMO running. Your workspace, drafts, and connections are safe.</p>
-            {/* A link, not a fetch: /api/billing/checkout reads the session, builds the
-                checkout server-side and redirects on to Polar. It used to be a mailto saying
-                card payments were not self-serve, which was true when it was written and is
-                the kind of sentence nobody remembers to delete. */}
-            <a
-              className="acct-btn pri"
-              style={{ marginTop: 18, display: "inline-block", textDecoration: "none" }}
-              href="/api/billing/checkout"
-            >
-              Subscribe — $15/mo
-            </a>
-            <div className="trial-lock-foot">
-              <a href="/account">Account</a>
-              <span> · </span>
-              <button onClick={logout}>Log out</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {expiredLock}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
