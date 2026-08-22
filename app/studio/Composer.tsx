@@ -293,7 +293,10 @@ export default function Composer({ initialFormat = "post" as ContentFormat, head
 
           {meta && (
             <p className="cmp-meta">
-              <span className="cmp-src">{meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in composer"}</span>
+              {/* Which model wrote it is not the customer's business and changes with a provider
+                  outage. Whether a model wrote it at all is very much their business, so that
+                  distinction stays and only the vendor name goes. */}
+              <span className="cmp-src">{meta.source === "llm" ? "written by Populr" : "built-in composer"}</span>
               <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
               <span className="cmp-reason">{meta.reasoning}</span>
             </p>

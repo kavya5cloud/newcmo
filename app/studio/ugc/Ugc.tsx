@@ -202,7 +202,7 @@ export default function UgcWorkspace() {
 
       {pkg && meta && (
         <div className="cmp-meta">
-          <span className="cmp-src">{meta.source === "llm" ? `${meta.provider}${meta.model ? ` · ${meta.model}` : ""}` : "built-in engine"}</span>
+          <span className="cmp-src">{meta.source === "llm" ? "written by Populr" : "built-in engine"}</span>
           <span className="cmp-conf">{Math.round(meta.confidence * 100)}% confident</span>
           <span className="cmp-reason">{meta.reasoning}</span>
           {meta.degradedReason && <span className="cmp-degraded">{meta.degradedReason}</span>}

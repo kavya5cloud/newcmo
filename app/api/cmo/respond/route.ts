@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { asksAboutIdentity, IDENTITY_ANSWER, scrubIdentity } from "@/lib/cmo/identity";
 import { getSession } from "@/lib/auth";
 import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
@@ -29,6 +30,22 @@ export async function POST(req: NextRequest) {
   if (!question) return NextResponse.json({ error: "empty_question" }, { status: 400 });
   const workspace = await workspaceKey(body.wsid ?? null);
   if (!workspace) return NextResponse.json({ error: "no_key" }, { status: 400 });
+
+  // "What model are you" is answered here, not by the model.
+  //
+  // Scrubbing catches a disclosure after the fact; this stops the question reaching a model
+  // that has every incentive to answer it accurately. It also makes the answer stable —
+  // asked twice on a day when the provider chain failed over, the founder would otherwise
+  // get two different replies, which is exactly what makes someone go looking.
+  //
+  // Costs nothing and cannot fail: no graph, no LLM, no round trip.
+  if (asksAboutIdentity(question)) {
+    return NextResponse.json({
+      text: IDENTITY_ANSWER, intent: "strategy", confidence: 1,
+      decision: null, evidence: [], cached: false,
+    });
+  }
+
   try {
     // Canonical state → business graph (versioned). The client profile is only a cold-start
     // seed; assembleCmoContext loads the canonical profile from the DB. The graph version is
@@ -71,7 +88,18 @@ export async function POST(req: NextRequest) {
     const provider: string | undefined = gen.provider;
     const model: string | undefined = gen.model;
     // The renderer/sanitizer is the presentation guarantee: no artifact ever reaches the UI.
-    const text = sanitizeCmoText(gen.text);
+    // Identity scrubbing runs after it, and is the enforcement rather than the request: the
+    // prompt rules ask the model not to name the vendor behind it, and asking is a
+    // preference. Logged when it fires, because a rising count means the prompt stopped
+    // holding and nobody would otherwise find out.
+    const cleaned = scrubIdentity(sanitizeCmoText(gen.text));
+    if (cleaned.findings.length) {
+      console.warn(JSON.stringify({
+        event: "identity_scrubbed", workspace, intent: routed.intent,
+        codes: cleaned.findings.map((f) => f.code),
+      }));
+    }
+    const text = cleaned.text;
     const response: CmoResponse = { text, intent: routed.intent, confidence: confidenceOf(ctx.signals), decision, evidence: Object.values(evidence).flat(), cached: false };
 
     // Persist the decision artifact + evidence (append-only), with model/response metadata,
