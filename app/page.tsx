@@ -102,37 +102,88 @@ export default function Landing() {
 
     const dcv = dotsRef.current;
     if (!dcv) return;
-    const dg = dcv.getContext("2d")!;
+    // `alpha: false` is wrong here — the dots sit over the mesh — but telling the browser
+    // reads are rare lets it keep the surface on the GPU.
+    const dg = dcv.getContext("2d", { desynchronized: true })!;
+
+    // Decoration must never cost the field its smoothness.
+    //
+    // This drew ~760 dots a frame at 60fps, each one assigning fillStyle a freshly built
+    // `rgba(...)` string — 760 allocations and 760 colour parses per frame, on top of
+    // clearing two million pixels. On a mid-range Android that is enough main-thread work
+    // to make typing in the hero input stutter, which is exactly what it did. The input is
+    // the product's first interaction; a background shimmer does not get to degrade it.
+    //
+    // Four changes, none of them visible: cap the pixel ratio, halve the frame rate, group
+    // the fills by opacity, and stop entirely when nobody can see it.
+    const DPR = Math.min(devicePixelRatio || 1, 2);
+    /** A slow shimmer gains nothing from 60fps and costs twice the work. */
+    const FRAME_MS = 1000 / 30;
+    /** Opacity buckets. fillStyle is set once per bucket instead of once per dot. */
+    const STEPS = 10;
+
     let DW = 0, DH = 0, GAP = 0, dots: { x: number; y: number; ph: number }[] = [], raf = 0;
+    let last = 0, visible = true;
+    const buckets: { x: number; y: number; s: number }[][] = Array.from({ length: STEPS }, () => []);
+
     const dsize = () => {
       if (!dcv.parentElement) return;
       const r = dcv.parentElement.getBoundingClientRect();
-      DW = dcv.width = r.width * devicePixelRatio;
-      DH = dcv.height = r.height * devicePixelRatio;
-      GAP = 26 * devicePixelRatio;
+      DW = dcv.width = r.width * DPR;
+      DH = dcv.height = r.height * DPR;
+      GAP = 26 * DPR;
       dots = [];
       for (let y = GAP / 2; y < DH; y += GAP)
         for (let x = GAP / 2; x < DW; x += GAP) dots.push({ x, y, ph: x * 0.011 + y * 0.017 });
     };
-    const ddraw = (t: number) => {
+
+    const paint = (t: number) => {
       dg.clearRect(0, 0, DW, DH);
       const tt = t * 0.00028;
+      for (const b of buckets) b.length = 0;
       for (const d of dots) {
         const w = Math.sin(d.x * 0.0016 + d.y * 0.0011 + tt * 2 + d.ph) * 0.5 + 0.5;
         const w2 = Math.sin(d.y * 0.002 - tt * 1.4) * 0.5 + 0.5;
         const b = w * 0.7 + w2 * 0.3;
-        const a = 0.03 + b * 0.1;
-        const s = (1.1 + b * 1.9) * devicePixelRatio;
-        dg.fillStyle = `rgba(250,250,250,${a.toFixed(3)})`;
-        dg.fillRect(d.x - s / 2, d.y - s / 2, s, s);
+        const s = (1.1 + b * 1.9) * DPR;
+        // Quantised, not rounded to a colour string: the difference between 0.031 and 0.034
+        // opacity on a 2px dot is not perceivable, and pretending it is costs a parse.
+        const step = Math.min(STEPS - 1, (b * STEPS) | 0);
+        buckets[step].push({ x: d.x - s / 2, y: d.y - s / 2, s });
       }
-      if (!reduce) raf = requestAnimationFrame(ddraw);
+      for (let i = 0; i < STEPS; i++) {
+        const list = buckets[i];
+        if (!list.length) continue;
+        dg.fillStyle = `rgba(250,250,250,${(0.03 + (i / STEPS) * 0.1).toFixed(3)})`;
+        for (const r of list) dg.fillRect(r.x, r.y, r.s, r.s);
+      }
     };
+
+    const ddraw = (t: number) => {
+      raf = requestAnimationFrame(ddraw);
+      if (!visible || t - last < FRAME_MS) return;
+      last = t;
+      paint(t);
+    };
+
     dsize();
     addEventListener("resize", dsize);
-    if (reduce) ddraw(0);
+
+    // Scrolled past, or the tab is in the background: the loop keeps being scheduled but
+    // paints nothing. A canvas animating under content nobody is looking at is pure cost.
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0 });
+    io.observe(dcv);
+    const onHidden = () => { visible = document.visibilityState === "visible"; };
+    document.addEventListener("visibilitychange", onHidden);
+
+    if (reduce) paint(0);
     else raf = requestAnimationFrame(ddraw);
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", dsize); };
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener("resize", dsize);
+      document.removeEventListener("visibilitychange", onHidden);
+      io.disconnect();
+    };
   }, []);
 
   return (
@@ -218,7 +269,19 @@ export default function Landing() {
 
               A plain GET form: no JavaScript needed to submit, and /app reads ?url= and
               starts on arrival. */}
-          <form className="hero-form" action="/app" method="get">
+          {/* Still a plain GET form that works with JavaScript off; the handler only tidies
+              what gets sent. Someone pasting a URL brings whatever was on the clipboard with
+              it — a trailing space, a newline out of a doc — and while canonicalSource trims
+              it later, the address bar in between should not show %20%20. */}
+          <form
+            className="hero-form"
+            action="/app"
+            method="get"
+            onSubmit={(e) => {
+              const field = e.currentTarget.elements.namedItem("url") as HTMLInputElement | null;
+              if (field) field.value = field.value.trim();
+            }}
+          >
             {/* type="text", not type="url".
                 
                 With type="url" the browser refuses "linear.app" before any of our code runs —
@@ -239,6 +302,9 @@ export default function Landing() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
+              /* "Go" on the phone keyboard rather than a newline glyph. The field submits,
+                 so the key that submits it should say so. */
+              enterKeyHint="go"
               required
             />
             <button type="submit" aria-label="Analyze my website">

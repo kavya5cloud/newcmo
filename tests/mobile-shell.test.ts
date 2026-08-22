@@ -26,7 +26,7 @@ describe("sideways rails do not draw a scrollbar across the screen", () => {
       expect(css, rail).toContain(rail);
     }
     // Hiding it alone would remove the only hint that there is more; the fade replaces it.
-    expect(css).toMatch(/\.settings \.set-rail \{[^}]*mask-image/s);
+    expect(css).toMatch(/\.settings \.set-rail \{[\s\S]*?mask-image/);
   });
 });
 
