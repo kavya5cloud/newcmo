@@ -3651,3 +3651,30 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .tm-b-fix:hover{text-decoration:underline}
 .tm-block-done{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line);
   font-size:11.5px;color:var(--faint)}
+
+/* "Recommended" on the pre-selected answer. Says why it is already chosen, so a default
+   reads as advice rather than as something the form filled in behind you. */
+.asst-rec{margin-left:8px;padding:2px 8px;border-radius:100px;
+  background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc);
+  font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+  vertical-align:middle}
+
+/* Planning, always reachable from the dashboard. Quiet once marketing is running: it is a
+   way back, not a call to action, and a loud button here would imply something is wrong. */
+.home-plan{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-top:18px}
+.home-plan-link{font-size:12.5px;color:var(--dim);text-decoration:none;
+  border-bottom:1px solid var(--line);padding-bottom:2px;transition:color .15s,border-color .15s}
+.home-plan-link:hover{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+
+/* The CMO's offer to act, under the answer that prompted it. Inside the message bubble on
+   purpose — it belongs to that reply, not to the conversation, and a founder scrolling back
+   should see which answer offered what. */
+.msg-do{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding-top:10px;
+  border-top:1px solid var(--line)}
+.msg-do-what{flex:1 1 180px;min-width:0;font-size:12px;line-height:1.45;color:var(--faint)}
+.msg-do-go{padding:5px 14px;border:0;border-radius:100px;background:var(--acc);color:#0b0d0a;
+  font-size:12px;font-weight:600;transition:filter .15s}
+.msg-do-go:hover{filter:brightness(1.08)}
+.msg-do-go:disabled{opacity:.6}
+/* Once taken, the offer becomes a record of what happened rather than disappearing. */
+.msg-done{font-size:12px;color:var(--acc)}

@@ -3,7 +3,7 @@ import HomeHero from "./HomeHero";
 import { FEED_SLOT_MS, feedIsFresh } from "@/lib/agent-feed";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type FeedEntry } from "@/lib/store";
+import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type ChatAction, type FeedEntry } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
 import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
@@ -87,6 +87,7 @@ export default function AppPage() {
   const [source, setSource] = useState<SourceType>("website");
   const [sourceDesc, setSourceDesc] = useState("");
   const [chatInput, setChatInput] = useState("");
+  const [busyAction, setBusyAction] = useState<number | null>(null);
   const [typing, setTyping] = useState(false);
   const [chatMode, setChatMode] = useState<"strategy" | "copy">("strategy");
   const [authUser, setAuthUser] = useState<string | null>(null);
@@ -563,11 +564,56 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
   }
 
   /* ---- chat ---- */
+  /**
+   * Does this instruction correspond to something Populr can actually carry out?
+   *
+   * Deterministic parse on the server (`preview: true` runs nothing), so a question is
+   * never mistaken for an order by a model in a hurry. The answer is only ever an offer:
+   * a false positive costs a button nobody presses, whereas acting on one would schedule
+   * a week of posts because someone asked whether they should.
+   */
+  async function offerFor(text: string): Promise<ChatAction | undefined> {
+    try {
+      const r = await fetch("/api/launch/command", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, preview: true, wsid: workspaceId() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!d?.ok || !d.parsed || d.parsed.intent === "unknown") return undefined;
+      return { intent: d.parsed.intent, summary: d.parsed.summary, text };
+    } catch { return undefined; }
+  }
+
+  /** Carry out an offer the founder accepted, and report what actually happened. */
+  async function runAction(msgIndex: number) {
+    const msg = chat[msgIndex];
+    if (!msg?.action || msg.action.ran) return;
+    setBusyAction(msgIndex);
+    try {
+      const r = await fetch("/api/launch/command", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: msg.action.text, wsid: workspaceId() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      const done = d?.outcome?.done || (d?.ok ? "Done." : "That didn't go through.");
+      // Marked on the message, so an offer already taken cannot be taken again by scrolling
+      // back up to it.
+      setChat((c) => c.map((m, i) => (i === msgIndex && m.action ? { ...m, action: { ...m.action, ran: done } } : m)));
+      const details: string[] = Array.isArray(d?.outcome?.details) ? d.outcome.details : [];
+      setChat((c) => [...c, { who: "ai", text: [done, ...details].join("\n"), intent: "action" }]);
+    } catch {
+      showToast("That didn't go through. Try again.");
+    } finally { setBusyAction(null); }
+  }
+
   async function sendChat() {
     const q = chatInput.trim(); if (!q) return;
     setChatInput(""); setChat((c) => [...c, { who: "me", text: q }]); setTyping(true);
     let reply: string;
     let intent = "strategy";
+    // Asked alongside the answer, not instead of it. The CMO still explains its thinking;
+    // the offer is what turns an explanation into something that happens.
+    const offer = offerFor(q);
     try {
       // The server owns classification, evidence retrieval, deterministic decision-making,
       // and rendering. The browser sends the founder's request, never an assembled prompt.
@@ -586,7 +632,8 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
     } catch (e) {
       reply = `AI request failed: ${aiErrorText(e).slice(0, 200)}`;
     }
-    setTyping(false); setChat((c) => [...c, { who: "ai", text: reply, intent }]);
+    const action = await offer;
+    setTyping(false); setChat((c) => [...c, { who: "ai", text: reply, intent, action }]);
   }
 
   function reset() {
@@ -1214,6 +1261,28 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
                       {m.who === "ai" && (
                         <div className="msg-actions">
                           <button onClick={() => { navigator.clipboard?.writeText(m.text).then(() => showToast("Copied")); }}>Copy</button>
+                        </div>
+                      )}
+                      {/* What it can do about what it just said.
+                          Restated before it runs and never run on its own: the parse is
+                          deterministic but the instruction was written by a person, and
+                          "should we publish now?" and "publish now" are one word apart. */}
+                      {m.action && (
+                        <div className="msg-do">
+                          {m.action.ran ? (
+                            <span className="msg-done">{m.action.ran}</span>
+                          ) : (
+                            <>
+                              <span className="msg-do-what">{m.action.summary}</span>
+                              <button
+                                className="msg-do-go"
+                                disabled={busyAction === i}
+                                onClick={() => runAction(i)}
+                              >
+                                {busyAction === i ? "Working…" : "Do it"}
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>

@@ -41,7 +41,15 @@ export default function Assistant() {
   const [step, setStep] = useState<Step>(0);
   const [cadence, setCadence] = useState<AssistantCadence | null>(null);
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([]);
-  const [control, setControl] = useState<ControlLevel | null>(null);
+  // Pre-answered, and the only one of the four that is.
+  //
+  // The other three have no defensible default — how often to post, where, and what for are
+  // genuinely the founder's call. This one has a right answer for almost everyone: hold the
+  // things with a date and a face attached, let routine posts go. Starting it null made the
+  // most common choice cost a decision, and "Review everything" is what a cautious person
+  // picks under uncertainty and then never revisits, which turns an AI CMO into an approval
+  // queue.
+  const [control, setControl] = useState<ControlLevel>("review_important");
   const [goal, setGoal] = useState<Goal | null>(null);
 
   const load = useCallback(async () => {
@@ -239,7 +247,10 @@ export default function Assistant() {
               {CONTROL_LEVELS.map((c) => (
                 <button key={c} className={"asst-choice" + (control === c ? " on" : "")}
                   aria-pressed={control === c} onClick={() => setControl(c)}>
-                  <strong>{CONTROL_META[c].label}</strong>
+                  <strong>
+                    {CONTROL_META[c].label}
+                    {c === "review_important" && <span className="asst-rec">Recommended</span>}
+                  </strong>
                   <em>{CONTROL_META[c].detail}</em>
                 </button>
               ))}

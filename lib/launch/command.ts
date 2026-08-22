@@ -64,6 +64,13 @@ function parseQuantity(s: string): number | undefined {
   return n > 0 && n <= 100 ? n : undefined;
 }
 
+/**
+ * Alternation binds looser than \b, so /\bpause|stop|hold\b/ anchors only the first and
+ * last words: "stop" matched inside "nonstop", and "market" inside "marketing", which turned
+ * "how is my marketing doing" — a question — into an offer to run a research pass. Harmless
+ * while this only served a command bar someone typed into deliberately; not harmless now the
+ * chat routes every sentence through it. Every alternation below is grouped.
+ */
 export function parseCommand(input: string): ParsedCommand {
   const s = input.toLowerCase().trim();
   const timelineDays = parseHorizon(s);
@@ -88,7 +95,7 @@ export function parseCommand(input: string): ParsedCommand {
     };
   }
 
-  if (/\bgenerate|write|draft|make\b/.test(s) && /\bposts?|assets?|creatives?|content\b/.test(s)) {
+  if (/\b(generate|write|draft|make)\b/.test(s) && /\b(posts?|assets?|creatives?|content)\b/.test(s)) {
     const n = quantity ?? 5;
     const where = platform ? ` for ${platform}` : "";
     return {
@@ -101,7 +108,7 @@ export function parseCommand(input: string): ParsedCommand {
   if (/\bschedule\b/.test(s)) {
     return {
       intent: "schedule_all",
-      summary: /\beverything|all\b/.test(s)
+      summary: /\b(everything|all)\b/.test(s)
         ? "Schedule every unscheduled item on the plan's publishing slots."
         : "Schedule the selected items on the plan's publishing slots.",
       params: { platform },
@@ -112,11 +119,11 @@ export function parseCommand(input: string): ParsedCommand {
     return { intent: "publish_now", summary: "Advance approved items into the publishing queue.", params: { platform } };
   }
 
-  if (/\bpause|stop|hold\b/.test(s)) {
+  if (/\b(pause|stop|hold)\b/.test(s)) {
     return { intent: "pause_all", summary: "Pause every in-progress item. Nothing is deleted.", params: {} };
   }
 
-  if (/\bresearch|trends?|competitors?|market|opportunit/.test(s)) {
+  if (/\b(research|trends?|competitors?|market|opportunit\w*)\b/.test(s)) {
     return { intent: "research_market", summary: "Run a market research pass and refresh the intelligence panel.", params: { subject: input.trim() } };
   }
 

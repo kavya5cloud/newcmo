@@ -23,7 +23,25 @@ export type Draft = {
    *  approve/publish events can never mislink after a re-analysis replaces the map. */
   recId?: string;
 };
-export type ChatMsg = { who: "ai" | "me"; text: string; intent?: string };
+/**
+ * A thing the CMO offered to do, attached to the message that offered it.
+ *
+ * Carried on the message rather than held as one "pending action" on the page, because a
+ * founder can ask three things in a row and each answer keeps its own offer. A single
+ * pending slot would silently replace the first two.
+ */
+export type ChatAction = {
+  /** The deterministic intent the command parser found. */
+  intent: string;
+  /** What will happen, restated before it happens. */
+  summary: string;
+  /** The original instruction, re-sent verbatim to execute. */
+  text: string;
+  /** Set once it has run, so an offer cannot be taken twice. */
+  ran?: string;
+};
+
+export type ChatMsg = { who: "ai" | "me"; text: string; intent?: string; action?: ChatAction };
 export type FeedEntry = { summary: string; items: [string, string][] };
 // Removed: Ranking. It typed a shape only the dashboard's Top queries panel used, and that
 // panel now shows Search Console data or nothing. The type's last job was carrying guessed

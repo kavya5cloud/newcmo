@@ -115,6 +115,19 @@ export default function HomeHero({ company }: { company?: string }) {
         </div>
       )}
 
+      {/* The way in to planning, always present.
+          Setting the plan up was reachable only from the empty state, so once marketing was
+          running there was no route back to change it — the founder had to know the URL. The
+          wording follows the state: there is a difference between starting a plan and
+          revisiting one, and one label for both makes the first read like a chore and the
+          second like a reset. */}
+      <div className="home-plan">
+        <a className={configured ? "home-plan-link" : "home-cta"} href="/app/assistant">
+          {configured ? "Change the plan" : "Plan my marketing"}
+        </a>
+        {configured && <a className="home-plan-link" href="/tomorrow">See tomorrow</a>}
+      </div>
+
     </section>
   );
 }
