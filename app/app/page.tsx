@@ -3,7 +3,7 @@ import HomeHero from "./HomeHero";
 import { FEED_SLOT_MS, feedIsFresh } from "@/lib/agent-feed";
 import AccountConnections from "@/app/components/AccountConnections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type ChatAction, type FeedEntry } from "@/lib/store";
+import { loadLocal, loadState, saveState, workspaceId, type Saved, type Profile, type Draft, type ChatMsg, type ChatAction, type FeedEntry } from "@/lib/store";
 import { CHANNEL_LABELS, formatWindowLabel, channelSchedule, type PublishChannel } from "@/lib/publish-times";
 import { matchGscSite, displaySite } from "@/lib/gsc-match";
 import { fetchPushStatus, subscribePush, unsubscribePush, type PushStatus } from "@/lib/push-client";
@@ -52,6 +52,9 @@ function isSafeNext(v: string): boolean {
 
 export default function AppPage() {
   const [entered, setEntered] = useState(false);
+  // True until the saved workspace has been read. Without it the first paint has to guess
+  // which screen someone is on, and it guesses "new visitor" for every returning one.
+  const [hydrating, setHydrating] = useState(true);
   const [cloud, setCloud] = useState(false);
   const [url, setUrl] = useState("");
   const [inputUrl, setInputUrl] = useState("");
@@ -150,20 +153,35 @@ export default function AppPage() {
   }, [chatMode]);
 
   /* ---- hydrate from persistence on mount ---- */
+  //
+  // Local first, and synchronously, before anything is awaited.
+  //
+  // This used to await loadState(), which fetches /api/state — so every mount, including
+  // pressing back, rendered "What are we growing?" until the network answered and then
+  // snapped to the dashboard. On a phone that is the two seconds of the wrong screen someone
+  // reported. localStorage already holds the same workspace and reads instantly, so the
+  // branch is decided from that and the cloud copy reconciles behind it.
   useEffect(() => {
+    const apply = (saved: Saved) => {
+      setUrl(saved.url); setProfile(saved.profile);
+      setCompetitors(saved.competitors || []); setChat(saved.chat || []);
+      setDrafts(saved.drafts || []); setFeed(saved.feed || {}); setFeedAt(saved.feedAt);
+      setDocCache(saved.docs || {});
+      setEstTraffic(saved.estTraffic || null);
+      setGscSite(saved.gscSite || "");
+      setRecIds(saved.recIds || {});
+      setEntered(true);
+    };
+
+    const local = loadLocal();
+    if (local?.profile) apply(local);
+    // Whether there is a workspace is now known, so a branch can be chosen without guessing.
+    setHydrating(false);
+
     (async () => {
       const { saved, cloud } = await loadState();
       setCloud(cloud);
-      if (saved?.profile) {
-        setUrl(saved.url); setProfile(saved.profile);
-        setCompetitors(saved.competitors || []); setChat(saved.chat || []);
-        setDrafts(saved.drafts || []); setFeed(saved.feed || {}); setFeedAt(saved.feedAt);
-        setDocCache(saved.docs || {});
-        setEstTraffic(saved.estTraffic || null);
-        setGscSite(saved.gscSite || "");
-        setRecIds(saved.recIds || {});
-        setEntered(true);
-      }
+      if (saved?.profile) apply(saved);
       hydrated.current = true;
     })();
   }, []);
@@ -800,6 +818,10 @@ Output ONLY this JSON, nothing else: {"impressions":<integer>,"clicks":<integer>
       </div>
     </div>
   ) : null;
+
+  // Nothing is rendered until the workspace is known. One frame of an empty shell beats a
+  // returning customer watching the new-visitor screen and then being thrown somewhere else.
+  if (hydrating) return <div className="appui" />;
 
   if (!entered && progress >= 0) {
     return (

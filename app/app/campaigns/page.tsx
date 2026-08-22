@@ -106,6 +106,13 @@ export default function Missions() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [planning, setPlanning] = useState<string | null>(null); // goal id being planned
+  // Which of the three steps is running.
+  //
+  // Planning is a decide → write → save chain that takes tens of seconds, and the button
+  // said "planning…" for all of it. A single unchanging word for thirty seconds is
+  // indistinguishable from a hang, which is most of why this felt slow: the work was
+  // visible in the code as three named phases and invisible on screen.
+  const [phase, setPhase] = useState<string>("");
   const [err, setErr] = useState<string | null>(null);
   const [assets, setAssets] = useState<Record<string, AssetRow[]>>({}); // campaignId → rows
   const [genBusy, setGenBusy] = useState<string | null>(null);
@@ -137,6 +144,7 @@ export default function Missions() {
   async function startMission(goalId: string) {
     if (!profile || planning) return;
     setPlanning(goalId);
+    setPhase("choosing channels");
     setErr(null);
     try {
       // 1. DECIDE — the engine ranks channels from real outcome data, before any LLM.
@@ -148,6 +156,7 @@ export default function Missions() {
         .join(", ");
 
       // 2. PLAN — the LLM turns the decision into a campaign + creative brief.
+      setPhase("writing the plan");
       const goalLabel = GOAL_LABEL[goalId] || goalId;
       const prompt = `You are Populr, the AI CMO for ${profile.name} — ${profile.oneLiner}. Audience: ${profile.audience}. Voice: ${profile.voice}. Positioning: ${profile.positioning}
 Mission: ${goalLabel}.
@@ -159,12 +168,17 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
       let campaign: unknown = null;
       let lastErr: unknown = null;
       for (let attempt = 0; attempt < 2 && !campaign; attempt++) {
+        // The second pass is a full round trip, so it is named. Silently repeating the
+        // longest step is exactly when someone decides the page has hung and reloads it —
+        // which throws away a plan that was about to arrive.
+        if (attempt > 0) setPhase("the plan came back malformed — rewriting");
         try { campaign = parseJSON(await ai(prompt, url)); }
         catch (e) { lastErr = e; }
       }
       if (!campaign) throw lastErr || new Error("plan_failed");
 
       // 3. PERSIST — server validates the creative-brief contract before anything is stored.
+      setPhase("saving");
       const res = await fetch("/api/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,6 +192,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
       setErr(String(e instanceof Error ? e.message : e).slice(0, 160));
     } finally {
       setPlanning(null);
+      setPhase("");
     }
   }
 
@@ -408,7 +423,7 @@ Give 4-8 tasks total across the timeline, each concrete enough to execute. Never
           <div className="m-goals">
             {CAMPAIGN_GOALS.map((g) => (
               <button key={g.id} className="m-goal" disabled={!!planning} onClick={() => startMission(g.id)}>
-                {planning === g.id ? "planning…" : g.label}
+                {planning === g.id ? `${phase}…` : g.label}
               </button>
             ))}
           </div>

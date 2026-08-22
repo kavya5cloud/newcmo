@@ -25,9 +25,20 @@ function Bar({ w, h }: { w: string; h?: number }) {
   return <span className="skl" style={BAR(w, h)} aria-hidden="true" />;
 }
 
-function Column({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * @param mobile Marks the one column a phone shows.
+ *
+ * On mobile the dashboard hides every column except `.col.mactive` and switches between them
+ * with the bottom tab bar. The skeleton copied the column markup but not that class, so all
+ * four were display:none and the loading screen was the progress log above a black void —
+ * the whole point of showing the layout early, inverted into looking broken.
+ *
+ * "company" because that is the tab the real dashboard opens on, so the shape someone sees
+ * loading is the shape they get.
+ */
+function Column({ title, children, mobile }: { title: string; children: React.ReactNode; mobile?: boolean }) {
   return (
-    <div className="col">
+    <div className={"col" + (mobile ? " mactive" : "")}>
       <div className="col-head"><span className="ct">{title}</span></div>
       <div className="col-body">{children}</div>
     </div>
@@ -59,7 +70,7 @@ export default function DashboardSkeleton({ steps, progress }: { steps: string[]
       </div>
 
       <div className="dash">
-        <Column title="Company">
+        <Column title="Company" mobile>
           <Bar w="72%" h={16} />
           <div className="skl-stack">
             <Bar w="96%" /><Bar w="90%" /><Bar w="93%" /><Bar w="61%" />
