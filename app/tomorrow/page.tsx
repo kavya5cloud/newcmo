@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { workspaceId } from "@/lib/store";
 import type { Tomorrow } from "@/lib/tomorrow/assemble";
+import type { Readiness } from "@/lib/autopilot/readiness";
 
 // The end-of-day read.
 //
@@ -22,7 +23,7 @@ const time = (at: number) =>
 const dayName = (at: number) =>
   new Date(at).toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
 
-type Payload = { ok: true; tomorrow: Tomorrow; headline: string };
+type Payload = { ok: true; tomorrow: Tomorrow; headline: string; readiness: Readiness };
 
 export default function TomorrowPage() {
   const [data, setData] = useState<Payload | null>(null);
@@ -79,6 +80,31 @@ export default function TomorrowPage() {
 
       {err && <p className="conn-err" role="alert">{err}</p>}
 
+      {/* Why nothing will go out, next to what was planned.
+          Shown only when something is actually wrong: a permanent checklist over a working
+          setup is a nag, and it teaches people to scroll past the one time it matters. */}
+      {data.readiness.blockers.length > 0 && (
+        <section className="tm-block">
+          <h2 className="tm-block-h">
+            {data.readiness.autonomous
+              ? "Worth knowing"
+              : "Populr can't post by itself yet"}
+          </h2>
+          <ul className="tm-block-list">
+            {data.readiness.blockers.map((b) => (
+              <li key={b.code} className={b.blocking ? "tm-b-stop" : "tm-b-note"}>
+                <span className="tm-b-title">{b.title}</span>
+                <span className="tm-b-detail">{b.detail}</span>
+                {b.fix && <a className="tm-b-fix" href={b.fix.href}>{b.fix.label} →</a>}
+              </li>
+            ))}
+          </ul>
+          {data.readiness.done.length > 0 && (
+            <p className="tm-block-done">Already done: {data.readiness.done.join(" · ")}</p>
+          )}
+        </section>
+      )}
+
       {t.posts.length > 0 && (
         <ol className="tm-list">
           {t.posts.map((p) => (
@@ -106,18 +132,14 @@ export default function TomorrowPage() {
         </ol>
       )}
 
-      {t.posts.length === 0 && (
+      {/* "Not configured" and "paused" are already stated above, with the same fix attached.
+          Repeating them here read as two problems rather than one. Only a clear day needs
+          its own line, because nothing above explains a day with nothing wrong and nothing
+          in it. */}
+      {t.posts.length === 0 && t.idleReason === "nothing_due" && (
         <p className="tm-empty">
-          {t.idleReason === "not_configured" && (
-            <>Populr hasn&apos;t been told what to work on yet. <Link href="/app">Start here</Link>.</>
-          )}
-          {t.idleReason === "paused" && (
-            <>Nothing will go out until you resume it. <Link href="/studio/social">Resume</Link>.</>
-          )}
-          {t.idleReason === "nothing_due" && (
-            <>Tomorrow is clear. That is sometimes the right plan — posting to a schedule you
-              can&apos;t sustain costs more than a quiet day.</>
-          )}
+          Tomorrow is clear. That is sometimes the right plan — posting to a schedule you
+          can&apos;t sustain costs more than a quiet day.
         </p>
       )}
 

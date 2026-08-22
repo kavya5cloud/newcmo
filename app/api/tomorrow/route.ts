@@ -5,6 +5,11 @@ import { rateLimit, requestKey } from "@/lib/throttle";
 import { automationRepo } from "@/lib/automation/shared";
 import { liveAdapterPlatforms } from "@/lib/social/registry";
 import { assembleTomorrow, tomorrowHeadline, tomorrowWindow } from "@/lib/tomorrow/assemble";
+import { assessAutopilot } from "@/lib/autopilot/readiness";
+import { lastHeartbeat } from "@/lib/autopilot/heartbeat";
+import { accessForUser } from "@/lib/billing/gate";
+import { assistantStore } from "@/lib/assistant/shared";
+import { socialEngine } from "@/lib/social/shared";
 
 export const runtime = "nodejs";
 
@@ -24,8 +29,33 @@ export async function GET(req: NextRequest) {
   const tzOffset = Number.isFinite(tz) ? Math.max(-840, Math.min(840, tz)) : 0;
 
   try {
-    const t = await assembleTomorrow(tenant, Date.now(), { livePlatforms: new Set(liveAdapterPlatforms()) }, tzOffset);
-    return NextResponse.json({ ok: true, tomorrow: t, headline: tomorrowHeadline(t) });
+    const now = Date.now();
+    const live = liveAdapterPlatforms();
+
+    // Why nothing will publish, assembled beside what will. Separating them would put the
+    // plan on one screen and the reason it cannot run on another, which is the shape of
+    // problem this page exists to end.
+    const [t, settings, automations, accounts, heartbeat, access] = await Promise.all([
+      assembleTomorrow(tenant, now, { livePlatforms: new Set(live) }, tzOffset),
+      assistantStore().get(tenant).catch(() => null),
+      automationRepo().listAutomations(tenant).catch(() => []),
+      socialEngine().listAccounts(tenant).catch(() => []),
+      lastHeartbeat().catch(() => null),
+      session ? accessForUser(session.userId).catch(() => null) : Promise.resolve(null),
+    ]);
+
+    const readiness = assessAutopilot({
+      // No session is a demo, not a lapsed customer. accessForUser already fails open for
+      // the same reason; treating an anonymous viewer as unpaid would put a subscribe
+      // prompt in front of someone who has not been asked to sign in yet.
+      hasPlan: access ? access.allowed : true,
+      settings, automations,
+      connectedPlatforms: accounts.filter((a) => a.status === "connected").map((a) => a.platform),
+      livePlatforms: live,
+      heartbeat, now,
+    });
+
+    return NextResponse.json({ ok: true, tomorrow: t, headline: tomorrowHeadline(t), readiness });
   } catch {
     return NextResponse.json({ error: "unavailable" }, { status: 503 });
   }

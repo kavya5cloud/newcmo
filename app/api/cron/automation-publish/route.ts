@@ -8,6 +8,7 @@ import { assistantStore } from "@/lib/assistant/shared";
 import { loadCanonicalProfile } from "@/lib/services/cmo-context";
 import { db } from "@/lib/db";
 import { recordGeneration } from "@/lib/content/generation-log";
+import { recordHeartbeat } from "@/lib/autopilot/heartbeat";
 import type { Automation, QueueItem } from "@/lib/automation/types";
 
 export const runtime = "nodejs";
@@ -206,6 +207,11 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       console.warn(JSON.stringify({ event: "dispatch_due_failed", error: String(e).slice(0, 200) }));
     }
+
+    // Proof the pass happened, so the app can stop taking "next post tomorrow 09:00" on
+    // trust. Written after the work, not before: a heartbeat recorded on entry would go on
+    // looking healthy through a pass that threw halfway.
+    await recordHeartbeat({ at: now, dispatched, tenants: report.length });
 
     return NextResponse.json({ ok: true, at: now, tenants: report.length, dispatched, report });
   } catch (e) {
