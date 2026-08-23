@@ -68,7 +68,7 @@ describe("the pass yields rather than being killed", () => {
     // Twenty-five due slots, each needing generation, do not fit in a 60s function. Being
     // terminated mid-loop is what stranded claims in the first place.
     const queue = Array.from({ length: 25 }, (_, i) => slot({ id: `q${i}`, at: NOW - 1000 }));
-    const r = await runDue(queue, "t", { now: NOW, engine: port(), budgetMs: 0 });
+    const r = await runDue(queue, "t", { now: NOW, engine: port(), budgetMs: 0, content: async () => null });
     // Budget zero: the first check trips before anything is claimed.
     expect(r.outcomes.length).toBe(0);
     expect(r.queue.every((q) => q.state === "upcoming")).toBe(true);
@@ -76,7 +76,7 @@ describe("the pass yields rather than being killed", () => {
 
   it("leaves unstarted slots upcoming so the next pass takes them", async () => {
     const queue = Array.from({ length: 5 }, (_, i) => slot({ id: `q${i}`, at: NOW - 1000 }));
-    const r = await runDue(queue, "t", { now: NOW, engine: port(), budgetMs: 0 });
+    const r = await runDue(queue, "t", { now: NOW, engine: port(), budgetMs: 0, content: async () => null });
     expect(r.queue.filter((q) => q.state === "upcoming")).toHaveLength(5);
   });
 });

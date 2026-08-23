@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bestResult } from "@/lib/results/headline";
 import { db } from "@/lib/db";
 import { getAccessToken, queryAnalytics, isoDaysAgo, listSites, ensureGoogleTable } from "@/lib/google";
 import {
@@ -41,35 +42,11 @@ function siteHost(siteUrl: string): string {
   }
 }
 
-/**
- * The single most notification-worthy improvement between two weekly snapshots, or null.
- * High-value only — a notification must tell the user WHY to open Populr, so generic
- * "analysis completed" noise is never sent, and neither are tiny/noisy movements.
- * Priority: query rank gains (most concrete) → CTR → clicks → impressions.
- */
+// The sentence itself now lives in lib/results/headline.ts, because it was computed here,
+// sent as a push notification, and thrown away for every customer with notifications off —
+// which is most of them. Same thresholds, one implementation, two consumers.
 function bestOutcomeNote(prev: SnapshotMetrics, cur: SnapshotMetrics, site: string): string | null {
-  // 1. A meaningful query climbed the rankings.
-  const prevQ = new Map((prev.topQueries || []).map((q) => [q.query, q]));
-  let bestGain: { query: string; gain: number } | null = null;
-  for (const q of cur.topQueries || []) {
-    const p = prevQ.get(q.query);
-    if (!p || q.impressions < 20) continue;
-    const gain = Math.round(p.position - q.position);
-    if (gain >= 2 && (!bestGain || gain > bestGain.gain)) bestGain = { query: q.query, gain };
-  }
-  if (bestGain) return `"${bestGain.query}" moved up ${bestGain.gain} positions on Google.`;
-
-  const pct = (b: number, a: number) => (b > 0 ? (a - b) / b : 0);
-  // 2. CTR jumped.
-  const ctrPct = pct(prev.ctr, cur.ctr);
-  if (ctrPct >= 0.1 && cur.impressions >= 100) return `Your CTR increased ${Math.round(ctrPct * 100)}% this week on ${displaySite(site)}.`;
-  // 3. Clicks jumped.
-  const clicksPct = pct(prev.clicks, cur.clicks);
-  if (clicksPct >= 0.15 && cur.clicks >= 10) return `Search clicks up ${Math.round(clicksPct * 100)}% this week (${prev.clicks} → ${cur.clicks}).`;
-  // 4. Visibility jumped.
-  const imprPct = pct(prev.impressions, cur.impressions);
-  if (imprPct >= 0.25 && cur.impressions >= 200) return `${displaySite(site)} was seen ${Math.round(imprPct * 100)}% more in Google this week.`;
-  return null;
+  return bestResult(prev, cur, site, Date.now())?.text ?? null;
 }
 
 async function captureSite(token: string, site: string): Promise<SnapshotMetrics | null> {

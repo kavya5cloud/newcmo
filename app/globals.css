@@ -3696,3 +3696,14 @@ html{scroll-padding-top:var(--eab-h,0px)}
 .msg-do-go:disabled{opacity:.6}
 /* Once taken, the offer becomes a record of what happened rather than disappearing. */
 .msg-done{font-size:12px;color:var(--acc)}
+
+/* The measured result, directly under the status line. Accent-led because it is the one
+   line on the dashboard that answers "did this work" — everything else on the screen is
+   activity, and activity is not why anyone renews. */
+.home-result{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:14px 0 0;
+  font-size:14.5px;line-height:1.5;color:var(--fg)}
+.home-result-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 14%,transparent)}
+.home-result-more{font-size:12.5px;color:var(--faint);text-decoration:none;
+  border-bottom:1px solid var(--line);padding-bottom:1px}
+.home-result-more:hover{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}

@@ -4,6 +4,7 @@ import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { automationRepo } from "@/lib/automation/shared";
 import { createAutomations, materialize } from "@/lib/automation/engine";
+import { latestResult } from "@/lib/results/headline";
 import { assistantStore } from "@/lib/assistant/shared";
 import { buildStatus } from "@/lib/assistant/status";
 import { planFor } from "@/lib/assistant/plan";
@@ -50,6 +51,17 @@ export async function GET(req: NextRequest) {
   const saved = await assistantStore().get(tenant);
   const queue = await automationRepo().listQueue(tenant).catch(() => []);
 
+  // What moved, alongside what is planned.
+  //
+  // The hero already answers "is it running". It has never answered "did it work", which is
+  // the question that decides whether anyone renews — and the measurement existed the whole
+  // time, computed weekly and delivered only as a push notification.
+  //
+  // Null is the common case and stays null: no Search Console, one snapshot, or a flat week
+  // all mean there is nothing measured to report, and the hero says nothing rather than
+  // reporting a zero.
+  const result = await latestResult(tenant).catch(() => null);
+
   const status = buildStatus(queue, {
     configured: !!saved,
     paused: saved?.paused ?? false,
@@ -59,6 +71,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     status,
+    result,
     setup: saved ? { cadence: saved.cadence, platforms: saved.platforms, control: saved.control, goal: saved.goal } : null,
     advanced: saved?.advanced ?? ADVANCED_DEFAULTS,
   });

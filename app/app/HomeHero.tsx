@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { workspaceId } from "@/lib/store";
 import { describeWhen } from "@/lib/assistant/status";
 import type { AssistantStatus } from "@/lib/assistant/types";
+import type { Result } from "@/lib/results/headline";
 import Icon from "@/app/components/Icon";
 
 // What you see when you open Populr.
@@ -36,6 +37,7 @@ const DISMISS_KEY = "populr:hero:dismissed";
 
 export default function HomeHero({ company }: { company?: string }) {
   const [status, setStatus] = useState<AssistantStatus | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
 
   // Dismissible, because "your marketing is running · 14 posts this week · next post 2:30pm"
   // is reassuring the first time and furniture the twentieth. Someone who already knows it is
@@ -57,7 +59,7 @@ export default function HomeHero({ company }: { company?: string }) {
   useEffect(() => {
     fetch(`/api/assistant?wsid=${encodeURIComponent(workspaceId())}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { if (d?.ok) setStatus(d.status); })
+      .then((d) => { if (d?.ok) { setStatus(d.status); setResult(d.result ?? null); } })
       .catch(() => {});   // the hero degrades to the greeting; it is never the reason a page fails
   }, []);
 
@@ -77,6 +79,19 @@ export default function HomeHero({ company }: { company?: string }) {
             ? "Your marketing is paused."
             : "Your marketing is running."}
       </h1>
+
+      {/* What moved, before what is queued.
+          Activity is the easier thing to show and the less valuable thing to read: a founder
+          renews because something changed, not because a queue is full. This sits directly
+          under the status line so it is the second thing on the page, and it is absent
+          entirely when nothing has been measured — no zero, no "no change yet", nothing. */}
+      {result && (
+        <p className="home-result">
+          <span className="home-result-dot" aria-hidden="true" />
+          {result.text}
+          <a className="home-result-more" href="/worked">what worked →</a>
+        </p>
+      )}
 
       {configured && !status!.paused && !dismissed && (
         <ul className="home-facts">
