@@ -107,3 +107,28 @@ jobs:
             # non-200 fails the run and shows up in the Actions tab.
             *)   echo "::error::Publish pass failed with status ${status}."; exit 1 ;;
           esac
+
+      # The nine agents, once a day.
+      #
+      # Called on the same ten-minute beat rather than given its own schedule. The endpoint
+      # decides whether a workspace is due, so calling it often is free and a missed window
+      # is picked up on the next tick — where a daily cron entry would fire at one fixed hour
+      # and silently skip the day if that one call failed.
+      - name: Run the agent team for anyone due
+        if: env.CRON_SECRET != ''
+        # Deliberately does not fail the job. Publishing is the thing customers are waiting
+        # on; a failed agent sweep is worth seeing in the log without turning the run red and
+        # training everyone to ignore it — the mistake this workflow already made once.
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          status=$(curl -sS -o /tmp/agents.json -w '%{http_code}' \
+            --max-time 90 --retry 1 --retry-delay 5 --retry-connrefused \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${SITE_URL}/api/cron/agent-pass")
+          echo "status: ${status}"
+          cat /tmp/agents.json || true
+          echo
+          if [ "${status}" != "200" ]; then
+            echo "::warning::Agent pass returned ${status}."
+          fi
