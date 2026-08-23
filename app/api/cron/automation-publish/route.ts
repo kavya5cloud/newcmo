@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { socialEngine } from "@/lib/social/shared";
 import { automationRepo } from "@/lib/automation/shared";
-import { extend, retryFailed, runDue, type PublishPort } from "@/lib/automation/runner";
+import { extend, reclaimStalled, retryFailed, runDue, type PublishPort } from "@/lib/automation/runner";
 import { resolveContent, type ResolvedContent } from "@/lib/automation/sources";
 import { angleKeyFor, formKeyFor, topicForSlot } from "@/lib/automation/topic";
 import { assistantStore } from "@/lib/assistant/shared";
@@ -75,7 +75,17 @@ export async function GET(req: NextRequest) {
     // Whether a tenant is entitled to anything at all is still decided — by accessFor, which
     // owns the trial, the grace period after a failed payment, and the period a cancelled
     // customer already paid for. That is the only question with a real answer.
+    // One deadline for the whole request, not one per tenant.
+    //
+    // A per-tenant budget still overruns: ten tenants with forty seconds each is four
+    // hundred, inside a sixty-second function. The remaining time is what each tenant gets,
+    // and when it is gone the loop stops and reports how far it reached. Nothing is lost —
+    // unstarted slots stay `upcoming` and the next pass is ten minutes away.
+    const deadline = now + 45_000;
+    let skippedTenants = 0;
+
     for (const tenant of await repo.activeTenants()) {
+      if (Date.now() > deadline) { skippedTenants++; continue; }
       const automations = await repo.listAutomations(tenant);
       let queue = await repo.listQueue(tenant);
 
@@ -104,6 +114,15 @@ export async function GET(req: NextRequest) {
         .map((d) => d.content.text)
         .filter(Boolean);
 
+      // Reclaim before retrying: a slot stranded in `publishing` by a killed run is not
+      // `failed` yet, so retryFailed cannot see it. Without this, every timeout silently
+      // retired whatever was in flight — the loud 504 was the smaller half of that bug.
+      const stalled = reclaimStalled(queue, { now });
+      queue = stalled.queue;
+      if (stalled.reclaimed.length) {
+        console.warn(JSON.stringify({ event: "publish_reclaimed", tenant, slots: stalled.reclaimed.length }));
+      }
+
       // Retries first: a slot whose backoff has elapsed rejoins this same run.
       const retry = retryFailed(queue, { now });
       queue = retry.queue;
@@ -117,6 +136,9 @@ export async function GET(req: NextRequest) {
 
       const run = await runDue(queue, tenant, {
         now, engine,
+        // Whatever is left of the request, so a slow first tenant cannot starve the rest by
+        // being killed rather than yielding.
+        budgetMs: Math.max(0, deadline - Date.now()),
         scheduledTexts,
         onOptimized: (slotId, result) => {
           scheduledTexts.push(result.optimization.optimized.text);
@@ -213,7 +235,13 @@ export async function GET(req: NextRequest) {
     // looking healthy through a pass that threw halfway.
     await recordHeartbeat({ at: now, dispatched, tenants: report.length });
 
-    return NextResponse.json({ ok: true, at: now, tenants: report.length, dispatched, report });
+    // `skipped` is reported rather than swallowed: a pass that ran out of time looks
+    // identical to a quiet one in the response body, and the workflow's own comment already
+    // warns that a green run does not mean anything published.
+    if (skippedTenants) {
+      console.warn(JSON.stringify({ event: "publish_budget_exhausted", skippedTenants, dispatched }));
+    }
+    return NextResponse.json({ ok: true, at: now, tenants: report.length, dispatched, skippedTenants, report });
   } catch (e) {
     return NextResponse.json({ error: "cron_failed", detail: String(e).slice(0, 200) }, { status: 503 });
   }

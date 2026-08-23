@@ -140,7 +140,11 @@ export function setState(queue: QueueItem[], id: string, next: QueueState, note?
     return { queue, ok: false, error: `A ${item.state.replace(/_/g, " ")} item cannot become ${next.replace(/_/g, " ")}.` };
   }
   return {
-    queue: queue.map((q) => (q.id === id ? { ...q, state: next, note: note ?? q.note } : q)),
+    queue: queue.map((q) => (q.id === id
+      // Stamped on the way into `publishing` and cleared on the way out, so the timestamp
+      // always describes the claim currently held rather than the last one ever taken.
+      ? { ...q, state: next, note: note ?? q.note, claimedAt: next === "publishing" ? Date.now() : null }
+      : q)),
     ok: true,
   };
 }

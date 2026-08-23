@@ -113,6 +113,8 @@ export type RunOptions = {
   content: ContentPort;
   /** Cap per run so one tenant with a huge backlog can't monopolise a cron minute. */
   max?: number;
+  /** Wall-clock ceiling for starting new slots. Defaults to 40s, under a 60s function. */
+  budgetMs?: number;
   /** Brand/market context handed to the optimiser. Assembled by the caller. */
   contextPrompt?: string;
   /** Already-scheduled text, so the pipeline can catch a duplicate before it posts. */
@@ -145,7 +147,21 @@ export async function runDue(
 
   const accounts = await opts.engine.listAccounts(tenant).catch(() => [] as ConnectedAccount[]);
 
+  // Stop before the platform stops us.
+  //
+  // Every slot whose content is not already drafted costs a model call, and this loop is
+  // sequential. Twenty-five of those do not fit in a sixty-second function, so the run was
+  // being killed part-way — which is how slots ended up stranded in `publishing`. Returning
+  // early is strictly better than being terminated: the queue is saved, nothing is claimed
+  // and abandoned, and the next pass is ten minutes away.
+  const startedAt = Date.now();
+  const budgetMs = opts.budgetMs ?? 40_000;
+
   for (const slot of ready) {
+    // >= rather than >, so a caller with no time left does no work at all. With `>` a zero
+    // budget still claimed and processed one slot, which is the opposite of what asking for
+    // zero means.
+    if (Date.now() - startedAt >= budgetMs) break;
     // Claim first. If this fails, another run already took it — skip without comment.
     const claim = setState(working, slot.id, "publishing");
     if (!claim.ok) continue;
@@ -248,6 +264,46 @@ export async function runDue(
  * more than `maxAttempts` times, because a queue that retries forever is a queue nobody
  * reads.
  */
+/**
+ * How long a claim may be held before it is assumed dead.
+ *
+ * The publish pass runs every ten minutes with a sixty-second ceiling, so nothing legitimate
+ * holds a claim for five. Anything older belongs to a run that no longer exists.
+ */
+export const STALE_CLAIM_MS = 5 * 60_000;
+
+/**
+ * Return slots stranded mid-publish to the retry path.
+ *
+ * A slot is claimed as `publishing` before generation and sending. If the function is killed
+ * — a platform timeout, a deploy landing mid-run — nothing ever moves it again: `publishing`
+ * only transitions to `published` or `failed`, and both of those are written by the run that
+ * died. retryFailed looks exclusively at `failed`, so these were invisible to it.
+ *
+ * Reclaimed as `failed` rather than straight to `upcoming` on purpose: the attempt genuinely
+ * did fail, and routing through `failed` reuses the existing backoff and the attempt cap
+ * instead of giving stalls their own parallel recovery that drifts out of step with it.
+ */
+export function reclaimStalled(
+  queue: QueueItem[],
+  opts: { now: number; staleMs?: number },
+): { queue: QueueItem[]; reclaimed: string[] } {
+  const stale = opts.staleMs ?? STALE_CLAIM_MS;
+  const reclaimed: string[] = [];
+  const next = queue.map((slot) => {
+    if (slot.state !== "publishing") return slot;
+    // A claim with no timestamp predates this field. Treated as stale rather than immortal:
+    // leaving it stuck forever is the bug, and one extra retry attempt is the cost of
+    // guessing wrong.
+    const claimed = slot.claimedAt ?? 0;
+    if (opts.now - claimed < stale) return slot;
+    reclaimed.push(slot.id);
+    const attempts = Number(/attempt (\d+)/.exec(slot.note ?? "")?.[1] ?? 0);
+    return { ...slot, state: "failed" as const, claimedAt: null, note: `attempt ${attempts} — publish did not finish` };
+  });
+  return { queue: next, reclaimed };
+}
+
 export function retryFailed(
   queue: QueueItem[],
   opts: { now: number; maxAttempts?: number },

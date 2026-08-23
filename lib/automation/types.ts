@@ -83,6 +83,18 @@ export type QueueItem = {
   /** Manual ordering within the same due time; lower runs first. */
   order: number;
   note: string | null;
+  /**
+   * When this slot was claimed for publishing.
+   *
+   * Exists so a claim can expire. The publish pass sets a slot to `publishing` before it
+   * generates and sends, and if the function is killed — a platform timeout, a deploy mid-run
+   * — the slot stays `publishing` forever: nothing transitions out of it except the run that
+   * died, and retryFailed only looks at `failed`. Every timeout stranded whatever was in
+   * flight, silently and permanently.
+   *
+   * Null in every other state.
+   */
+  claimedAt?: number | null;
 };
 
 export type AutomationSummary = {
