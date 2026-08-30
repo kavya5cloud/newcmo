@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     version="1.2"
+     baseProfile="tiny-ps"
+     viewBox="0 0 1000 1000"
+     width="1000"
+     height="1000">
+  <title>Populr.</title>
+  <desc>Populr. brand mark — white paper-plane symbol on a black background.</desc>
+  <rect width="1000" height="1000" fill="#000000"/>
+  <polygon points="810.6,207.1 786.7,207.1 188.3,347.5 180.0,355.9 180.0,374.6 191.4,385.0 490.1,467.2 495.3,779.4 505.7,791.9 522.4,792.9 532.8,784.6 820.0,233.1 820.0,217.5" fill="#ffffff"/>
+</svg>
