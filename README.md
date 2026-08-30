@@ -15,21 +15,6 @@ npm run dev
 - `/` — marketing landing page
 - `/app` — the product: onboarding → dashboard (Company · Analytics · Agents Feed · AI CMO chat)
 
-## Configuration (`.env.local`)
-
-| Var | What it does |
-|-----|--------------|
-| `GROQ_API_KEY` | Free AI provider (default). Get one at console.groq.com |
-| `GEMINI_API_KEY` | Optional Gemini fallback provider |
-| `OPENAI_API_KEY` | Optional fallback provider |
-| `GROQ_MODEL` / `GEMINI_MODEL` / `OPENAI_MODEL` | Override the model |
-| `DATABASE_URL` | Optional Neon Postgres connection string for cloud persistence |
-
-The app degrades gracefully:
-- **No AI key** → dashboard runs on demo data (a banner explains why).
-- **No `DATABASE_URL`** → state persists to the browser's localStorage (survives refresh). Add a Neon URL to sync to the cloud; the topbar shows `local` vs `cloud ✓`.
-
-> ⚠️ Never commit secrets. `.env.local`, `groq_key.txt`, and `openai_key.txt` are gitignored.
 
 ## Architecture
 
