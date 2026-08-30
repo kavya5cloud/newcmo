@@ -1,4 +1,4 @@
-# Pop
+# Populr
 
 An AI CMO for teams that ship — it runs your marketing, skips the busywork, and only surfaces what actually moves your numbers.
 
