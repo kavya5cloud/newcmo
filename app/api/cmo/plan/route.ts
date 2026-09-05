@@ -5,7 +5,9 @@ import { rateLimit, requestKey } from "@/lib/throttle";
 import { workspaceKey } from "@/lib/intel";
 import { assembleCmoContext, type CmoProfile } from "@/lib/services/cmo-context";
 import { buildEvidencePack, classifyRequest } from "@/lib/cmo/pipeline";
-import { planDecision } from "@/lib/cmo/planner";
+import { planDecision, generateCandidates } from "@/lib/cmo/planner";
+import { refusalsFromPlan } from "@/lib/refusals/from-plan";
+import { refusalRepo } from "@/lib/refusals/store";
 import type { CmoRequest } from "@/lib/cmo/contracts";
 
 export const runtime = "nodejs";
@@ -32,6 +34,18 @@ export async function POST(req: NextRequest) {
     const evidence = buildEvidencePack(ctx);
     const routed = classifyRequest({ ...body, question });
     const plan = planDecision(ctx, evidence, routed, question);
+
+    // Record what the planner declined. Same ctx that produced the plan, fully
+    // deterministic — no LLM involved. Failures here must not break the plan response.
+    try {
+      const candidates = generateCandidates(ctx);
+      const refusals = refusalsFromPlan(candidates, workspace, Date.now());
+      for (const r of refusals) {
+        await refusalRepo().record(r);
+      }
+    } catch (e) {
+      console.info(JSON.stringify({ event: "cmo_refusal_record_error", workspace, detail: String(e).slice(0, 200) }));
+    }
     console.info(JSON.stringify({
       event: "cmo_plan_api", workspace, intent: routed.intent, planId: plan.decisionId,
       recommended: plan.recommendedStrategy?.channel, candidates: plan.alternativeStrategies.length + 1,
